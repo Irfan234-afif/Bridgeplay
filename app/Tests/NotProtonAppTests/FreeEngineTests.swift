@@ -18,7 +18,7 @@ struct FreeEngineTests {
         let build = try #require(SupportedRunners.build(id: FreeEngine.current.build))
         #expect(build.isFree)
         #expect(!NtdllPatcher.patches(for: build).isEmpty)
-        #expect(SupportedRunners.all.filter(\.isFree).map(\.id) == [FreeEngine.current.build])
+        #expect(SupportedRunners.all.filter(\.isFree).map(\.id).contains(FreeEngine.current.build))
     }
 
     @Test("A CrossOver-shaped tree whose loader is not a free build still needs a license")
