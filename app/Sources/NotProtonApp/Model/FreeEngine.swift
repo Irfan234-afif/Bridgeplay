@@ -202,10 +202,15 @@ enum FreeEngine {
     // Upstream Wine hides the macdrv functions DXMT looks up, so without this DXMT can
     // create a device but no swapchain, and games abort on their first window.
     static func installMacDriver(root: URL, release: FreeEngineRelease) throws {
-        guard let source = Bundle.module.url(forResource: "winemac-\(release.build)", withExtension: "so"),
-              Digest.sha256IfPresent(source) == release.macDriver
+        try installMacDriver(root: root, build: release.build, sha256: release.macDriver, step: step)
+    }
+
+    // Puts the bundled winemac-<build>.so, checked against its pin, over the engine's own.
+    static func installMacDriver(root: URL, build: String, sha256: String, step: String) throws {
+        guard let source = Bundle.module.url(forResource: "winemac-\(build)", withExtension: "so"),
+              Digest.sha256IfPresent(source) == sha256
         else {
-            throw StepFailure(step: step, detail: "NotProton is missing its winemac.so for \(release.build).")
+            throw StepFailure(step: step, detail: "NotProton is missing its winemac.so for \(build).")
         }
         let destination = root.appending(path: macDriverPath)
         try? FileManager.default.removeItem(at: destination)

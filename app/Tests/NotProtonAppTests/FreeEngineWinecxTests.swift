@@ -79,11 +79,37 @@ struct FreeEngineWinecxTests {
             #expect(table["lib/wine/\(arch)/winemetal.dll"] == FreeEngine.dxmt.files["\(arch)/winemetal.dll"])
         }
         #expect(table["lib/wine/x86_64-unix/winemetal.so"] == FreeEngine.dxmt.files["x86_64-unix/winemetal.so"])
+        #expect(table[FreeEngine.macDriverPath] == FreeEngineWinecx.current.macDriver)
         #expect(Set(FreeEngineWinecx.current.d3dStock.keys) == Set(WinecxD3DMetal.forwarders))
         #expect(FreeEngineWinecx.msyncMarker(in: URL(filePath: "/r")).path(percentEncoded: false)
             == "/r/.notproton-msync")
         #expect(WinecxD3DMetal.enabledMarker(in: URL(filePath: "/r")).path(percentEncoded: false)
             == "/r/lib/notproton-backends/d3dmetal.enabled")
+    }
+
+    // winemac-patch/winecx-d3dmetal-retina.patch: an engine with winecx's own winemac.so is
+    // outdated, and the copy NotProton installs is the one it pins.
+    @Test("The patched winemac.so ships with the app and replaces winecx's own")
+    func patchedMacDriver() throws {
+        let release = FreeEngineWinecx.current
+        let bundled = try #require(Bundle.module.url(forResource: "winemac-\(release.build)", withExtension: "so"))
+        #expect(Digest.sha256IfPresent(bundled) == release.macDriver)
+
+        let root = try makeDirectory("macdriver")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let driver = root.appending(path: FreeEngine.macDriverPath)
+        try FileManager.default.createDirectory(at: driver.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try Data("winecx's own winemac.so".utf8).write(to: driver)
+        #expect(FreeEngineWinecx.layoutProblems(root: root).contains(FreeEngine.macDriverPath))
+
+        try FreeEngine.installMacDriver(root: root, build: release.build, sha256: release.macDriver,
+                                        step: FreeEngineWinecx.step)
+        #expect(Digest.sha256IfPresent(driver) == release.macDriver)
+        #expect(!FreeEngineWinecx.layoutProblems(root: root).contains(FreeEngine.macDriverPath))
+        #expect(throws: StepFailure.self) {
+            try FreeEngine.installMacDriver(root: root, build: release.build, sha256: String(repeating: "0", count: 64),
+                                            step: FreeEngineWinecx.step)
+        }
     }
 
     @Test("Each free engine is current, outdated or missing on its own pins")

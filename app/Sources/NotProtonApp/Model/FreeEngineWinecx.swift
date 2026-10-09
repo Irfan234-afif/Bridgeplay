@@ -34,6 +34,10 @@ struct WinecxRelease: Sendable {
     // lib/wine/x86_64-windows/<name> -> sha256 of Wine's own copy, for the four DLLs a linked
     // Game Porting Toolkit replaces (WinecxD3DMetal.forwarders).
     let d3dStock: [String: String]
+    // sha256 of the winemac.so NotProton ships for this build: winecx's own with
+    // winemac-patch/winecx-d3dmetal-retina.patch, so D3DMetal sizes a Retina-mode
+    // swapchain in Win32 pixels rather than points.
+    let macDriver: String
 }
 
 enum FreeEngineWinecx {
@@ -68,14 +72,15 @@ enum FreeEngineWinecx {
                               sha256: "f79d417f675d00008375eb4ea2318af6fcd0b27971d604d3cf345a0dcfa998a0"),
         ],
         // winecx's winemac.so already exports the macdrv_functions DXMT reads, and that
-        // table is unchanged between 0.80 and master, so no winemac-patch is needed.
+        // table is unchanged between 0.80 and master, so DXMT needs no winemac-patch.
         renderer: FreeEngine.dxmt,
         d3dStock: [
             "d3d10.dll": "bcbd3fb8a59a5992bd3035babc5c046327f19cdc0669ce9e7c438c3ce3a9546d",
             "d3d11.dll": "84f5a337fdd7405bbbee5f0542427842a22aff749a3d061ba6334f10cf01dee4",
             "d3d12.dll": "c6e285308bb3241efca3d94da4746b16a526a9fb5113f61922e7bd86694bebf9",
             "dxgi.dll": "f1f24da777c65a583b29f74475c6a9464da35068d75def6cee806268def9ecbb",
-        ]
+        ],
+        macDriver: "c611031855e596b2aeb2d2ea2c2ddef8cb843376d85ccf8bbe10c4fc727a527e"
     )
 
     // Appended to SupportedRunners.all. The hash-pinned loader is what makes it free, so a
@@ -169,7 +174,7 @@ enum FreeEngineWinecx {
     // four Direct3D DLLs D3DMetal can replace are not in here: WinecxD3DMetal.layoutProblems
     // checks them, since they are either Wine's own or links into a Game Porting Toolkit.
     static func expectedFiles(_ release: WinecxRelease = current) -> [String: String] {
-        var table: [String: String] = [:]
+        var table: [String: String] = [FreeEngine.macDriverPath: release.macDriver]
         for file in release.backends { table["\(backendsPath)/\(file.destination)"] = file.sha256 }
         for path in release.renderer.files.keys {
             table[release.renderer.installPath(of: path)] = release.renderer.installedHash(of: path)
@@ -257,6 +262,7 @@ enum FreeEngineWinecx {
         let root = SupportPaths.crossOverRoot(inBundle: shaped)
         try fm.createDirectory(at: root.deletingLastPathComponent(), withIntermediateDirectories: true)
         try fm.moveItem(at: wine, to: root)
+        try FreeEngine.installMacDriver(root: root, build: release.build, sha256: release.macDriver, step: step)
 
         let libraries = wine.deletingLastPathComponent()
         for file in release.backends {

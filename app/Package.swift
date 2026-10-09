@@ -43,6 +43,7 @@ let package = Package(
                 .copy("Resources/winemac-winehq-11.15.so"),
                 .copy("Resources/detour2-winecx-11.15.bin"),
                 .copy("Resources/detour32-winecx-11.15.bin"),
+                .copy("Resources/winemac-winecx-11.15.so"),
             ],
             swiftSettings: [.swiftLanguageMode(.v6)]
         ),

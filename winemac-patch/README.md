@@ -17,3 +17,38 @@ To rebuild `app/Sources/NotProtonApp/Resources/winemac-winehq-11.15.so`:
     codesign -fs - dlls/winemac.drv/winemac.so
 
 Then update `macDriver` in `FreeEngine.swift` with its sha256.
+
+## WineCX: `winecx-d3dmetal-retina.patch`
+
+D3DMetal (libd3dshared's `WineSwapchainCallbacks::InitializeForHWND`) sizes a window's
+backbuffer, and through it the `CAMetalLayer` drawable, from `-frame` of the view
+`macdrv_view_create_metal_view` returns. A frame is in points, while D3D sizes are Win32
+pixels, which are backing pixels in Retina mode, so a 1512x876-point window got a
+1512x876 drawable for a 3024x1752 game and showed only its top-left quarter. The patch
+hands D3DMetal a proxy view whose `-frame` is in Win32 pixels (`cgrect_win_from_mac`) and
+forwards everything else; DXMT never asks for `frame`.
+
+To rebuild `app/Sources/NotProtonApp/Resources/winemac-winecx-11.15.so` from winecx
+`5b45f45` (runtime 4.5.125), natively, with the CI's flags:
+
+    git -C winecx apply ../winemac-patch/winecx-d3dmetal-retina.patch
+    mkdir build && cd build
+    PATH="$(brew --prefix bison)/bin:$PATH" MACOSX_DEPLOYMENT_TARGET=26.0 ac_cv_func_pipe2=no \
+      ../winecx/configure --host=x86_64-apple-darwin24 --enable-archs=x86_64 --disable-tests \
+      --without-x --without-wayland --without-oss --without-alsa --without-pulse --without-sane \
+      --without-usb --without-v4l2 --without-pcap --without-capi --without-opencl --without-cups \
+      --without-freetype --without-gstreamer --without-ffmpeg \
+      CC="/usr/bin/clang -arch x86_64" CXX="/usr/bin/clang++ -arch x86_64" \
+      CFLAGS="-O2 -Wno-error=implicit-function-declaration"
+    make dlls/winemac.drv/<each object of winemac.so>   # the .o list of its Makefile rule
+    # link as the Makefile rule does, against the runtime's own ntdll.so and win32u.so
+    clang -arch x86_64 -dynamiclib -install_name @rpath/winemac.so -Wl,-rpath,@loader_path/ \
+      -o winemac.so dlls/winemac.drv/*.o <runtime>/ntdll.so <runtime>/win32u.so \
+      -framework AppKit -framework Carbon -framework CoreVideo -framework Foundation \
+      -framework IOKit -framework Metal -framework OpenGL -framework QuartzCore -framework Security
+    codesign -fs - winemac.so
+
+Built this way without the patch, the result matches the runtime's `winemac.so` in every
+section (`__text`, `__cstring`, `__const`, `__data`, objc) and in its 2147 symbols; only
+`__LINKEDIT` and the SDK's framework versions differ. Then update `macDriver` in
+`FreeEngineWinecx.swift` with the sha256.
