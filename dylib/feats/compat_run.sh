@@ -193,6 +193,8 @@ gamefix_reason() {
       # Space-separated arguments, each of A-Za-z0-9_+./:=,- only, so none can glob or quote.
       case "$2" in *[!A-Za-z0-9_+./:=,\ -]*) echo "an argument with characters outside A-Za-z0-9_+./:=,-" ;; esac ;;
     MTL_HUD_ENABLED|WINEDEBUG|WINE_LARGE_ADDRESS_AWARE|WINE_CPU_TOPOLOGY) ;;
+    ROSETTA_ADVERTISE_AVX)
+      case "$2" in 0|1) ;; *) echo "not 0 or 1" ;; esac ;;
     DXMT_?*|DXVK_?*|MVK_?*|VKD3D_?*|D3DM_?*|STAGING_?*) ;;
     *) echo "not on the allow-list" ;;
   esac

@@ -21,6 +21,7 @@ logged, when:
 | Key | Values | Effect |
 | --- | --- | --- |
 | `BACKEND` | `dxmt`, `dxvk`, `wined3d`, `d3dmetal` | Graphics backend, see below |
+| `ROSETTA_ADVERTISE_AVX` | `1` makes Rosetta report AVX/AVX2 to the game (needed by AVX-only titles) |
 | `ARGS` | space-separated arguments of `A-Za-z0-9_+./:=,-` | Added to the game's command line after the launch options' own arguments. Ignored for installers and other helpers |
 | `DLLOVERRIDES` | Wine syntax, e.g. `dinput8=n,b;xinput1_3=n` | Added to `WINEDLLOVERRIDES` after the backend's entries and before the launch options' |
 | `MSYNC` | `0`, `1` | `1` turns msync on when the engine supports it; `0` turns it off |
