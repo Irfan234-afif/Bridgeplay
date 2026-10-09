@@ -1,0 +1,85 @@
+name: Game report
+description: Report how a Windows game runs under NotProton (WineHQ engine)
+title: "[Game] <name> (<appid>)"
+labels: ["game-report"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Run `scripts/np-test-game.sh <appid> --stop` first; it writes logs and `result.json` to `compat/runs/<appid>-<timestamp>/`. Attach that folder (zipped) below.
+  - type: input
+    id: name
+    attributes:
+      label: Game name
+    validations:
+      required: true
+  - type: input
+    id: appid
+    attributes:
+      label: Steam AppID
+      description: The number in the store URL.
+      placeholder: "1966720"
+    validations:
+      required: true
+  - type: dropdown
+    id: api
+    attributes:
+      label: Graphics API of the game
+      description: PCGamingWiki lists it; choose Unknown if unsure.
+      options: [Unknown, D3D9, D3D10, D3D11, D3D12, Vulkan, OpenGL, "D3D11 + D3D12"]
+    validations:
+      required: true
+  - type: input
+    id: anticheat
+    attributes:
+      label: Anti-cheat
+      description: Easy Anti-Cheat, BattlEye, Vanguard, VAC, none, etc.
+      placeholder: none
+  - type: dropdown
+    id: status
+    attributes:
+      label: Status
+      options:
+        - platinum (perfect out of the box)
+        - gold (perfect after tweaks)
+        - silver (playable with minor issues)
+        - bronze (runs, major issues)
+        - borked (does not run)
+    validations:
+      required: true
+  - type: dropdown
+    id: backend
+    attributes:
+      label: Backend used
+      options: [dxmt, dxvk, wined3d, d3dmetal, default (no gamefix)]
+    validations:
+      required: true
+  - type: input
+    id: engine
+    attributes:
+      label: Engine
+      placeholder: WineHQ 11.15
+    validations:
+      required: true
+  - type: input
+    id: fork_commit
+    attributes:
+      label: Fork commit
+      description: Output of `git rev-parse --short HEAD` in your NotProton-WineHQ checkout.
+    validations:
+      required: true
+  - type: input
+    id: hardware
+    attributes:
+      label: Mac model and macOS version
+      placeholder: MacBook Pro M3 Pro, macOS 26.0
+  - type: textarea
+    id: notes
+    attributes:
+      label: Notes
+      description: What works, what breaks (black screen, crash on load, missing audio, input), settings or gamefix keys used.
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs
+      description: Drag and drop the zipped `compat/runs/<appid>-<timestamp>/` folder here, or paste `result.json`.

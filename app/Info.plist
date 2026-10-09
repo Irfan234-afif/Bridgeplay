@@ -31,7 +31,7 @@
 	<key>NSPrincipalClass</key>
 	<string>NSApplication</string>
 	<key>SUFeedURL</key>
-	<string>https://github.com/leonseemann/NotProton-WineHQ/releases/latest/download/appcast.xml</string>
+	<string>https://github.com/raymondchins/NotProton-WineHQ/releases/latest/download/appcast.xml</string>
 	<key>SUPublicEDKey</key>
 	<string>Nuv7Ma5pfYsZ7umT8wTZdqE1QbVzeymu9jjUd2D7bb0=</string>
 </dict>
