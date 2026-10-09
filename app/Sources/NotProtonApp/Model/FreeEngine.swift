@@ -15,6 +15,10 @@ struct FreeEngineRelease: Sendable {
     // sha256 of the winemac.so NotProton ships for this build (winemac-patch/), which
     // exports the macdrv entry points DXMT needs to put Metal into a window.
     let macDriver: String
+    // arch/file -> sha256 of Wine's own file, which stays in lib/wine untouched.
+    let stock: [String: String]
+    // DXVK-macOS, staged beside DXMT for games that do better on it.
+    let dxvk: BackendRelease
 }
 
 // DXMT replaces Wine's own D3D10/11 and DXGI. Wine's wined3d goes through macOS
@@ -27,7 +31,25 @@ struct RendererRelease: Sendable {
     let sha256: String
     let bases: [URL]
     let tree: String
-    // arch/file -> sha256 of the file the engine should end up carrying under lib/wine.
+    // Path inside the archive tree -> sha256. The winemetal pair goes into lib/wine,
+    // where the unix half and its PE stub are found by the loader; the D3D DLLs go to
+    // FreeEngine.dxmtDirectory, so lib/wine keeps Wine's own.
+    let files: [String: String]
+
+    func installPath(of path: String) -> String {
+        path.hasSuffix("/winemetal.dll") || path.hasSuffix("/winemetal.so")
+            ? "lib/wine/\(path)" : "\(FreeEngine.dxmtDirectory)/\(path)"
+    }
+}
+
+// A set of D3D DLLs the launcher can swap in per game. Nothing here is loaded by default.
+struct BackendRelease: Sendable {
+    let name: String
+    let archive: String
+    let sha256: String
+    let bases: [URL]
+    let tree: String
+    // Path inside the archive tree -> sha256, installed at FreeEngine.dxvkDirectory/<path>.
     let files: [String: String]
 }
 
@@ -64,10 +86,41 @@ enum FreeEngine {
                 "i386-windows/winemetal.dll": "20a6865facebdaac92b6c06fadf37d2efb5a242b22ca1c349bb57d7ad43df8e3",
             ]
         ),
-        macDriver: "68d1c10cb4ec80beb2e97dcb8df5f81768f4f6e62848932d6bee5270dcf54982"
+        macDriver: "68d1c10cb4ec80beb2e97dcb8df5f81768f4f6e62848932d6bee5270dcf54982",
+        stock: [
+            "x86_64-windows/d3d10core.dll": "ff08e21a331e4160779ae140b0fd67c25f1557803b0f865467025a55e6133800",
+            "x86_64-windows/d3d11.dll": "66d08df71bdb897b55d6f5d12f44b90846dec362641baab2100c0cdf6615c809",
+            "x86_64-windows/d3d12.dll": "7dfa70d5b9ac50541c81801d8539be4cd31f37079ea1d93a495fe70c93f95d9a",
+            "x86_64-windows/dxgi.dll": "ed8d22612d121415063e54283e7284ae294a07a6b6d83b65dcd91abaadde2e49",
+            "i386-windows/d3d10core.dll": "7f9d10eaf361d7d7ad0a76fcedda037014184df9abe3ef0a65c4966a74bcd98d",
+            "i386-windows/d3d11.dll": "9f7a4f6ed76c75e902b8f27c45ba9a8d7cadb3205d3e4ab16a6f8a29aedfd30e",
+            "i386-windows/d3d12.dll": "501a94c7f2689f996b658ceee101b5b7bd44845dfc53a9336b4ece848ed343e1",
+            "i386-windows/dxgi.dll": "5e7310cc1c80650a467a4022e924d34ec07ce58933383ad06f530a61c82afc9d",
+        ],
+        // Gcenx's repack carries d3d10core and d3d11 only: it drops dxgi and d3d9 as
+        // unwanted on macOS, so DXVK games run on Wine's stock dxgi.
+        dxvk: BackendRelease(
+            name: "DXVK-macOS 1.10.3",
+            archive: "dxvk-macOS-async-v1.10.3-20230507-repack-builtin.tar.gz",
+            sha256: "810b1e5caf8ce975b784fae866a130ad23fa0ea233b0e5609cbc4a45f3ef6f00",
+            bases: [URL(string: "https://github.com/Gcenx/DXVK-macOS/releases/download/v1.10.3-20230507-repack")!],
+            tree: "dxvk-macOS-async-v1.10.3-20230507-repack-builtin",
+            files: [
+                "x86_64-windows/d3d10core.dll": "225562562050d9fae1d4d5d2ca0537020bac268c80dec9aa0633dc0d338a2840",
+                "x86_64-windows/d3d11.dll": "173980cb6c51fdd53dc37b9a17f0de7c5dfdebda18f52059aa7d5a6f1871299c",
+                "i386-windows/d3d10core.dll": "9e0202437af13a6d0acdb992954321f00a641b2eb98897908c41635ffddc1fc8",
+                "i386-windows/d3d11.dll": "2173b081a8660dd70a089dac875a829da6cd1a6230b23fd1daa2a7d7baa1cb03",
+            ]
+        )
     )
 
     static let macDriverPath = "lib/wine/x86_64-unix/winemac.so"
+
+    // Wine keeps its own dxgi, d3d11 and d3d10core in lib/wine. The launcher picks a
+    // backend per game from these, so no game is forced onto one by the engine itself.
+    static let backendsDirectory = "lib/notproton-backends"
+    static let dxmtDirectory = "\(backendsDirectory)/dxmt"
+    static let dxvkDirectory = "\(backendsDirectory)/dxvk"
 
     static var downloads: URL {
         SupportPaths.home.appending(path: "Library/Caches/\(SupportPaths.supportDirName)/engines")
@@ -83,12 +136,35 @@ enum FreeEngine {
         return hasRenderer(root: install.crossOverRoot, release: release)
     }
 
-    // An engine unpacked before this renderer was part of it still runs, but D3D11
-    // games either fail on it or run slowly.
+    // Every file the engine should carry, relative to its root, with its sha256: Wine's
+    // stock D3D DLLs, DXMT's winemetal pair, both backends and the patched winemac.so.
+    static func expectedFiles(_ release: FreeEngineRelease = current) -> [String: String] {
+        var table: [String: String] = [macDriverPath: release.macDriver]
+        for (path, hash) in release.stock { table["lib/wine/\(path)"] = hash }
+        for (path, hash) in release.renderer.files { table[release.renderer.installPath(of: path)] = hash }
+        for (path, hash) in release.dxvk.files { table["\(dxvkDirectory)/\(path)"] = hash }
+        return table
+    }
+
+    // Files that are absent or differ from the pinned hash.
+    static func layoutProblems(root: URL, release: FreeEngineRelease = current) -> [String] {
+        expectedFiles(release).filter { path, hash in
+            Digest.sha256IfPresent(root.appending(path: path)) != hash
+        }.keys.sorted()
+    }
+
+    // An engine unpacked before the backends were split out still runs, but it needs
+    // the new layout before the launcher can choose a renderer per game.
     static func hasRenderer(root: URL, release: FreeEngineRelease = current) -> Bool {
-        release.renderer.files.allSatisfy { path, hash in
-            Digest.sha256IfPresent(root.appending(path: "lib/wine/\(path)")) == hash
-        } && Digest.sha256IfPresent(root.appending(path: macDriverPath)) == release.macDriver
+        layoutProblems(root: root, release: release).isEmpty
+    }
+
+    // The first layout baked DXMT's dxgi, d3d11 and d3d10core over Wine's in lib/wine.
+    static func hasLegacyLayout(root: URL, release: FreeEngineRelease = current) -> Bool {
+        release.renderer.files.contains { path, hash in
+            !path.hasSuffix("winemetal.dll") && !path.hasSuffix("winemetal.so")
+                && Digest.sha256IfPresent(root.appending(path: "lib/wine/\(path)")) == hash
+        }
     }
 
     // Upstream Wine hides the macdrv functions DXMT looks up, so without this DXMT can
@@ -131,12 +207,19 @@ enum FreeEngine {
             into: downloads, step: step, source: "GitHub",
             report: { report(.downloading($0)) }
         )
+        let dxvk = try await PinnedDownload.obtain(
+            file: release.dxvk.archive, sha256: release.dxvk.sha256, bases: release.dxvk.bases,
+            into: downloads, step: step, source: "GitHub",
+            report: { report(.downloading($0)) }
+        )
         report(.unpacking)
-        return try unpack(archive, renderer: renderer, release: release, engines: engines)
+        // The engine is always rebuilt from the pinned archives, so an engine from the
+        // first layout (DXMT over Wine's DLLs) is replaced rather than patched in place.
+        return try unpack(archive, renderer: renderer, dxvk: dxvk, release: release, engines: engines)
     }
 
     static func unpack(
-        _ archive: URL, renderer: URL?, release: FreeEngineRelease, engines: URL
+        _ archive: URL, renderer: URL?, dxvk: URL? = nil, release: FreeEngineRelease, engines: URL
     ) throws -> CrossOverInstall {
         let fm = FileManager.default
         let target = bundle(for: release, engines: engines)
@@ -167,11 +250,21 @@ enum FreeEngine {
                 guard Digest.sha256IfPresent(source) == hash else {
                     throw StepFailure(step: step, detail: "\(release.renderer.archive) has no pinned \(path).")
                 }
-                let destination = root.appending(path: "lib/wine/\(path)")
-                try? fm.removeItem(at: destination)
-                try fm.copyItem(at: source, to: destination)
+                try place(source, at: root.appending(path: release.renderer.installPath(of: path)))
             }
             try installMacDriver(root: root, release: release)
+        }
+
+        if let dxvk {
+            try untar(dxvk, into: extracted)
+            let tree = extracted.appending(path: release.dxvk.tree, directoryHint: .isDirectory)
+            for (path, hash) in release.dxvk.files.sorted(by: { $0.key < $1.key }) {
+                let source = tree.appending(path: path)
+                guard Digest.sha256IfPresent(source) == hash else {
+                    throw StepFailure(step: step, detail: "\(release.dxvk.archive) has no pinned \(path).")
+                }
+                try place(source, at: root.appending(path: "\(dxvkDirectory)/\(path)"))
+            }
         }
 
         // WineHQ already keeps its unix loader beside the unix libraries, where
@@ -200,6 +293,13 @@ enum FreeEngine {
         }
         try fm.moveItem(at: shaped, to: target)
         return CrossOverSource.inspect(bundle: target)
+    }
+
+    private static func place(_ source: URL, at destination: URL) throws {
+        let fm = FileManager.default
+        try fm.createDirectory(at: destination.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try? fm.removeItem(at: destination)
+        try fm.copyItem(at: source, to: destination)
     }
 
     private static func untar(_ archive: URL, into directory: URL) throws {

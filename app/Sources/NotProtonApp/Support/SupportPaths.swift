@@ -26,6 +26,9 @@ enum SupportPaths {
     static var launchers: URL { support.appending(path: "launchers") }
     // Free WineHQ engines NotProton downloaded, laid out like a CrossOver bundle.
     static var engines: URL { support.appending(path: "engines") }
+    // Per-game defaults NotProton ships. Replaced on every install; the user's own
+    // overrides live in the sibling "gamefixes" directory, which NotProton never writes.
+    static var gamefixesDefault: URL { support.appending(path: "gamefixes-default") }
 
     static var signatures: URL {
         support.appending(path: "signatures/macos.arm64")
