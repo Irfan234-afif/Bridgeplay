@@ -25,6 +25,10 @@ struct StatusSnapshot: Sendable {
     var orphanedRunners: [String] = []
     var damagedRunners: [String] = []
     var installContent: DeploymentContent.Status = .unchecked
+    // Free engine builds whose engine tree matches every pin, checked per engine.
+    var currentFreeEngines: Set<String> = []
+    // The Game Porting Toolkit folder linked into the WineCX engine, when one is.
+    var gptkSource: String?
 
     static func capture(bundledVersion: String) -> StatusSnapshot {
         let installs = CrossOverSource.discover()
@@ -35,6 +39,7 @@ struct StatusSnapshot: Sendable {
 
         let runner = RunnerStore.state()
         let installed = RunnerStore.installedBuilds()
+        let engines = FreeEngineStatus.capture(installs)
 
         return StatusSnapshot(
             steam: SteamBundle.deployment(bundledVersion: bundledVersion),
@@ -47,8 +52,52 @@ struct StatusSnapshot: Sendable {
             installedRunners: installed,
             orphanedRunners: RunnerStore.orphanedClones(),
             damagedRunners: RunnerStore.damagedClones(),
-            installContent: DeploymentContent.current(version: bundledVersion)
+            installContent: DeploymentContent.current(version: bundledVersion),
+            currentFreeEngines: engines.current,
+            gptkSource: engines.gptkSource
         )
+    }
+}
+
+enum FreeEngineState: Sendable, Equatable {
+    case missing
+    // Unpacked, but not matching every pin of this NotProton: "Update & Set Up".
+    case outdated
+    case current
+}
+
+enum FreeEngineStatus {
+
+    static func buildID(of install: CrossOverInstall) -> String? {
+        if case .supported(let build) = install.support { return build.id }
+        return nil
+    }
+
+    // Each free engine is judged against its own pins.
+    static func isCurrent(_ install: CrossOverInstall) -> Bool {
+        switch buildID(of: install) {
+        case FreeEngine.current.build: FreeEngine.hasRenderer(root: install.crossOverRoot)
+        case FreeEngineWinecx.current.build: FreeEngineWinecx.hasBackends(root: install.crossOverRoot)
+        default: false
+        }
+    }
+
+    static func capture(_ installs: [CrossOverInstall]) -> (current: Set<String>, gptkSource: String?) {
+        var current: Set<String> = []
+        var gptk: String?
+        for install in installs where install.isFree {
+            guard let id = buildID(of: install) else { continue }
+            if isCurrent(install) { current.insert(id) }
+            if id == FreeEngineWinecx.current.build, gptk == nil {
+                gptk = WinecxD3DMetal.linkedSource(root: install.crossOverRoot)
+            }
+        }
+        return (current, gptk)
+    }
+
+    static func state(build: String, installs: [CrossOverInstall], current: Set<String>) -> FreeEngineState {
+        if current.contains(build) { return .current }
+        return installs.contains { $0.isFree && buildID(of: $0) == build } ? .outdated : .missing
     }
 }
 
@@ -341,7 +390,7 @@ final class SystemStatus {
 
     private func setUpRunner(from install: CrossOverInstall?, replacingExisting: Bool = false) async {
         guard let install else {
-            setFailure("No supported Wine engine found. Download the free WineHQ engine first.")
+            setFailure("No supported Wine engine found. Download the free WineHQ or WineCX engine first.")
             AppLog.note("run refused: no supported CrossOver")
             outcome = nil
             return
@@ -361,8 +410,10 @@ final class SystemStatus {
         }
     }
 
-    var freeEngineInstalled: Bool {
-        snapshot?.crossOver.contains { $0.isFree && FreeEngine.hasRenderer(root: $0.crossOverRoot) } ?? false
+    func freeEngineState(_ build: String) -> FreeEngineState {
+        guard let snapshot else { return .missing }
+        return FreeEngineStatus.state(
+            build: build, installs: snapshot.crossOver, current: snapshot.currentFreeEngines)
     }
 
     // Downloads the free WineHQ engine and sets the compatibility tool up from it,
@@ -379,6 +430,56 @@ final class SystemStatus {
             }.value
             return runnerOutcome(result)
         }
+    }
+
+    // The same for WineCX. The engine links a Game Porting Toolkit while it is unpacked,
+    // and the runner is cloned from it afterwards, so the copy carries the same links.
+    func installWinecxEngine() async {
+        guard canInstall else { return }
+        await perform(from: FreeEngineWinecx.step) { progress in
+            let lock = try DeploymentContent.acquireInstallationLock(for: SupportPaths.Steam.app)
+            defer { close(lock) }
+            try await requireInstallableContent()
+            let install = try await FreeEngineWinecx.install { progress($0.label) }
+            let result = try await Task.detached(priority: .userInitiated) {
+                try RunnerSetup.run(from: install, replacingExisting: true) { progress($0.label) }
+            }.value
+            return runnerOutcome(result)
+        }
+    }
+
+    static let rescanStep = "Look for the Game Porting Toolkit"
+
+    // Looks for a Game Porting Toolkit again and links or unlinks it in the WineCX engine
+    // and in the runner copied from it, so both always carry the same Direct3D.
+    func rescanGameportingToolkit() async {
+        guard canInstall else { return }
+        await perform(from: Self.rescanStep) { _ in
+            let lock = try DeploymentContent.acquireInstallationLock(for: SupportPaths.Steam.app)
+            defer { close(lock) }
+            try await requireInstallableContent()
+            let found = await Task.detached(priority: .userInitiated) {
+                Self.relinkGameportingToolkit()
+            }.value
+            return found.map { "Game Porting Toolkit linked from \($0)." }
+                ?? "Game Porting Toolkit not found."
+        }
+    }
+
+    nonisolated static func relinkGameportingToolkit(
+        engines: URL = SupportPaths.engines,
+        runners: URL = SupportPaths.runners,
+        roots: [URL] = WinecxD3DMetal.searchRoots()
+    ) -> String? {
+        let engine = SupportPaths.crossOverRoot(inBundle: FreeEngineWinecx.bundle(engines: engines))
+        let runner = SupportPaths.clonedRoot(forBuild: FreeEngineWinecx.current.build, runners: runners)
+        var linked: String?
+        for root in [engine, runner] {
+            if let payload = WinecxD3DMetal.refresh(root: root, roots: roots) {
+                linked = linked ?? payload.libRoot.standardizedFileURL.path(percentEncoded: false)
+            }
+        }
+        return linked
     }
 
     func fetchValveBinaries() async {

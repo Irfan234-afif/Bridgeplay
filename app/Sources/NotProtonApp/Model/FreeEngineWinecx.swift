@@ -1,8 +1,10 @@
 // The second free engine: WineCX, CodeWeavers' LGPL CrossOver 26.3 Wine changes rebased
 // onto wine-11.15 by dappermint (github.com/dappermint/winecx, wine1115 branch) and built
 // into a Whisky runtime by dappermint/winecx-gptk's CI. Over the WineHQ engine it adds
-// msync and the CrossOver hooks Apple's D3DMetal needs, and it carries DXMT and DXVK as
-// backends a game opts into instead of replacing Wine's own Direct3D. docs/WINECX.md.
+// msync and the CrossOver hooks Apple's D3DMetal needs. DXMT (the same master build as the
+// WineHQ engine, not the archive's 0.80) and DXVK are backends a game opts into; Wine's own
+// Direct3D, or D3DMetal once a user's Game Porting Toolkit is linked, is the builtin.
+// docs/WINECX.md.
 
 import Foundation
 
@@ -24,7 +26,14 @@ struct WinecxRelease: Sendable {
     let bundleName: String
     // Path of the Wine tree inside the archive.
     let wineTree: String
+    // DXVK, copied out of the archive. The archive's DXMT 0.80 is not used.
     let backends: [WinecxBackendFile]
+    // DXMT, from its own tarball: the D3D DLLs as natives under lib/notproton-backends/dxmt,
+    // the winemetal pair over the archive's in lib/wine.
+    let renderer: RendererRelease
+    // lib/wine/x86_64-windows/<name> -> sha256 of Wine's own copy, for the four DLLs a linked
+    // Game Porting Toolkit replaces (WinecxD3DMetal.forwarders).
+    let d3dStock: [String: String]
 }
 
 enum FreeEngineWinecx {
@@ -46,23 +55,9 @@ enum FreeEngineWinecx {
         ],
         bundleName: "WineCX 11.15.app",
         wineTree: "Libraries/Wine",
-        // The archive's DXMT 0.80 frontends already have the builtin marker stripped, so
-        // they load as native DLLs from a prefix. nvapi64 and nvngx are left out for the
-        // reason FreeEngine gives. winemetal stays where the archive put it, a builtin in
-        // lib/wine beside its unix half. The DXVK-macOS 1.10.3 repack ships no dxgi.
+        // nvapi64 and nvngx are left out for the reason FreeEngine gives. The DXVK-macOS
+        // 1.10.3 repack ships no dxgi, and its DLLs carry no builtin marker.
         backends: [
-            WinecxBackendFile(source: "DXMT/x64/d3d10core.dll", destination: "dxmt/x86_64-windows/d3d10core.dll",
-                              sha256: "24ca320249f0683d0bded170ef135f430c5b0f310b461e68108ee3c13e7e0aac"),
-            WinecxBackendFile(source: "DXMT/x64/d3d11.dll", destination: "dxmt/x86_64-windows/d3d11.dll",
-                              sha256: "8d4842aaf4fd3de3f115d1f51da13930f27764dad1bb217fc28e7d154c1612b3"),
-            WinecxBackendFile(source: "DXMT/x64/dxgi.dll", destination: "dxmt/x86_64-windows/dxgi.dll",
-                              sha256: "a9686960d8341a034cdfbb46015592b1d407922f4b2686274b7865bbc4c0683c"),
-            WinecxBackendFile(source: "DXMT/x32/d3d10core.dll", destination: "dxmt/i386-windows/d3d10core.dll",
-                              sha256: "e867d24efe319bbc5e54da8732cc67d4bf975a291a57782d0cf8517af11fca22"),
-            WinecxBackendFile(source: "DXMT/x32/d3d11.dll", destination: "dxmt/i386-windows/d3d11.dll",
-                              sha256: "7002dac2b38c757109c2a661832d90f391a0f5cee9bda469cae539de75ff6eec"),
-            WinecxBackendFile(source: "DXMT/x32/dxgi.dll", destination: "dxmt/i386-windows/dxgi.dll",
-                              sha256: "4ca0246cc6aac9f1d36ac4da495f31adca33c5a02bb42b3231bd84b940514fdd"),
             WinecxBackendFile(source: "DXVK/x64/d3d10core.dll", destination: "dxvk/x86_64-windows/d3d10core.dll",
                               sha256: "0fa08bba860c63e3abeeabfc96d0e7aa327411a975f8f23d2dc63594ef5f796e"),
             WinecxBackendFile(source: "DXVK/x64/d3d11.dll", destination: "dxvk/x86_64-windows/d3d11.dll",
@@ -71,6 +66,15 @@ enum FreeEngineWinecx {
                               sha256: "2277187a4e13fc2049fe28cb8dd05b34b48c68031c386c3597ba0e18b0c3d327"),
             WinecxBackendFile(source: "DXVK/x32/d3d11.dll", destination: "dxvk/i386-windows/d3d11.dll",
                               sha256: "f79d417f675d00008375eb4ea2318af6fcd0b27971d604d3cf345a0dcfa998a0"),
+        ],
+        // winecx's winemac.so already exports the macdrv_functions DXMT reads, and that
+        // table is unchanged between 0.80 and master, so no winemac-patch is needed.
+        renderer: FreeEngine.dxmt,
+        d3dStock: [
+            "d3d10.dll": "bcbd3fb8a59a5992bd3035babc5c046327f19cdc0669ce9e7c438c3ce3a9546d",
+            "d3d11.dll": "84f5a337fdd7405bbbee5f0542427842a22aff749a3d061ba6334f10cf01dee4",
+            "d3d12.dll": "c6e285308bb3241efca3d94da4746b16a526a9fb5113f61922e7bd86694bebf9",
+            "dxgi.dll": "f1f24da777c65a583b29f74475c6a9464da35068d75def6cee806268def9ecbb",
         ]
     )
 
@@ -135,7 +139,8 @@ enum FreeEngineWinecx {
     ]
 
     // Runtime contract with compat_run.sh: the engine root says it can run msync, and the
-    // backends sit outside lib/wine so Wine's own Direct3D stays the builtin.
+    // backends sit outside lib/wine, whose Direct3D builtins are Wine's own or, with
+    // d3dmetal.enabled, Apple's (WinecxD3DMetal).
     static let backendsPath = "lib/notproton-backends"
     static let msyncMarkerPath = ".notproton-msync"
 
@@ -157,9 +162,31 @@ enum FreeEngineWinecx {
     }
 
     static func hasBackends(root: URL, release: WinecxRelease = current) -> Bool {
-        release.backends.allSatisfy { file in
-            Digest.sha256IfPresent(backend(file.destination, in: root)) == file.sha256
-        } && FileManager.default.fileExists(atPath: msyncMarker(in: root).path(percentEncoded: false))
+        layoutProblems(root: root, release: release).isEmpty
+    }
+
+    // Every pinned file NotProton lays out, relative to the engine root, with its sha256. The
+    // four Direct3D DLLs D3DMetal can replace are not in here: WinecxD3DMetal.layoutProblems
+    // checks them, since they are either Wine's own or links into a Game Porting Toolkit.
+    static func expectedFiles(_ release: WinecxRelease = current) -> [String: String] {
+        var table: [String: String] = [:]
+        for file in release.backends { table["\(backendsPath)/\(file.destination)"] = file.sha256 }
+        for path in release.renderer.files.keys {
+            table[release.renderer.installPath(of: path)] = release.renderer.installedHash(of: path)
+        }
+        return table
+    }
+
+    // Files that are absent or differ from their pin, the msync marker, and a Direct3D
+    // layout that is neither stock nor a complete D3DMetal link.
+    static func layoutProblems(root: URL, release: WinecxRelease = current) -> [String] {
+        var problems = expectedFiles(release).filter { path, hash in
+            Digest.sha256IfPresent(root.appending(path: path)) != hash
+        }.keys.sorted()
+        if !FileManager.default.fileExists(atPath: msyncMarker(in: root).path(percentEncoded: false)) {
+            problems.append(msyncMarkerPath)
+        }
+        return problems + WinecxD3DMetal.layoutProblems(root: root, stock: release.d3dStock)
     }
 
     static func backend(_ path: String, in root: URL) -> URL {
@@ -192,12 +219,20 @@ enum FreeEngineWinecx {
             into: downloads, step: step, source: "GitHub",
             report: { report(.downloading($0)) }
         )
+        let renderer = try await PinnedDownload.obtain(
+            file: release.renderer.archive, sha256: release.renderer.sha256, bases: release.renderer.bases,
+            into: FreeEngine.downloads, step: step, source: "GitHub",
+            report: { report(.downloading($0)) }
+        )
         report(.unpacking)
-        return try unpack(archive, release: release, engines: engines)
+        return try unpack(archive, renderer: renderer, release: release, engines: engines)
     }
 
+    // Without a renderer archive (tests only) the engine gets no DXMT and does not count
+    // as installed.
     static func unpack(
         _ archive: URL,
+        renderer: URL?,
         release: WinecxRelease,
         engines: URL,
         gptkRoots: [URL] = WinecxD3DMetal.searchRoots()
@@ -234,6 +269,16 @@ enum FreeEngineWinecx {
             try? fm.removeItem(at: destination)
             try fm.copyItem(at: source, to: destination)
         }
+        // The archive's own DXMT 0.80 frontends stay out, and its winemetal pair is replaced
+        // with master's: the two halves share one unix-call table and never mix versions.
+        if let renderer {
+            let unpacked = staging.appending(path: "renderer", directoryHint: .isDirectory)
+            try fm.createDirectory(at: unpacked, withIntermediateDirectories: true)
+            try untar(renderer, into: unpacked)
+            try FreeEngine.installRenderer(
+                release.renderer, from: unpacked.appending(path: release.renderer.tree, directoryHint: .isDirectory),
+                root: root, step: step)
+        }
         try Data("\(release.build)\n".utf8).write(to: msyncMarker(in: root))
 
         // The winecx tree keeps its unix loader beside the unix libraries the way
@@ -257,7 +302,7 @@ enum FreeEngineWinecx {
         }
 
         // Only links, and only to a Game Porting Toolkit the user installed. An engine
-        // without one is complete, it just has no D3DMetal.
+        // without one keeps Wine's own Direct3D and is complete, it just has no D3DMetal.
         WinecxD3DMetal.refresh(root: install.crossOverRoot, roots: gptkRoots)
 
         try fm.createDirectory(at: engines, withIntermediateDirectories: true)

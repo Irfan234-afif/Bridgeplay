@@ -11,6 +11,32 @@ fixes, the WIP D3D12 backend).
 | Tarball | `dxmt-e94c312.tar.gz`, top-level directory `e94c312/` |
 | License | LGPL-2.1-or-later since `ec357fd` (v0.80 was the last MIT release) |
 
+## In NotProton
+
+Both free engines download this tarball from
+`https://github.com/raymondchins/NotProton-WineHQ/releases/download/dxmt-e94c312/` into the
+engine cache (`FreeEngine.dxmt`, also `FreeEngineWinecx.current.renderer`). `winemetal.so`
+and both `winemetal.dll` go into `lib/wine` as shipped. `d3d10core`, `d3d11` and `dxgi` go to
+`lib/notproton-backends/dxmt/` with the 16 bytes of the Wine builtin marker at 0x40
+overwritten with a DOS stub (the bytes winecx-gptk uses), because the launcher copies them
+into a prefix as natives and Wine swaps a marked DLL found there for the `lib/wine` builtin
+of the same name (`load_builtin` in `dlls/ntdll/unix/loader.c`). They are pinned both as
+shipped (table below) and as installed:
+
+| Installed file | sha256 |
+| - | - |
+| `x86_64-windows/d3d10core.dll` | `aeb43e1ca7d9f221b9f0070c8654fa3579fd767006272cf675a9113e27bc6e72` |
+| `x86_64-windows/d3d11.dll` | `c1c8c4779686990bf343162a8804dd2d1564b2a893e64e5ddcc7db5e76ce409e` |
+| `x86_64-windows/dxgi.dll` | `1bb4939ff43e676eac8b3f3cb0583985ab8f7b1a8e11760d14931da3fc44223b` |
+| `i386-windows/d3d10core.dll` | `e851c39641f66d64a3e4460e7046900cd234b11f44d793826d2f094e9d2166d9` |
+| `i386-windows/d3d11.dll` | `a654ea3851ccc128a1f33d978462872e22fa6430ea85eff6ba9549de95788652` |
+| `i386-windows/dxgi.dll` | `91f38df103412235793f84efe06b87f6f6fc3a4791d4f8d9f8cc2e16bc137d53` |
+
+The same stripping applied to v0.80 reproduces the hashes of the frontends in the WineCX
+archive exactly. `nvapi64`, `nvngx` and `d3d12.dll` are not installed.
+`FreeEngineTests.downloadsAndUnpacksRealDxmt` downloads the real tarball and checks all of
+this.
+
 ## Rebuilding
 
     DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer \

@@ -60,22 +60,50 @@ struct FreeEngineWinecxTests {
         for file in backends {
             let parts = file.destination.split(separator: "/").map(String.init)
             #expect(parts.count == 3, "\(file.destination)")
-            #expect(["dxmt", "dxvk"].contains(parts[0]), "\(file.destination)")
+            // DXMT comes from the master tarball, never the archive's 0.80.
+            #expect(parts[0] == "dxvk", "\(file.destination)")
+            #expect(!file.source.hasPrefix("DXMT/"))
             #expect(["x86_64-windows", "i386-windows"].contains(parts[1]), "\(file.destination)")
             #expect(!["nvapi64.dll", "nvngx.dll"].contains(parts[2]))
             #expect(file.sha256.count == 64 && file.sha256.allSatisfy(\.isHexDigit))
             #expect(FreeEngineWinecx.backend(file.destination, in: URL(filePath: "/r")).path(percentEncoded: false)
                 == "/r/lib/notproton-backends/\(file.destination)")
         }
-        for backend in ["dxmt", "dxvk"] {
-            for arch in ["x86_64-windows", "i386-windows"] {
-                #expect(backends.contains { $0.destination == "\(backend)/\(arch)/d3d11.dll" })
+        let table = FreeEngineWinecx.expectedFiles()
+        for arch in ["x86_64-windows", "i386-windows"] {
+            for backend in ["dxmt", "dxvk"] {
+                #expect(table["lib/notproton-backends/\(backend)/\(arch)/d3d11.dll"] != nil)
             }
+            #expect(table["lib/notproton-backends/dxmt/\(arch)/d3d11.dll"]
+                == FreeEngine.dxmt.natives["\(arch)/d3d11.dll"])
+            #expect(table["lib/wine/\(arch)/winemetal.dll"] == FreeEngine.dxmt.files["\(arch)/winemetal.dll"])
         }
+        #expect(table["lib/wine/x86_64-unix/winemetal.so"] == FreeEngine.dxmt.files["x86_64-unix/winemetal.so"])
+        #expect(Set(FreeEngineWinecx.current.d3dStock.keys) == Set(WinecxD3DMetal.forwarders))
         #expect(FreeEngineWinecx.msyncMarker(in: URL(filePath: "/r")).path(percentEncoded: false)
             == "/r/.notproton-msync")
         #expect(WinecxD3DMetal.enabledMarker(in: URL(filePath: "/r")).path(percentEncoded: false)
             == "/r/lib/notproton-backends/d3dmetal.enabled")
+    }
+
+    @Test("Each free engine is current, outdated or missing on its own pins")
+    func perEngineState() throws {
+        let winehqBuild = try #require(SupportedRunners.build(id: FreeEngine.current.build))
+        let winecxBuild = try #require(SupportedRunners.build(id: FreeEngineWinecx.current.build))
+        let winehq = CrossOverInstall(bundle: URL(filePath: "/e/WineHQ 11.15.app"), releaseVersion: nil,
+                                      support: .supported(winehqBuild))
+        let winecx = CrossOverInstall(bundle: URL(filePath: "/e/WineCX 11.15.app"), releaseVersion: nil,
+                                      support: .supported(winecxBuild))
+        let both = [winehq, winecx]
+        #expect(FreeEngineStatus.state(build: winehqBuild.id, installs: both, current: [winecxBuild.id]) == .outdated)
+        #expect(FreeEngineStatus.state(build: winecxBuild.id, installs: both, current: [winecxBuild.id]) == .current)
+        #expect(FreeEngineStatus.state(build: winecxBuild.id, installs: [winehq], current: [winehqBuild.id]) == .missing)
+        // Neither engine is judged by the other's pins: these empty trees match neither.
+        #expect(!FreeEngineStatus.isCurrent(winehq) && !FreeEngineStatus.isCurrent(winecx))
+        #expect(FreeEngineStatus.capture(both).current.isEmpty)
+        // Steam lists one tool per engine.
+        let tools = SupportedRunners.tools(for: [winehqBuild, winecxBuild]).map(\.display)
+        #expect(Set(tools) == ["WineHQ 11.15 - Rosetta", "WineCX 11.15 (msync, D3DMetal)"])
     }
 
     @Test("Downloads come only from the pinned GitHub release mirrors")
@@ -108,17 +136,35 @@ struct FreeEngineWinecxTests {
         image[0] = 0x4d
         image[1] = 0x5a
         if builtin { image.replaceSubrange(0x40 ..< 0x51, with: Array("Wine builtin DLL".utf8) + [0]) }
-        for name in WinecxD3DMetal.forwarders {
+        let unix = lib.appending(path: "wine/x86_64-unix")
+        try fm.createDirectory(at: unix, withIntermediateDirectories: true)
+        // GPTK 4.0 beta 2: the four forwarders plus nvapi64 and nvngx-on-metalfx, each unix
+        // half a relative link to libd3dshared.
+        for name in WinecxD3DMetal.forwarders + ["nvapi64.dll", "nvngx-on-metalfx.dll"] {
             try image.write(to: pe.appending(path: name))
+            try fm.createSymbolicLink(
+                atPath: unix.appending(path: WinecxD3DMetal.unixName(of: name)).path(percentEncoded: false),
+                withDestinationPath: "../../external/libd3dshared.dylib")
         }
         return lib
     }
 
+    // Wine's four originals, as text whose hashes the test pins.
+    private static let stockText = Dictionary(uniqueKeysWithValues: WinecxD3DMetal.forwarders.map { ($0, "wine's own \($0)") })
+    private static let stock = stockText.mapValues { Digest.sha256(of: Data($0.utf8)) }
+
     private func makeEngineRoot(in folder: URL) throws -> URL {
+        let fm = FileManager.default
         let root = folder.appending(path: "CrossOver")
         let external = root.appending(path: "lib/external")
-        try FileManager.default.createDirectory(at: external, withIntermediateDirectories: true)
+        try fm.createDirectory(at: external, withIntermediateDirectories: true)
         try Data("winecx readme".utf8).write(to: external.appending(path: "README"))
+        let builtins = root.appending(path: "lib/wine/x86_64-windows")
+        try fm.createDirectory(at: builtins, withIntermediateDirectories: true)
+        try fm.createDirectory(at: root.appending(path: "lib/wine/x86_64-unix"), withIntermediateDirectories: true)
+        for (name, text) in Self.stockText {
+            try Data(text.utf8).write(to: builtins.appending(path: name))
+        }
         return root
     }
 
@@ -175,7 +221,7 @@ struct FreeEngineWinecxTests {
         #expect(WinecxD3DMetal.locate(in: [native, partial, noFramework]) == nil)
     }
 
-    @Test("Linking writes only symlinks into the user's copy, then the marker")
+    @Test("Linking makes Apple's forwarders the builtins, as links, with Wine's originals set aside")
     func linksPayload() throws {
         let base = try makeDirectory("link")
         defer { try? FileManager.default.removeItem(at: base) }
@@ -183,40 +229,48 @@ struct FreeEngineWinecxTests {
 
         let lib = try makePayload(in: base.appending(path: "gptk"))
         let root = try makeEngineRoot(in: base)
+        #expect(WinecxD3DMetal.layoutProblems(root: root, stock: Self.stock).isEmpty)
         let payload = try #require(WinecxD3DMetal.locate(in: [lib]))
-        try WinecxD3DMetal.link(payload, root: root)
+        try WinecxD3DMetal.link(payload, root: root, stock: Self.stock)
 
         #expect(WinecxD3DMetal.isLinked(root: root))
+        #expect(WinecxD3DMetal.linkedSource(root: root) == lib.standardizedFileURL.path(percentEncoded: false))
+        #expect(WinecxD3DMetal.layoutProblems(root: root, stock: Self.stock).isEmpty)
         let source = lib.standardizedFileURL
         #expect(try destination(of: root.appending(path: "lib/external/libd3dshared.dylib"))
             == source.appending(path: "external/libd3dshared.dylib").path(percentEncoded: false))
         #expect(try destination(of: root.appending(path: "lib/external/D3DMetal.framework"))
             == source.appending(path: "external/D3DMetal.framework").path(percentEncoded: false))
-        for name in WinecxD3DMetal.forwarders {
-            let pe = root.appending(path: "lib/notproton-backends/d3dmetal/x86_64-windows/\(name)")
-            #expect(try destination(of: pe)
+        for name in WinecxD3DMetal.forwarders + ["nvapi64.dll"] {
+            #expect(try destination(of: root.appending(path: "lib/wine/x86_64-windows/\(name)"))
                 == source.appending(path: "wine/x86_64-windows/\(name)").path(percentEncoded: false))
-            let unix = root.appending(
-                path: "lib/notproton-backends/d3dmetal/x86_64-unix/\((name as NSString).deletingPathExtension).so")
-            #expect(try destination(of: unix) == "../../../external/libd3dshared.dylib")
-            // The relative link has to land on the shared library through lib/external.
-            #expect(try Data(contentsOf: unix) == Data("dylib".utf8))
+            let so = WinecxD3DMetal.unixName(of: name)
+            #expect(try destination(of: root.appending(path: "lib/wine/x86_64-unix/\(so)"))
+                == source.appending(path: "wine/x86_64-unix/\(so)").path(percentEncoded: false))
+            // Through Apple's own relative link, onto the shared library.
+            #expect(try Data(contentsOf: root.appending(path: "lib/wine/x86_64-unix/\(so)")) == Data("dylib".utf8))
         }
+        for name in WinecxD3DMetal.forwarders {
+            let saved = root.appending(path: "lib/notproton-backends/wine-stock/x86_64-windows/\(name)")
+            #expect(Digest.sha256IfPresent(saved) == Self.stock[name])
+        }
+        // nvngx-on-metalfx is left out.
+        #expect(!fm.fileExists(atPath: root.appending(path: "lib/wine/x86_64-windows/nvngx-on-metalfx.dll").path(percentEncoded: false)))
+        #expect(!fm.fileExists(atPath: root.appending(path: "lib/notproton-backends/d3dmetal").path(percentEncoded: false)))
         #expect(fm.fileExists(atPath: root.appending(path: "lib/external/README").path(percentEncoded: false)))
-        // Nothing lands in lib/wine.
-        #expect(!fm.fileExists(atPath: root.appending(path: "lib/wine").path(percentEncoded: false)))
 
         let marker = try String(contentsOf: WinecxD3DMetal.enabledMarker(in: root), encoding: .utf8)
         #expect(marker.contains("version=3.0\n"))
         #expect(marker.contains("libd3dshared=lib/external/libd3dshared.dylib\n"))
-        #expect(marker.contains("dllpath=lib/notproton-backends/d3dmetal\n"))
+        #expect(marker.contains("model=builtin\n"))
 
         // Relinking is idempotent.
-        try WinecxD3DMetal.link(payload, root: root)
+        try WinecxD3DMetal.link(payload, root: root, stock: Self.stock)
         #expect(WinecxD3DMetal.isLinked(root: root))
+        #expect(WinecxD3DMetal.layoutProblems(root: root, stock: Self.stock).isEmpty)
     }
 
-    @Test("A Game Porting Toolkit that went away reads as unlinked, and unlinking keeps winecx's files")
+    @Test("Unlinking puts Wine's originals back byte for byte and removes only links")
     func unlinksCleanly() throws {
         let base = try makeDirectory("unlink")
         defer { try? FileManager.default.removeItem(at: base) }
@@ -224,14 +278,23 @@ struct FreeEngineWinecxTests {
 
         let lib = try makePayload(in: base.appending(path: "gptk"))
         let root = try makeEngineRoot(in: base)
-        try WinecxD3DMetal.link(try #require(WinecxD3DMetal.locate(in: [lib])), root: root)
+        try WinecxD3DMetal.link(try #require(WinecxD3DMetal.locate(in: [lib])), root: root, stock: Self.stock)
 
         try fm.removeItem(at: lib)
         #expect(!WinecxD3DMetal.isLinked(root: root))
+        // Still the linked shape, only dangling: refresh is what clears it.
+        #expect(WinecxD3DMetal.layoutProblems(root: root, stock: Self.stock).isEmpty)
 
         WinecxD3DMetal.unlink(root: root)
+        #expect(WinecxD3DMetal.layoutProblems(root: root, stock: Self.stock).isEmpty)
         #expect(!fm.fileExists(atPath: WinecxD3DMetal.enabledMarker(in: root).path(percentEncoded: false)))
-        #expect(!fm.fileExists(atPath: root.appending(path: "lib/notproton-backends/d3dmetal").path(percentEncoded: false)))
+        for (name, text) in Self.stockText {
+            let live = root.appending(path: "lib/wine/x86_64-windows/\(name)")
+            #expect((try? fm.destinationOfSymbolicLink(atPath: live.path(percentEncoded: false))) == nil)
+            #expect(try Data(contentsOf: live) == Data(text.utf8))
+        }
+        #expect(try fm.contentsOfDirectory(atPath: root.appending(path: "lib/wine/x86_64-unix").path(percentEncoded: false)).isEmpty)
+        #expect(!fm.fileExists(atPath: root.appending(path: "lib/notproton-backends/wine-stock").path(percentEncoded: false)))
         #expect((try? fm.destinationOfSymbolicLink(
             atPath: root.appending(path: "lib/external/libd3dshared.dylib").path(percentEncoded: false))) == nil)
         #expect(fm.fileExists(atPath: root.appending(path: "lib/external/README").path(percentEncoded: false)))
@@ -241,6 +304,40 @@ struct FreeEngineWinecxTests {
         try Data("placed by hand".utf8).write(to: real)
         WinecxD3DMetal.unlink(root: root)
         #expect(fm.fileExists(atPath: real.path(percentEncoded: false)))
+    }
+
+    @Test("Only the stock and the linked layout pass; a tampered builtin blocks linking")
+    func toleratesExactlyTwoStates() throws {
+        let base = try makeDirectory("states")
+        defer { try? FileManager.default.removeItem(at: base) }
+        let fm = FileManager.default
+        let lib = try makePayload(in: base.appending(path: "gptk"))
+        let root = try makeEngineRoot(in: base)
+        let payload = try #require(WinecxD3DMetal.locate(in: [lib]))
+
+        let dxgi = root.appending(path: "lib/wine/x86_64-windows/dxgi.dll")
+        try Data("tampered".utf8).write(to: dxgi)
+        #expect(WinecxD3DMetal.layoutProblems(root: root, stock: Self.stock) == ["lib/wine/x86_64-windows/dxgi.dll"])
+        #expect(throws: StepFailure.self) { try WinecxD3DMetal.link(payload, root: root, stock: Self.stock) }
+        // The failed link left nothing behind and moved nothing aside.
+        #expect(!fm.fileExists(atPath: WinecxD3DMetal.enabledMarker(in: root).path(percentEncoded: false)))
+        for name in ["d3d10.dll", "d3d11.dll", "d3d12.dll"] {
+            #expect(Digest.sha256IfPresent(root.appending(path: "lib/wine/x86_64-windows/\(name)")) == Self.stock[name])
+        }
+        try Data(Self.stockText["dxgi.dll"]!.utf8).write(to: dxgi)
+
+        // A stray unix half or a set-aside copy without the marker is neither state.
+        let stray = root.appending(path: "lib/wine/x86_64-unix/d3d12.so")
+        try fm.createSymbolicLink(at: stray, withDestinationURL: lib.appending(path: "external/libd3dshared.dylib"))
+        #expect(WinecxD3DMetal.layoutProblems(root: root, stock: Self.stock) == ["lib/wine/x86_64-unix/d3d12.so"])
+        try fm.removeItem(at: stray)
+
+        try WinecxD3DMetal.link(payload, root: root, stock: Self.stock)
+        // Linked, but one forwarder swapped for a real file: refused.
+        let d3d11 = root.appending(path: "lib/wine/x86_64-windows/d3d11.dll")
+        try fm.removeItem(at: d3d11)
+        try Data("copied apple file".utf8).write(to: d3d11)
+        #expect(WinecxD3DMetal.layoutProblems(root: root, stock: Self.stock) == ["lib/wine/x86_64-windows/d3d11.dll"])
     }
 
     @Test("Refresh never writes into a tree that is not WineCX")
@@ -273,8 +370,14 @@ struct FreeEngineWinecxTests {
     }
 
     @Test("Unpacking the real archive yields a free, patchable engine with the runtime contract")
-    func unpacksRealArchive() throws {
+    func unpacksRealArchive() async throws {
         guard let archive = Self.realArchive else { return }
+        // Fetched into the engine cache the way FreeEngineWinecx.install does, when missing.
+        let dxmt = FreeEngine.dxmt
+        let renderer = try await PinnedDownload.obtain(
+            file: dxmt.archive, sha256: dxmt.sha256, bases: dxmt.bases,
+            into: FreeEngine.downloads, step: FreeEngineWinecx.step, source: "GitHub"
+        )
         let fm = FileManager.default
         let base = try makeDirectory("real")
         defer { try? fm.removeItem(at: base) }
@@ -282,7 +385,7 @@ struct FreeEngineWinecxTests {
         let engines = base.appending(path: "engines")
         let gptk = try makePayload(in: base.appending(path: "gptk"))
         let install = try FreeEngineWinecx.unpack(
-            archive, release: FreeEngineWinecx.current, engines: engines, gptkRoots: [gptk]
+            archive, renderer: renderer, release: FreeEngineWinecx.current, engines: engines, gptkRoots: [gptk]
         )
         guard case .supported(let build) = install.support else {
             Issue.record("unpacked engine is \(install.support)")
@@ -304,27 +407,97 @@ struct FreeEngineWinecxTests {
             #expect(Digest.sha256(of: patched) == build.patchedNtdll[patch.arch])
         }
 
-        // lib/wine keeps Wine's own Direct3D: none of it is a backend copy.
-        let pinned = Set(FreeEngineWinecx.current.backends.map(\.sha256))
-        for arch in ["x86_64-windows", "i386-windows"] {
-            for name in ["d3d11.dll", "dxgi.dll", "d3d10core.dll", "d3d12.dll"] {
-                let stock = root.appending(path: "lib/wine/\(arch)/\(name)")
-                let hash = try #require(Digest.sha256IfPresent(stock), "\(arch)/\(name)")
-                #expect(!pinned.contains(hash), "\(arch)/\(name)")
-            }
+        #expect(FreeEngineWinecx.layoutProblems(root: root).isEmpty)
+        // Master's winemetal replaced the archive's, and its DLLs are natives.
+        for (path, hash) in FreeEngineWinecx.expectedFiles() {
+            #expect(Digest.sha256IfPresent(root.appending(path: path)) == hash, "\(path)")
         }
-        // DXMT's builtin half and the unix loader winecx's DXMT and D3DMetal hooks live in.
-        #expect(fm.fileExists(atPath: root.appending(path: "lib/wine/x86_64-unix/winemetal.so").path(percentEncoded: false)))
+        #expect(!WinecxD3DMetal.isBuiltin(root.appending(path: "lib/notproton-backends/dxmt/x86_64-windows/d3d11.dll")))
+        #expect(WinecxD3DMetal.isBuiltin(root.appending(path: "lib/wine/x86_64-windows/winemetal.dll")))
         #expect(try String(contentsOf: FreeEngineWinecx.msyncMarker(in: root), encoding: .utf8) == "winecx-11.15\n")
 
-        // The fixture GPTK was linked into the real tree, through winecx's own lib/external.
+        // The fixture GPTK was linked as the builtins, with Wine's own set aside under their pins.
         #expect(WinecxD3DMetal.isLinked(root: root))
         #expect(fm.fileExists(atPath: root.appending(path: "lib/external/README").path(percentEncoded: false)))
-        WinecxD3DMetal.unlink(root: root)
-        #expect(!WinecxD3DMetal.isLinked(root: root))
-        #expect(WinecxD3DMetal.refresh(root: root, roots: [gptk]) != nil)
+        for (name, hash) in FreeEngineWinecx.current.d3dStock {
+            #expect(Digest.sha256IfPresent(root.appending(path: "\(WinecxD3DMetal.stockPath)/\(name)")) == hash)
+        }
+
+        // A runner cloned from it carries the same links, and a rescan reaches both trees.
+        let runners = base.appending(path: "runners")
+        let cloned = try RunnerInstaller.clone(from: install, runners: runners)
+        let runnerRoot = SupportPaths.clonedRoot(forBuild: cloned.id, runners: runners)
+        #expect(WinecxD3DMetal.isLinked(root: runnerRoot))
+        #expect(FreeEngineWinecx.layoutProblems(root: runnerRoot).isEmpty)
         try fm.removeItem(at: gptk)
-        #expect(WinecxD3DMetal.refresh(root: root, roots: [gptk]) == nil)
-        #expect(!fm.fileExists(atPath: WinecxD3DMetal.enabledMarker(in: root).path(percentEncoded: false)))
+        #expect(SystemStatus.relinkGameportingToolkit(engines: engines, runners: runners, roots: [gptk]) == nil)
+        for tree in [root, runnerRoot] {
+            #expect(!WinecxD3DMetal.isLinked(root: tree))
+            #expect(!fm.fileExists(atPath: WinecxD3DMetal.enabledMarker(in: tree).path(percentEncoded: false)))
+            #expect(FreeEngineWinecx.layoutProblems(root: tree).isEmpty, "\(tree)")
+            for (name, hash) in FreeEngineWinecx.current.d3dStock {
+                #expect(Digest.sha256IfPresent(tree.appending(path: "lib/wine/x86_64-windows/\(name)")) == hash)
+            }
+        }
+        let again = try makePayload(in: base.appending(path: "gptk2"))
+        #expect(SystemStatus.relinkGameportingToolkit(engines: engines, runners: runners, roots: [again])
+            == again.standardizedFileURL.path(percentEncoded: false))
+        #expect(WinecxD3DMetal.isLinked(root: root) && WinecxD3DMetal.isLinked(root: runnerRoot))
+    }
+
+    // MARK: - Against the user's own Game Porting Toolkit
+
+    // Runs only when a GPTK sits in NotProton's gptk folder. It is only read: the links go
+    // into a throwaway engine tree under the repository's scratch/.
+    @Test("Linking the real Game Porting Toolkit resolves every link and leaves it untouched")
+    func linksRealGameportingToolkit() throws {
+        let gptk = WinecxD3DMetal.userFolder
+        guard WinecxD3DMetal.payloadRoot(under: gptk) != nil else { return }
+        let fm = FileManager.default
+        let before = try snapshot(of: gptk)
+
+        let scratch = URL(filePath: #filePath).deletingLastPathComponent()
+            .appending(path: "../../../scratch/gptk-link-test-\(UUID().uuidString)").standardizedFileURL
+        try fm.createDirectory(at: scratch, withIntermediateDirectories: true)
+        defer { try? fm.removeItem(at: scratch) }
+        let root = try makeEngineRoot(in: scratch)
+
+        let payload = try #require(WinecxD3DMetal.locate(in: [gptk]))
+        #expect(payload.version != nil)
+        try WinecxD3DMetal.link(payload, root: root, stock: Self.stock)
+        #expect(WinecxD3DMetal.isLinked(root: root))
+        #expect(WinecxD3DMetal.layoutProblems(root: root, stock: Self.stock).isEmpty)
+        let shared = try Data(contentsOf: payload.libRoot.appending(path: "external/libd3dshared.dylib"))
+        for name in WinecxD3DMetal.forwarders + ["nvapi64.dll"] {
+            let pe = root.appending(path: "lib/wine/x86_64-windows/\(name)")
+            #expect(WinecxD3DMetal.isBuiltin(pe), "\(name)")
+            #expect(try Data(contentsOf: root.appending(path: "lib/wine/x86_64-unix/\(WinecxD3DMetal.unixName(of: name))"))
+                == shared, "\(name)")
+        }
+        #expect(!fm.fileExists(atPath: root.appending(path: "lib/wine/x86_64-windows/nvngx-on-metalfx.dll").path(percentEncoded: false)))
+        // Only links: no file in the engine tree holds Apple's bytes.
+        let walker = try #require(fm.enumerator(atPath: root.path(percentEncoded: false)))
+        for case let path as String in walker {
+            let attributes = try fm.attributesOfItem(atPath: root.appending(path: path).path(percentEncoded: false))
+            if attributes[.type] as? FileAttributeType == .typeRegular {
+                #expect(!path.contains("D3DMetal") && !path.hasSuffix(".dylib"), "\(path)")
+            }
+        }
+
+        WinecxD3DMetal.unlink(root: root)
+        #expect(WinecxD3DMetal.layoutProblems(root: root, stock: Self.stock).isEmpty)
+        #expect(try snapshot(of: gptk) == before)
+    }
+
+    // Path, type, size and modification time of everything below a folder.
+    private func snapshot(of folder: URL) throws -> [String] {
+        let fm = FileManager.default
+        let walker = try #require(fm.enumerator(atPath: folder.path(percentEncoded: false)))
+        var lines: [String] = []
+        for case let path as String in walker {
+            let a = try fm.attributesOfItem(atPath: folder.appending(path: path).path(percentEncoded: false))
+            lines.append("\(path) \(a[.type] ?? "") \(a[.size] ?? "") \(a[.modificationDate] ?? "")")
+        }
+        return lines.sorted()
     }
 }

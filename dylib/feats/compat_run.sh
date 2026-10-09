@@ -41,6 +41,12 @@ export CX_ROOT
 if [ -f "$CX_ROOT/lib64/apple_gptk/external/libd3dshared.dylib" ]; then
   export CX_APPLEGPTK_LIBD3DSHARED_PATH="$CX_ROOT/lib64/apple_gptk/external/libd3dshared.dylib"
 fi
+# WineCX with a Game Porting Toolkit linked in keeps libd3dshared in its own lib/external.
+if [ -z "${CX_APPLEGPTK_LIBD3DSHARED_PATH:-}" ] \
+  && [ -f "$CX_ROOT/lib/notproton-backends/d3dmetal.enabled" ] \
+  && [ -f "$CX_ROOT/lib/external/libd3dshared.dylib" ]; then
+  export CX_APPLEGPTK_LIBD3DSHARED_PATH="$CX_ROOT/lib/external/libd3dshared.dylib"
+fi
 
 wine_unix="$CX_ROOT/lib/wine/aarch64-unix"
 WINELOADER="$wine_unix/wine.app/Contents/MacOS/wine"
@@ -81,6 +87,41 @@ fi
   env | grep -iE '^(Steam|SDL_)' | sort
 } >> "$log" 2>&1 || true
 
+# Wine keeps its server socket in <tmp>/.wine-<uid> and the wineserver refuses to start when
+# others can read it ("must not be accessible by other users"). A directory of ours with a
+# looser mode goes back to 0700. A link, or a directory someone else owns, is only reported:
+# it is never followed or changed.
+heal_wine_tmp() {
+  wine_tmp="$1/.wine-$(id -u)"
+  if [ -L "$wine_tmp" ]; then
+    echo "=== warning: $wine_tmp is a symlink, left alone; wineserver may refuse to start ===" >> "$log" 2>&1 || true
+    return 0
+  fi
+  [ -e "$wine_tmp" ] || return 0
+  wine_tmp_info=$(stat -f '%u %Lp %HT' "$wine_tmp" 2>/dev/null) || return 0
+  wine_tmp_owner=${wine_tmp_info%% *}
+  wine_tmp_rest=${wine_tmp_info#* }
+  wine_tmp_mode=${wine_tmp_rest%% *}
+  wine_tmp_type=${wine_tmp_rest#* }
+  if [ "$wine_tmp_type" != Directory ]; then
+    echo "=== warning: $wine_tmp is not a directory ($wine_tmp_type), left alone ===" >> "$log" 2>&1 || true
+    return 0
+  fi
+  if [ "$wine_tmp_owner" != "$(id -u)" ]; then
+    echo "=== warning: $wine_tmp belongs to uid $wine_tmp_owner, left alone; wineserver may refuse to start ===" >> "$log" 2>&1 || true
+    return 0
+  fi
+  [ "$wine_tmp_mode" != 700 ] || return 0
+  # -h: should the directory have been swapped for a link since the checks, the link
+  # itself changes, never what it points at.
+  if chmod -h 700 "$wine_tmp" 2>> "$log"; then
+    echo "=== $wine_tmp was mode $wine_tmp_mode, set to 700 ===" >> "$log" 2>&1 || true
+  else
+    echo "=== warning: could not set $wine_tmp to mode 700 ===" >> "$log" 2>&1 || true
+  fi
+}
+heal_wine_tmp /tmp
+
 stage_step="startup"
 # shellcheck disable=SC2329 # the trap below invokes this
 report_early_exit() {
@@ -112,6 +153,7 @@ gamefix_keys=""
 gamefix_backend=""
 gamefix_dlloverrides=""
 gamefix_msync=""
+gamefix_nvapi=""
 gamefix_args=""
 
 gamefix_log() {
@@ -143,7 +185,7 @@ gamefix_reason() {
   case "$1" in
     BACKEND)
       case "$2" in dxmt|dxvk|wined3d|d3dmetal) ;; *) echo "not dxmt, dxvk, wined3d or d3dmetal" ;; esac ;;
-    MSYNC|RETINA)
+    MSYNC|RETINA|NVAPI)
       case "$2" in 0|1) ;; *) echo "not 0 or 1" ;; esac ;;
     DLLOVERRIDES)
       valid_dll_overrides "$2" || echo "not Wine override syntax" ;;
@@ -215,6 +257,7 @@ load_gamefixes() {
       DLLOVERRIDES) gamefix_dlloverrides=$value
         gamefix_log "DLLOVERRIDES=$value from the $from conf, launch options still win per DLL" ;;
       MSYNC) gamefix_msync=$value; gamefix_log "MSYNC=$value from the $from conf" ;;
+      NVAPI) gamefix_nvapi=$value; gamefix_log "NVAPI=$value from the $from conf" ;;
       ARGS)
         if [ "$verb" = waitforexitandrun ]; then
           gamefix_args=$value
@@ -250,8 +293,10 @@ resolve_msync() {
 }
 
 # Graphics backends. The engine keeps Wine's own dxgi/d3d11/d3d10core/d3d12 in lib/wine and
-# ships the alternatives under lib/notproton-backends/<name>/<arch>-windows. An engine
-# without that folder bakes its DLLs into lib/wine, so nothing is swapped there.
+# ships the alternatives under lib/notproton-backends/<name>/<arch>-windows, which a game
+# gets as natives in its prefix. WineCX with d3dmetal.enabled has Apple's D3DMetal as those
+# builtins instead and defaults to it. An engine without that folder bakes its DLLs into
+# lib/wine, so nothing is swapped there.
 backend_root="$CX_ROOT/lib/notproton-backends"
 backend=""
 backend_from=""
@@ -259,6 +304,13 @@ backend_overrides=""
 
 graphics_log() {
   echo "graphics: $*" >> "$log" 2>&1 || true
+}
+
+# WineCX with a Game Porting Toolkit linked in: Apple's D3DMetal forwarders are the
+# dxgi/d3d10/d3d11/d3d12 builtins of lib/wine, and Wine's own are set aside in
+# notproton-backends/wine-stock, so wined3d is not there to fall back on.
+d3dmetal_engine() {
+  [ -f "$backend_root/d3dmetal.enabled" ]
 }
 
 # The lower-case module names of the DLLs in one backend folder, winemetal left to lib/wine.
@@ -276,7 +328,9 @@ backend_dlls() {
 managed_dlls() {
   {
     printf '%s\n' dxgi d3d11 d3d10core
+    ! d3dmetal_engine || printf '%s\n' d3d10 d3d12
     for dir in "$backend_root"/*/x86_64-windows "$backend_root"/*/i386-windows; do
+      case "$dir" in "$backend_root"/wine-stock/*) continue ;; esac
       [ ! -d "$dir" ] || backend_dlls "$dir"
     done
   } | sort -u
@@ -284,8 +338,8 @@ managed_dlls() {
 
 backend_available() {
   case "$1" in
-    wined3d) return 0 ;;
-    d3dmetal) [ -f "$backend_root/d3dmetal.enabled" ] ;;
+    wined3d) ! d3dmetal_engine ;;
+    d3dmetal) d3dmetal_engine ;;
     dxmt|dxvk) [ -n "$(backend_dlls "$backend_root/$1/x86_64-windows")" ] ;;
     *) return 1 ;;
   esac
@@ -418,17 +472,21 @@ select_backend() {
     wanted=$recorded
     backend_from="carried over from the last launch"
   fi
+  # D3DMetal, when the engine has it, runs D3D11 and D3D12 alike and is the default.
   if [ -z "$wanted" ] && [ "$verb" = waitforexitandrun ] && [ -f "$1" ]; then
     if imports_d3d12 "$1"; then
-      wanted=wined3d
+      if d3dmetal_engine; then wanted=d3dmetal; else wanted=wined3d; fi
       backend_from="auto-detected, the game imports d3d12.dll"
+    elif d3dmetal_engine; then
+      wanted=d3dmetal
+      backend_from="auto-detected, the engine has D3DMetal"
     else
       wanted=dxmt
       backend_from="auto-detected, the game does not import d3d12.dll"
     fi
   fi
   if [ -z "$wanted" ]; then
-    wanted=dxmt
+    if d3dmetal_engine; then wanted=d3dmetal; else wanted=dxmt; fi
     backend_from=default
   fi
   backend=$wanted
@@ -436,7 +494,10 @@ select_backend() {
     case "$backend" in
       d3dmetal) why="no d3dmetal.enabled marker"; next=dxmt ;;
       dxvk) why="no x86_64 DLLs in notproton-backends/dxvk"; next=dxmt ;;
-      *) why="no x86_64 DLLs in notproton-backends/$backend"; next=wined3d ;;
+      wined3d) why="D3DMetal replaces Wine's Direct3D in this engine"; next=d3dmetal ;;
+      *)
+        why="no x86_64 DLLs in notproton-backends/$backend"
+        if d3dmetal_engine; then next=d3dmetal; else next=wined3d; fi ;;
     esac
     graphics_log "$backend is not available ($why), falling back to $next"
     backend_from="$backend_from, fell back from $backend"
@@ -467,10 +528,14 @@ stage_backend_file() {
 # back to Wine's own. Anything else in the prefix is left alone.
 restore_stock_dll() {
   [ -f "$3" ] && [ ! -L "$3" ] || return 0
-  stock="$CX_ROOT/lib/wine/$1/$2.dll"
-  [ -f "$stock" ] || return 0
+  # Wine's own copy, which D3DMetal moves aside. A link in lib/wine is Apple's and is
+  # never copied into a prefix.
+  stock="$backend_root/wine-stock/$1/$2.dll"
+  [ -f "$stock" ] && [ ! -L "$stock" ] || stock="$CX_ROOT/lib/wine/$1/$2.dll"
+  [ -f "$stock" ] && [ ! -L "$stock" ] || return 0
   ! cmp -s "$stock" "$3" || return 0
   for theirs in "$backend_root"/*/"$1"/*.[dD][lL][lL]; do
+    case "$theirs" in "$backend_root"/wine-stock/*) continue ;; esac
     [ -f "$theirs" ] || continue
     base=${theirs##*/}
     [ "$(printf '%s' "${base%.*}" | tr '[:upper:]' '[:lower:]')" = "$2" ] || continue
@@ -516,8 +581,9 @@ activate_backend() {
     done
   done
   if [ "$staging_failed" -eq 1 ]; then
-    graphics_log "$backend could not be staged, falling back to wined3d"
-    backend=wined3d
+    if d3dmetal_engine; then next=d3dmetal; else next=wined3d; fi
+    graphics_log "$backend could not be staged, falling back to $next"
+    backend=$next
     backend_from="$backend_from, fell back after staging failed"
     activate_backend
     return
@@ -532,6 +598,17 @@ activate_backend() {
   done
   backend_overrides="${native:+$native=n,b}"
   [ -z "$builtin" ] || backend_overrides="${backend_overrides:+$backend_overrides;}$builtin=b"
+  # A linked Game Porting Toolkit can bring Apple's nvapi64 into lib/wine. An nvapi that
+  # answers sends some games down NVIDIA-only paths, so it stays disabled unless the game's
+  # conf says NVAPI=1, and then only on D3DMetal, the only backend it talks to.
+  if d3dmetal_engine && [ -e "$CX_ROOT/lib/wine/x86_64-windows/nvapi64.dll" ]; then
+    if [ "$gamefix_nvapi" = 1 ] && [ "$backend" = d3dmetal ]; then
+      backend_overrides="${backend_overrides:+$backend_overrides;}nvapi64=b"
+    else
+      [ "$gamefix_nvapi" != 1 ] || graphics_log "NVAPI=1 not applied, $backend is not d3dmetal"
+      backend_overrides="${backend_overrides:+$backend_overrides;}nvapi64=d"
+    fi
+  fi
   if [ "$backend" = d3dmetal ]; then
     if [ -n "${CX_GRAPHICS_BACKEND:-}" ] && [ "$CX_GRAPHICS_BACKEND" != d3dmetal ]; then
       graphics_log "CX_GRAPHICS_BACKEND=$CX_GRAPHICS_BACKEND replaced by d3dmetal"

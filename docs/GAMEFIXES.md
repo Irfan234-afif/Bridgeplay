@@ -25,6 +25,7 @@ logged, when:
 | `DLLOVERRIDES` | Wine syntax, e.g. `dinput8=n,b;xinput1_3=n` | Added to `WINEDLLOVERRIDES` after the backend's entries and before the launch options' |
 | `MSYNC` | `0`, `1` | `1` turns msync on when the engine supports it; `0` turns it off |
 | `RETINA` | `0`, `1` | Same as `NOTPROTON_RETINA` (High Resolution) |
+| `NVAPI` | `0`, `1` | `1` turns on Apple's `nvapi64` on an engine with a linked Game Porting Toolkit, for `d3dmetal` only. Off by default, since an nvapi that answers sends some games down NVIDIA-only paths |
 | `DXMT_*`, `DXVK_*`, `MVK_*`, `VKD3D_*`, `D3DM_*`, `STAGING_*` | any | Exported as is |
 | `MTL_HUD_ENABLED`, `WINEDEBUG`, `WINE_LARGE_ADDRESS_AWARE`, `WINE_CPU_TOPOLOGY` | any | Exported as is |
 
@@ -35,10 +36,10 @@ Wine uses the last entry for a DLL in `WINEDLLOVERRIDES`. The order is: backend,
 
 | Name | What runs D3D10/11 | D3D12 |
 | --- | --- | --- |
-| `dxmt` | DXMT (Metal), the default | does not work |
-| `dxvk` | DXVK-macOS (MoltenVK); Wine's own `dxgi` stays builtin | vkd3d |
-| `wined3d` | Wine's own DLLs | vkd3d |
-| `d3dmetal` | Apple D3DMetal, only on engines that ship it | D3DMetal |
+| `dxmt` | DXMT master (Metal), the default without D3DMetal | does not work |
+| `dxvk` | DXVK-macOS (MoltenVK); the engine's own `dxgi` stays builtin | vkd3d, or D3DMetal |
+| `wined3d` | Wine's own DLLs, not on an engine with D3DMetal | vkd3d |
+| `d3dmetal` | Apple D3DMetal, on the WineCX engine with a linked Game Porting Toolkit; the default there | D3DMetal |
 
 The backend is picked in this order:
 
@@ -49,16 +50,42 @@ The backend is picked in this order:
 3. `BACKEND=` in a conf file
 4. Auto-detect. If the game's `.exe` imports `d3d12.dll` in its PE import table, the game
    gets `wined3d`. Otherwise it gets `dxmt`. Delay-loaded and `LoadLibrary` imports do not
-   count, and neither does a file that does not parse as a PE
-5. `dxmt`
+   count, and neither does a file that does not parse as a PE. On an engine with D3DMetal
+   every game gets `d3dmetal`
+5. `dxmt`, or `d3dmetal` on an engine with D3DMetal
 
 A backend the engine lacks falls back: `dxvk` → `dxmt` → `wined3d`, and `d3dmetal` → `dxmt`.
+
+### WineCX with D3DMetal
+
+When a Game Porting Toolkit is linked into the WineCX engine
+(`lib/notproton-backends/d3dmetal.enabled`, see [WINECX.md](WINECX.md)), Apple's
+forwarders are that engine's `dxgi`, `d3d10`, `d3d11` and `d3d12` builtins and Wine's own
+are set aside. So on that engine:
+
+- the default, and auto-detection for D3D11 and D3D12 games alike, is `d3dmetal`
+- `wined3d`, from any source (launch options, the Steam panel, a conf, the last launch), is
+  logged as not available and runs `d3dmetal`
+- a missing `dxmt` falls back to `d3dmetal`, and so does a `dxmt` or `dxvk` that cannot be
+  staged into the prefix
+- `dxmt` and `dxvk` still work per game: their DLLs go into the prefix as natives (`n,b`),
+  and `d3d10`/`d3d12` stay builtin, which is Apple's
+- `d3dmetal` sets every D3D DLL (`d3d10`, `d3d10core`, `d3d11`, `d3d12`, `dxgi`) to `b`,
+  exports `CX_GRAPHICS_BACKEND=d3dmetal` and `CX_APPLEGPTK_LIBD3DSHARED_PATH`
+- Apple's `nvapi64` is set to `d` unless the conf says `NVAPI=1` and the backend is
+  `d3dmetal`
+
+Without a linked Game Porting Toolkit the WineCX engine behaves like the WineHQ one.
 Engines without `lib/notproton-backends` have their graphics DLLs built in. They show the
 backend `dxmt-builtin` and do not swap anything.
 
 The chosen backend's DLLs are copied into the prefix's `system32` and `syswow64` and set
-to `n,b`. Every other DLL that any backend ships is set to `b`. When you switch backends, a
-copy left behind by another backend is replaced with Wine's own. `d3dmetal` also sets
+to `n,b`. Wine swaps a DLL carrying the Wine builtin marker found in a prefix for the
+`lib/wine` builtin of the same name, so a marked copy would quietly run Wine's own; the
+engine install strips the marker from DXMT's DLLs for that reason.
+Every other DLL that any backend ships is set to `b`. When you switch backends, a copy
+left behind by another backend is replaced with Wine's own (the set-aside copy on an
+engine with D3DMetal; Apple's files are never copied into a prefix). `d3dmetal` also sets
 `CX_GRAPHICS_BACKEND=d3dmetal`. The run log
 (`notproton-run.log`) shows each decision. The `notproton-backend` file in the game's
 compatdata folder has the current backend and why it was picked.
@@ -78,6 +105,19 @@ A game that needs native input DLLs and verbose loader logs:
 ```
 DLLOVERRIDES=dinput8=n,b;xinput1_3=n,b
 WINEDEBUG=+loaddll
+```
+
+A game on the WineCX engine that runs better on DXMT than on D3DMetal:
+
+```
+BACKEND=dxmt
+```
+
+A D3DMetal game that needs an nvapi to answer:
+
+```
+BACKEND=d3dmetal
+NVAPI=1
 ```
 
 A DXMT game with MetalFX, msync off and High Resolution on:

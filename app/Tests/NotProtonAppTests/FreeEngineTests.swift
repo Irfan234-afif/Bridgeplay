@@ -89,8 +89,9 @@ struct FreeEngineTests {
             build: "t", archive: "a", sha256: "", bases: [], bundleName: "T.app", wineTree: "w",
             renderer: RendererRelease(
                 name: "r", archive: "r", sha256: "", bases: [], tree: "r",
-                files: ["x86_64-windows/d3d11.dll": table["dxmt-d3d11"]!,
-                        "x86_64-windows/winemetal.dll": table["winemetal"]!]),
+                files: ["x86_64-windows/d3d11.dll": table["dxmt-shipped"] ?? table["dxmt-d3d11"]!,
+                        "x86_64-windows/winemetal.dll": table["winemetal"]!],
+                natives: ["x86_64-windows/d3d11.dll": table["dxmt-d3d11"]!]),
             macDriver: table["mac"]!,
             stock: ["x86_64-windows/d3d11.dll": table["stock-d3d11"]!],
             dxvk: BackendRelease(
@@ -138,6 +139,8 @@ struct FreeEngineTests {
         // DXMT's D3D DLLs must differ from Wine's, or the migration check could not tell them apart.
         for (path, hash) in release.renderer.files where !path.contains("winemetal") {
             #expect(release.stock[path] != hash)
+            // Installed without the builtin marker, so the table pins the stripped copy.
+            #expect(table[release.renderer.installPath(of: path)] == release.renderer.natives[path])
         }
     }
 
@@ -213,6 +216,94 @@ struct FreeEngineTests {
         for (path, hash) in FreeEngine.current.dxvk.files {
             #expect(Digest.sha256IfPresent(work.appending(path: "\(FreeEngine.current.dxvk.tree)/\(path)")) == hash)
         }
+    }
+
+    @Test("DXMT is the pinned master build on NotProton's release, shared by both free engines")
+    func dxmtPins() {
+        let dxmt = FreeEngine.current.renderer
+        #expect(dxmt.archive == "dxmt-e94c312.tar.gz")
+        #expect(dxmt.sha256 == "8de0d5b7eb2b96315f6ec8e259c05423ab43212e776196147b30d9f44927f7f0")
+        #expect(dxmt.tree == "e94c312")
+        #expect(dxmt.bases.map(\.absoluteString)
+            == ["https://github.com/raymondchins/NotProton-WineHQ/releases/download/dxmt-e94c312"])
+        // docs/DXMT.md, minus nvapi64, nvngx and the WIP d3d12.
+        #expect(dxmt.files == [
+            "x86_64-unix/winemetal.so": "1d0a1258cbb696e1323d1fde77ebef7fedf5ea32a554bb777a9916321dedc195",
+            "x86_64-windows/d3d10core.dll": "14fef5785b9c83ab1d440d9d8de9d2d875420b9ae468c282737fcd44bb75336b",
+            "x86_64-windows/d3d11.dll": "f2ee8959c19548fb66c5b2a3802ff84967107d2faa3391bafb38c1363ece8a8b",
+            "x86_64-windows/dxgi.dll": "75436305876c11f4b7e8535fc32b0007e157b062dbd1534c1757c310a44bd99e",
+            "x86_64-windows/winemetal.dll": "33dd95086ab29ed03f876c47589b04a1e4a5891c6cbb5af6129309414aa8b0f7",
+            "i386-windows/d3d10core.dll": "7cbefea0f3b766024b85413ec75a2cc32e0431bbcc5f966b0b7515b4d785f3e7",
+            "i386-windows/d3d11.dll": "842b5a3868230e1b3eb829581b362f4ff56c86b318a3ce5b5307fa071485b58d",
+            "i386-windows/dxgi.dll": "51d01ce7f2b9edacaaa3490d838a95bf060ff04db7f42fe746cb62174c484bca",
+            "i386-windows/winemetal.dll": "6ddeb053c5510cffafdabfd27c8a67950f2e37308e6b9f9d1a0c44b9119ac456",
+        ])
+        #expect(!dxmt.files.keys.contains { $0.contains("d3d12") || $0.contains("nv") })
+        #expect(Set(dxmt.natives.keys) == Set(dxmt.files.keys.filter { !RendererRelease.isWinemetal($0) }))
+        #expect(FreeEngineWinecx.current.renderer.sha256 == dxmt.sha256)
+        #expect(FreeEngineWinecx.current.renderer.files == dxmt.files)
+    }
+
+    @Test("Stripping the builtin marker turns a builtin PE into a native one and refuses anything else")
+    func stripsBuiltinMarker() throws {
+        var image = Data(repeating: 0, count: 0x80)
+        image[0] = 0x4d
+        image[1] = 0x5a
+        image.replaceSubrange(0x40 ..< 0x51, with: FreeEngine.builtinMarker)
+        var stripped = image
+        try FreeEngine.stripBuiltinMarker(&stripped)
+        #expect(Array(stripped[0x40 ..< 0x50]) == FreeEngine.dosStub)
+        #expect(stripped.count == image.count)
+        #expect(stripped[0x50...] == image[0x50...])
+        #expect(!WinecxD3DMetal.isBuiltin(try write(stripped)))
+        #expect(WinecxD3DMetal.isBuiltin(try write(image)))
+        // Already native: refused, so a pin mismatch cannot be papered over.
+        #expect(throws: StepFailure.self) { try FreeEngine.stripBuiltinMarker(&stripped) }
+    }
+
+    private func write(_ data: Data) throws -> URL {
+        let url = FileManager.default.temporaryDirectory.appending(path: "np-pe-\(UUID().uuidString).dll")
+        try data.write(to: url)
+        return url
+    }
+
+    // Downloads the real tarball into NotProton's engine cache (where the app and the other
+    // real-archive tests look for it) unless it is already there. NOTPROTON_OFFLINE=1 skips
+    // the download, and the test then runs only against a cached copy.
+    @Test("The real DXMT master tarball downloads, matches every pin and installs as natives")
+    func downloadsAndUnpacksRealDxmt() async throws {
+        let dxmt = FreeEngine.current.renderer
+        let cached = FreeEngine.downloads.appending(path: dxmt.archive)
+        if Digest.sha256IfPresent(cached) != dxmt.sha256,
+           ProcessInfo.processInfo.environment["NOTPROTON_OFFLINE"] == "1" { return }
+        let archive = try await PinnedDownload.obtain(
+            file: dxmt.archive, sha256: dxmt.sha256, bases: dxmt.bases,
+            into: FreeEngine.downloads, step: FreeEngine.step, source: "GitHub"
+        )
+        #expect(Digest.sha256IfPresent(archive) == dxmt.sha256)
+
+        let work = try makeEngines()
+        defer { try? FileManager.default.removeItem(at: work) }
+        let result = try Shell.run("/usr/bin/tar", ["-xf", archive.path(percentEncoded: false), "-C", work.path(percentEncoded: false)])
+        #expect(result.status == 0)
+        let tree = work.appending(path: dxmt.tree)
+        for (path, hash) in dxmt.files {
+            #expect(Digest.sha256IfPresent(tree.appending(path: path)) == hash, "\(path)")
+        }
+
+        let root = work.appending(path: "root")
+        try FreeEngine.installRenderer(dxmt, from: tree, root: root, step: FreeEngine.step)
+        for path in dxmt.files.keys {
+            let installed = root.appending(path: dxmt.installPath(of: path))
+            #expect(Digest.sha256IfPresent(installed) == dxmt.installedHash(of: path), "\(path)")
+            // winemetal stays a builtin beside its unix half; the D3D DLLs load as natives.
+            if path.hasSuffix(".dll") {
+                #expect(WinecxD3DMetal.isBuiltin(installed) == RendererRelease.isWinemetal(path), "\(path)")
+            }
+        }
+        // The WIP D3D12 backend and the DLSS pair are never staged.
+        let staged = try FileManager.default.subpathsOfDirectory(atPath: root.path(percentEncoded: false))
+        #expect(!staged.contains { $0.hasSuffix("d3d12.dll") || $0.contains("nvapi") || $0.contains("nvngx") })
     }
 
     @Test("Shipped game fixes are located in the payload and installed beside the user's own")

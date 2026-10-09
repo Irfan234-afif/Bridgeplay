@@ -24,21 +24,38 @@ struct FreeEngineRelease: Sendable {
 // DXMT replaces Wine's own D3D10/11 and DXGI. Wine's wined3d goes through macOS
 // OpenGL 4.1, which tops out below feature level 11 and so fails any Unreal or
 // Unity game that needs it, and DXVK pays for a second translation through
-// MoltenVK. DXMT goes to Metal directly, the way D3DMetal does, and is MIT licensed.
+// MoltenVK. DXMT goes to Metal directly, the way D3DMetal does. Both free engines take
+// the same build: DXMT master e94c312 (https://github.com/3Shain/dxmt/tree/e94c312f5c054263acf261cfa109edf13e757587),
+// LGPL-2.1-or-later since ec357fd (v0.80 was the last MIT release), built by
+// scripts/build-dxmt.sh as docs/DXMT.md describes.
 struct RendererRelease: Sendable {
     let name: String
     let archive: String
     let sha256: String
     let bases: [URL]
     let tree: String
-    // Path inside the archive tree -> sha256. The winemetal pair goes into lib/wine,
-    // where the unix half and its PE stub are found by the loader; the D3D DLLs go to
-    // FreeEngine.dxmtDirectory, so lib/wine keeps Wine's own.
+    // Path inside the archive tree -> sha256 as shipped. The winemetal pair goes into
+    // lib/wine, where the unix half and its PE stub are found by the loader; the D3D DLLs
+    // go to FreeEngine.dxmtDirectory, so lib/wine keeps Wine's own.
     let files: [String: String]
+    // The D3D DLLs again, path -> sha256 once FreeEngine.stripBuiltinMarker has run. The
+    // launcher copies them into a prefix as natives, and Wine swaps any file carrying the
+    // builtin marker for the lib/wine builtin of the same name (load_builtin in
+    // dlls/ntdll/unix/loader.c), which would quietly run wined3d instead of DXMT.
+    let natives: [String: String]
+
+    static func isWinemetal(_ path: String) -> Bool {
+        path.hasSuffix("/winemetal.dll") || path.hasSuffix("/winemetal.so")
+    }
 
     func installPath(of path: String) -> String {
-        path.hasSuffix("/winemetal.dll") || path.hasSuffix("/winemetal.so")
-            ? "lib/wine/\(path)" : "\(FreeEngine.dxmtDirectory)/\(path)"
+        Self.isWinemetal(path) ? "lib/wine/\(path)" : "\(FreeEngine.dxmtDirectory)/\(path)"
+    }
+
+    // The sha256 the file has once installed: the winemetal pair as shipped, the D3D DLLs
+    // with the builtin marker stripped.
+    func installedHash(of path: String) -> String? {
+        Self.isWinemetal(path) ? files[path] : natives[path]
     }
 }
 
@@ -66,26 +83,7 @@ enum FreeEngine {
         bases: [URL(string: "https://github.com/Gcenx/macOS_Wine_builds/releases/download/11.15")!],
         bundleName: "WineHQ 11.15.app",
         wineTree: "Wine Devel.app/Contents/Resources/wine",
-        renderer: RendererRelease(
-            name: "DXMT 0.80",
-            archive: "dxmt-v0.80-builtin.tar.gz",
-            sha256: "8f260e36b5739e68f3bad613381441385c4dc7b85b78ba8de653d5a6a264529d",
-            bases: [URL(string: "https://github.com/3Shain/dxmt/releases/download/v0.80")!],
-            tree: "v0.80",
-            // nvapi64 and nvngx are left out: they only serve DLSS to MetalFX, and an
-            // nvapi that answers makes some games take NVIDIA-only paths.
-            files: [
-                "x86_64-unix/winemetal.so": "3d50d7f39c64778c71d0af2fce1cde818d09ffbce7c4f7b8ae24ae1df567c0ca",
-                "x86_64-windows/d3d10core.dll": "833d26971abc8661efc8b5cc18548c70ce8e482e4ea4b1d3f69a367612264d26",
-                "x86_64-windows/d3d11.dll": "7ca382af0eb32d8a432f6efb14d594fefb45673663be1f7e6682254bff885c47",
-                "x86_64-windows/dxgi.dll": "fc58aae0aba511a1ec4d2417e5bba6adb888bb14315d0f59cccdfd27f670d544",
-                "x86_64-windows/winemetal.dll": "514245d533c750599614311a792c45ed600aef52948571d98c0fc70fd3df16e0",
-                "i386-windows/d3d10core.dll": "c5a26310d14a30c3e1700a4d0c9865be28a11351a5c4dc5b83ab1bd8fcf7662f",
-                "i386-windows/d3d11.dll": "9afc2b3419818618c4c87274435a28935b0df002caa4b9a8d3a88d3dc846b17d",
-                "i386-windows/dxgi.dll": "7df8cdf66e12a108410002abc77b01f70aa59b8a36a70fa0bc6ae3b056841319",
-                "i386-windows/winemetal.dll": "20a6865facebdaac92b6c06fadf37d2efb5a242b22ca1c349bb57d7ad43df8e3",
-            ]
-        ),
+        renderer: dxmt,
         macDriver: "68d1c10cb4ec80beb2e97dcb8df5f81768f4f6e62848932d6bee5270dcf54982",
         stock: [
             "x86_64-windows/d3d10core.dll": "ff08e21a331e4160779ae140b0fd67c25f1557803b0f865467025a55e6133800",
@@ -112,6 +110,38 @@ enum FreeEngine {
                 "i386-windows/d3d11.dll": "2173b081a8660dd70a089dac875a829da6cd1a6230b23fd1daa2a7d7baa1cb03",
             ]
         )
+    )
+
+    // Shared by both free engines. Hosted on NotProton's own release, since upstream
+    // publishes no build of master; the per-file hashes are in docs/DXMT.md. d3d12.dll
+    // (x86_64-windows-d3d12/ in the tarball) is the unfinished backend and is never staged.
+    static let dxmt = RendererRelease(
+        name: "DXMT e94c312",
+        archive: "dxmt-e94c312.tar.gz",
+        sha256: "8de0d5b7eb2b96315f6ec8e259c05423ab43212e776196147b30d9f44927f7f0",
+        bases: [URL(string: "https://github.com/raymondchins/NotProton-WineHQ/releases/download/dxmt-e94c312")!],
+        tree: "e94c312",
+        // nvapi64 and nvngx are left out: they only serve DLSS to MetalFX, and an
+        // nvapi that answers makes some games take NVIDIA-only paths.
+        files: [
+            "x86_64-unix/winemetal.so": "1d0a1258cbb696e1323d1fde77ebef7fedf5ea32a554bb777a9916321dedc195",
+            "x86_64-windows/d3d10core.dll": "14fef5785b9c83ab1d440d9d8de9d2d875420b9ae468c282737fcd44bb75336b",
+            "x86_64-windows/d3d11.dll": "f2ee8959c19548fb66c5b2a3802ff84967107d2faa3391bafb38c1363ece8a8b",
+            "x86_64-windows/dxgi.dll": "75436305876c11f4b7e8535fc32b0007e157b062dbd1534c1757c310a44bd99e",
+            "x86_64-windows/winemetal.dll": "33dd95086ab29ed03f876c47589b04a1e4a5891c6cbb5af6129309414aa8b0f7",
+            "i386-windows/d3d10core.dll": "7cbefea0f3b766024b85413ec75a2cc32e0431bbcc5f966b0b7515b4d785f3e7",
+            "i386-windows/d3d11.dll": "842b5a3868230e1b3eb829581b362f4ff56c86b318a3ce5b5307fa071485b58d",
+            "i386-windows/dxgi.dll": "51d01ce7f2b9edacaaa3490d838a95bf060ff04db7f42fe746cb62174c484bca",
+            "i386-windows/winemetal.dll": "6ddeb053c5510cffafdabfd27c8a67950f2e37308e6b9f9d1a0c44b9119ac456",
+        ],
+        natives: [
+            "x86_64-windows/d3d10core.dll": "aeb43e1ca7d9f221b9f0070c8654fa3579fd767006272cf675a9113e27bc6e72",
+            "x86_64-windows/d3d11.dll": "c1c8c4779686990bf343162a8804dd2d1564b2a893e64e5ddcc7db5e76ce409e",
+            "x86_64-windows/dxgi.dll": "1bb4939ff43e676eac8b3f3cb0583985ab8f7b1a8e11760d14931da3fc44223b",
+            "i386-windows/d3d10core.dll": "e851c39641f66d64a3e4460e7046900cd234b11f44d793826d2f094e9d2166d9",
+            "i386-windows/d3d11.dll": "a654ea3851ccc128a1f33d978462872e22fa6430ea85eff6ba9549de95788652",
+            "i386-windows/dxgi.dll": "91f38df103412235793f84efe06b87f6f6fc3a4791d4f8d9f8cc2e16bc137d53",
+        ]
     )
 
     static let macDriverPath = "lib/wine/x86_64-unix/winemac.so"
@@ -141,7 +171,9 @@ enum FreeEngine {
     static func expectedFiles(_ release: FreeEngineRelease = current) -> [String: String] {
         var table: [String: String] = [macDriverPath: release.macDriver]
         for (path, hash) in release.stock { table["lib/wine/\(path)"] = hash }
-        for (path, hash) in release.renderer.files { table[release.renderer.installPath(of: path)] = hash }
+        for path in release.renderer.files.keys {
+            table[release.renderer.installPath(of: path)] = release.renderer.installedHash(of: path)
+        }
         for (path, hash) in release.dxvk.files { table["\(dxvkDirectory)/\(path)"] = hash }
         return table
     }
@@ -162,7 +194,7 @@ enum FreeEngine {
     // The first layout baked DXMT's dxgi, d3d11 and d3d10core over Wine's in lib/wine.
     static func hasLegacyLayout(root: URL, release: FreeEngineRelease = current) -> Bool {
         release.renderer.files.contains { path, hash in
-            !path.hasSuffix("winemetal.dll") && !path.hasSuffix("winemetal.so")
+            !RendererRelease.isWinemetal(path)
                 && Digest.sha256IfPresent(root.appending(path: "lib/wine/\(path)")) == hash
         }
     }
@@ -245,13 +277,7 @@ enum FreeEngine {
         if let renderer {
             try untar(renderer, into: extracted)
             let tree = extracted.appending(path: release.renderer.tree, directoryHint: .isDirectory)
-            for (path, hash) in release.renderer.files.sorted(by: { $0.key < $1.key }) {
-                let source = tree.appending(path: path)
-                guard Digest.sha256IfPresent(source) == hash else {
-                    throw StepFailure(step: step, detail: "\(release.renderer.archive) has no pinned \(path).")
-                }
-                try place(source, at: root.appending(path: release.renderer.installPath(of: path)))
-            }
+            try installRenderer(release.renderer, from: tree, root: root, step: step)
             try installMacDriver(root: root, release: release)
         }
 
@@ -293,6 +319,51 @@ enum FreeEngine {
         }
         try fm.moveItem(at: shaped, to: target)
         return CrossOverSource.inspect(bundle: target)
+    }
+
+    // Lays the renderer out under root: the winemetal pair as shipped into lib/wine, the
+    // D3D DLLs with the builtin marker stripped into dxmtDirectory. Every file is checked
+    // against its pin before and after, so a winemetal from another build never lands
+    // beside these DLLs (they share one unix-call table).
+    static func installRenderer(_ renderer: RendererRelease, from tree: URL, root: URL, step: String) throws {
+        for (path, hash) in renderer.files.sorted(by: { $0.key < $1.key }) {
+            let source = tree.appending(path: path)
+            guard Digest.sha256IfPresent(source) == hash else {
+                throw StepFailure(step: step, detail: "\(renderer.archive) has no pinned \(path).")
+            }
+            let destination = root.appending(path: renderer.installPath(of: path))
+            if RendererRelease.isWinemetal(path) {
+                try place(source, at: destination)
+                continue
+            }
+            var image = try Data(contentsOf: source)
+            try stripBuiltinMarker(&image)
+            guard Digest.sha256(of: image) == renderer.natives[path] else {
+                throw StepFailure(step: step, detail: "\(path) from \(renderer.archive) does not match its native pin.")
+            }
+            try FileManager.default.createDirectory(
+                at: destination.deletingLastPathComponent(), withIntermediateDirectories: true)
+            try? FileManager.default.removeItem(at: destination)
+            try image.write(to: destination)
+        }
+    }
+
+    static let builtinMarker = Array("Wine builtin DLL".utf8) + [0]
+    // The bytes winecx-gptk writes over the marker (a plain DOS stub), so DXMT 0.80 stripped
+    // here hashes the same as the copy in the WineCX archive.
+    static let dosStub: [UInt8] = [0x0e, 0x1f, 0xba, 0x0e, 0x00, 0xb4, 0x09, 0xcd,
+                                   0x21, 0xb8, 0x01, 0x4c, 0xcd, 0x21, 0x90, 0x90]
+
+    // Wine reads the 17 bytes at 0x40 as the builtin marker. Without it the DLL is an
+    // ordinary native, which is what a per-game backend in a prefix has to be.
+    static func stripBuiltinMarker(_ image: inout Data) throws {
+        let start = image.startIndex
+        guard image.count > 0x51, image[start] == 0x4d, image[start + 1] == 0x5a,
+              Array(image[(start + 0x40) ..< (start + 0x51)]) == builtinMarker
+        else {
+            throw StepFailure(step: step, detail: "A DXMT DLL does not carry the Wine builtin marker.")
+        }
+        image.replaceSubrange((start + 0x40) ..< (start + 0x50), with: dosStub)
     }
 
     private static func place(_ source: URL, at destination: URL) throws {

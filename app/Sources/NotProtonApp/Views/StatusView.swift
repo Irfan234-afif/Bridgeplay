@@ -532,13 +532,14 @@ struct StatusView: View {
         if rows.isEmpty {
             StatusRow(
                 title: "Wine Engine",
-                value: "None found. Download the free WineHQ engine, or use CrossOver "
+                value: "None found. Download the free WineHQ or WineCX engine, or use CrossOver "
                     + "(\(SupportedRunners.versionList)).",
                 tone: .bad
             )
         }
-        if !status.freeEngineInstalled {
-            let outdated = snapshot.crossOver.contains(where: \.isFree)
+        let winehq = status.freeEngineState(FreeEngine.current.build)
+        if winehq != .current {
+            let outdated = winehq == .outdated
             StatusRow(
                 title: "Free Wine Engine",
                 value: outdated
@@ -552,6 +553,40 @@ struct StatusView: View {
                     help: "Download WineHQ and set the compatibility tool up from it.",
                     isEnabled: status.canInstall
                 ) { Task { await status.installFreeEngine() } }
+            )
+        }
+        let winecx = status.freeEngineState(FreeEngineWinecx.current.build)
+        if winecx != .current {
+            let outdated = winecx == .outdated
+            StatusRow(
+                title: "WineCX Engine",
+                value: "WineCX 11.15 with msync and D3DMetal, no CrossOver license needed.",
+                tone: outdated ? .warning : .neutral,
+                action: StatusAction(
+                    label: outdated ? "Update & Set Up" : "Download & Set Up",
+                    isProminent: rows.isEmpty,
+                    help: "Download WineCX and set the compatibility tool up from it.",
+                    isEnabled: status.canInstall
+                ) { Task { await status.installWinecxEngine() } }
+            )
+        }
+        if let source = snapshot.gptkSource {
+            StatusRow(
+                title: "Game Porting Toolkit",
+                value: "Linked from \(source).",
+                tone: .ok
+            )
+        } else {
+            StatusRow(
+                title: "Game Porting Toolkit",
+                value: "Not found. Copy the redist/lib folder of Apple's Game Porting Toolkit to "
+                    + "~/Library/Application Support/notproton/gptk, then press Rescan.",
+                tone: .neutral,
+                action: StatusAction(
+                    label: "Rescan",
+                    help: "Look for the Game Porting Toolkit again and link it into the WineCX engine.",
+                    isEnabled: status.canInstall
+                ) { Task { await status.rescanGameportingToolkit() } }
             )
         }
         let tools = SupportedRunners.tools(for: snapshot.installedRunners)

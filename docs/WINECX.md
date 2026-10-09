@@ -12,8 +12,9 @@ Compared with the WineHQ 11.15 engine it adds:
 - **D3DMetal support** through CrossOver's hooks (winemac `macdrv_functions`, the
   `libd3dshared` non-native code regions in ntdll, and the d3dkmt answers). This only works
   with a Game Porting Toolkit you install yourself. NotProton never downloads or ships it.
-- **DXMT 0.80 and DXVK-macOS 1.10.3** as backends a game opts into. Wine's own Direct3D stays
-  the builtin.
+- **DXMT master and DXVK-macOS 1.10.3** as backends a game opts into. DXMT is the same
+  `e94c312` build as the WineHQ engine ([DXMT.md](DXMT.md)), not the archive's 0.80. The
+  builtin Direct3D is Wine's own, or D3DMetal once a Game Porting Toolkit is linked.
 
 In NotProton it is build `winecx-11.15`, tool `notproton-winecx`, shown as "WineCX 11.15
 (msync, D3DMetal)". Like the WineHQ engine it needs no CrossOver license. The licence check
@@ -42,78 +43,124 @@ waiting on.
 
 Layout inside the archive: `Libraries/Wine` is the Wine tree (`bin/`, `lib/wine/{x86_64-unix,
 x86_64-windows,i386-windows}`, bundled dylibs in `lib/`, `share/wine` with wine-mono 11.2.0
-and gecko). `Libraries/DXMT/{x64,x32}` holds DXMT's frontends with the builtin marker
-stripped. `Libraries/DXVK/{x64,x32}` holds DXVK. DXMT's `winemetal` is already a builtin in
-`lib/wine`.
+and gecko). `Libraries/DXMT/{x64,x32}` holds DXMT 0.80's frontends with the builtin marker
+stripped, which NotProton does not use. `Libraries/DXVK/{x64,x32}` holds DXVK. A 0.80-era
+`winemetal` is a builtin in `lib/wine`, which NotProton replaces.
 
 ## What NotProton lays out
 
-The engine root (`…/WineCX 11.15.app/Contents/SharedSupport/CrossOver`, cloned into the runner)
-is the archive's `Libraries/Wine`, plus:
+The engine root (`…/WineCX 11.15.app/Contents/SharedSupport/CrossOver`, cloned into the runner
+`runners/crossover-winecx-11.15`) is the archive's `Libraries/Wine`, plus:
 
 ```
 .notproton-msync                                  engine supports msync
-lib/notproton-backends/dxmt/{x86_64,i386}-windows/{d3d11,d3d10core,dxgi}.dll
-lib/notproton-backends/dxvk/{x86_64,i386}-windows/{d3d11,d3d10core}.dll
-lib/notproton-backends/d3dmetal.enabled           only when a GPTK is linked in
-lib/notproton-backends/d3dmetal/x86_64-windows/{d3d10,d3d11,d3d12,dxgi}.dll -> your GPTK
-lib/notproton-backends/d3dmetal/x86_64-unix/{d3d10,d3d11,d3d12,dxgi}.so   -> ../../../external/libd3dshared.dylib
-lib/external/{D3DMetal.framework,libd3dshared.dylib}                      -> your GPTK
+lib/wine/x86_64-unix/winemetal.so                 DXMT master, replacing the archive's
+lib/wine/{x86_64,i386}-windows/winemetal.dll      DXMT master, replacing the archive's
+lib/notproton-backends/dxmt/{x86_64,i386}-windows/{d3d11,d3d10core,dxgi}.dll   DXMT master, marker stripped
+lib/notproton-backends/dxvk/{x86_64,i386}-windows/{d3d11,d3d10core}.dll        from the archive
 ```
 
-`lib/wine` is left as shipped, with Wine's own `d3d10/d3d11/d3d10core/d3d12/dxgi`. Every
-backend file is pinned by sha256 (`FreeEngineWinecx.current.backends`). nvapi64 and nvngx are
-left out, as they are for the WineHQ engine. The DXVK repack has no `dxgi.dll`.
-
-`d3dmetal.enabled` is a `key=value` file: `source=` (the GPTK `lib` folder), `version=`
-(D3DMetal.framework's version), `libd3dshared=lib/external/libd3dshared.dylib` (the path to
-export as `CX_APPLEGPTK_LIBD3DSHARED_PATH`, relative to `CX_ROOT`) and
-`dllpath=lib/notproton-backends/d3dmetal`.
+DXMT comes from `dxmt-e94c312.tar.gz` (the WineHQ engine's pin, shared download cache).
+`winemetal.so` and both `winemetal.dll` are replaced together, since they share one unix-call
+table and never mix with 0.80. The D3D DLLs get the 16 bytes of the Wine builtin marker at
+0x40 overwritten with a DOS stub, the same bytes winecx-gptk writes, so they load as natives
+from a prefix: Wine swaps a marked DLL found in a prefix for the `lib/wine` builtin of the
+same name (`load_builtin`, `dlls/ntdll/unix/loader.c`). Each is pinned before and after.
+nvapi64, nvngx and the WIP `d3d12.dll` are left out. The DXVK repack has no `dxgi.dll`.
+Every file is pinned by sha256 (`FreeEngineWinecx.expectedFiles`); a pin change makes an
+installed engine show "Update & Set Up".
 
 DXMT on this engine does **not** need `winemac-patch/`. winecx's `winemac.so` already exports
-`_macdrv_functions` (`dlls/winemac.drv/d3dmetal.c`). Its first nine entries and the
-`hwnd/cocoa_window/cocoa_view/client_cocoa_view` head of the window data are what DXMT 0.80's
-`winemetal_unix.c` reads, and DXMT only uses `client_cocoa_view`.
+`_macdrv_functions` (`dlls/winemac.drv/d3dmetal.c`), and the table DXMT reads is unchanged
+between 0.80 and master.
+
+## D3DMetal: the builtin model
+
+Apple's forwarders only work as builtins: only a builtin gets its unix half
+(`get_builtin_unix_funcs`), and Wine searches its own `lib/wine` before any `WINEDLLPATH`
+entry, swapping a marked copy in a prefix for the `lib/wine` builtin. So, as Whisky does,
+a linked Game Porting Toolkit *becomes* the engine's Direct3D builtins:
+
+```
+lib/wine/x86_64-windows/{d3d10,d3d11,d3d12,dxgi}.dll  -> <gptk>/wine/x86_64-windows/<name>
+lib/wine/x86_64-unix/{d3d10,d3d11,d3d12,dxgi}.so      -> <gptk>/wine/x86_64-unix/<name>.so
+                                                         (or <gptk>/external/libd3dshared.dylib
+                                                         when the GPTK has no unix folder)
+lib/wine/x86_64-{windows,unix}/nvapi64.{dll,so}       -> <gptk>, when the GPTK has it
+lib/external/{D3DMetal.framework,libd3dshared.dylib}  -> <gptk>/external/
+lib/notproton-backends/wine-stock/x86_64-windows/{d3d10,d3d11,d3d12,dxgi}.dll  Wine's originals
+lib/notproton-backends/d3dmetal.enabled
+```
+
+**Link** (`WinecxD3DMetal.link`): each of Wine's four DLLs is checked against its pin
+(`FreeEngineWinecx.current.d3dStock`) and moved, not copied, into `wine-stock`. A DLL that
+does not match refuses the link. Then the symlinks are created, every link is checked to
+resolve, and `d3dmetal.enabled` is written last. Nothing of Apple's is copied. A failure at
+any step runs unlink.
+
+**Unlink** (`WinecxD3DMetal.unlink`): the marker goes first, then only symlinks are removed,
+and Wine's originals are moved back from `wine-stock`, byte for byte. A real file is never
+deleted. `lib/external` keeps winecx's `README`.
+
+The engine passes its layout check in exactly two states: stock (Wine's four DLLs in
+`lib/wine` under their pins, no `wine-stock`, no `.so` for them, no marker) or linked (the
+marker, symlinks in `lib/wine` and `lib/external`, Wine's four intact in `wine-stock`).
+Anything else makes the engine show "Update & Set Up". A Game Porting Toolkit that was moved
+or deleted leaves the linked shape with dangling links: the Status page then shows it as not
+found, and Rescan unlinks.
+
+Linking happens when the engine is installed (before the runner is cloned from it, so the
+runner carries the same links) and when you press **Rescan**, which relinks or unlinks both
+the engine and `runners/crossover-winecx-11.15`. It refuses while a game is running. The
+32-bit side is untouched: D3DMetal has no i386 half.
+
+`d3dmetal.enabled` is a `key=value` file: `source=` (the GPTK `lib` folder), `version=`
+(D3DMetal.framework's version), `libd3dshared=lib/external/libd3dshared.dylib` (exported as
+`CX_APPLEGPTK_LIBD3DSHARED_PATH`, relative to `CX_ROOT`) and `model=builtin`.
+
+What `compat_run.sh` does with it is in [GAMEFIXES.md](GAMEFIXES.md#winecx-with-d3dmetal):
+`d3dmetal` becomes the default and the D3D12 choice, `wined3d` runs `d3dmetal`, and `dxmt`
+and `dxvk` still work per game as natives.
+
+`nvngx-on-metalfx.dll` is not linked. It only serves DLSS through Apple's nvapi, and
+CrossOver renames it to `nvngx.dll` per prefix, which NotProton does not do. Apple's
+`nvapi64` is linked but disabled per game unless its conf says `NVAPI=1`.
 
 ## Using D3DMetal with your own Game Porting Toolkit
 
-Apple's licence does not let NotProton redistribute D3DMetal, so you supply it. NotProton looks
-in this order and links the first complete copy:
+Apple's licence does not let NotProton redistribute D3DMetal, so you supply it:
 
-1. `~/Library/Application Support/notproton/gptk/`. Copy the **`redist/lib` folder's contents**
-   from Apple's "Evaluation environment for Windows games" disk image here, so you end up
-   with `gptk/external/` and `gptk/wine/`. The `redist` folder itself, or the whole volume,
-   is also accepted. `external/` alone is not enough: D3DMetal also needs Apple's four PE
-   forwarders from `wine/x86_64-windows`.
-2. `/Applications/Game Porting Toolkit.app`. This is the default location for
-   `brew install --cask gcenx/wine/game-porting-toolkit`, which looks in
-   `Contents/Resources/wine/lib`.
-3. `~/Applications/Game Porting Toolkit.app`.
+1. Download the Game Porting Toolkit from Apple:
+   https://developer.apple.com/download/all/?q=Game%20Porting%20Toolkit (free Apple
+   developer account).
+2. Open the disk image ("Evaluation environment for Windows games").
+3. Copy the **contents of its `redist/lib` folder** into
+   `~/Library/Application Support/notproton/gptk/`, so you end up with `gptk/external/` and
+   `gptk/wine/`.
+4. In NotProton's Status page, press **Rescan** on the "Game Porting Toolkit" row. It turns
+   green with "Linked from <path>." If the WineCX engine is not installed yet, "Download & Set
+   Up" on the "WineCX Engine" row links it during setup.
+
+NotProton looks in this order and links the first complete copy: that folder (the
+`redist` folder itself, or the whole volume, is also accepted), then
+`/Applications/Game Porting Toolkit.app` (`brew install --cask gcenx/wine/game-porting-toolkit`,
+which keeps it in `Contents/Resources/wine/lib`), then `~/Applications/Game Porting Toolkit.app`.
 
 A copy counts only when `external/libd3dshared.dylib`, `external/D3DMetal.framework` and
-`wine/x86_64-windows/{d3d10,d3d11,d3d12,dxgi}.dll` are all present, and each forwarder
-carries the `Wine builtin DLL` marker. NotProton creates symlinks only, and writes the marker
-last. Linking happens when the engine is installed. After you install or move a GPTK, set
-the engine up again (`WinecxD3DMetal.refresh(root:)`). A GPTK that disappears leaves
-dangling links, which `isLinked(root:)` reports as unlinked. A refresh then removes the
-layout and the marker. D3DMetal has no i386 half, so 32-bit games cannot use it.
+`wine/x86_64-windows/{d3d10,d3d11,d3d12,dxgi}.dll` are all present and each forwarder carries
+the `Wine builtin DLL` marker. GPTK 4.0 beta 2 also has `wine/x86_64-unix/<name>.so` (links
+to `../../external/libd3dshared.dylib`), `nvapi64` and `nvngx-on-metalfx`, `License.rtf` and
+`SOURCE.txt`; the unix halves and nvapi64 are linked when present. NotProton only reads the
+folder.
 
 ## Risks
 
-- **D3DMetal per game is not solved by this layout alone.** Apple's forwarders are winebuild
-  builtins and only work when loaded as builtins: only a builtin gets its unix half
-  (`get_builtin_unix_funcs`). Wine searches its own `lib/wine` before any `WINEDLLPATH` entry
-  (`set_dll_path` in `dlls/ntdll/unix/loader.c`, winecx `5b45f45`). A builtin-marked copy in
-  a prefix is swapped for the `lib/wine` builtin of the same name (`load_builtin`), and a
-  copy with the marker stripped loads as native with no unix half. So while `lib/wine`
-  keeps Wine's `d3d12/dxgi`, neither `WINEDLLPATH` nor prefix overrides reach
-  `lib/notproton-backends/d3dmetal`. Whisky gets around this by replacing the `lib/wine`
-  builtins outright (`GPTKImporter+Deployment.swift`). DXMT and DXVK do not have this problem
-  because they load as natives from the prefix with `n,b` overrides. The consumer
-  (`compat_run.sh`) needs one of two things: a per-backend loader tree, meaning a
-  `lib/wine` whose `ntdll.so` and loader are real clones with the forwarders in its
-  `x86_64-windows`, because Wine derives the DLL directory from `ntdll.so`'s real path; or
-  the Whisky model, with D3DMetal as the builtin and DXMT/DXVK/wined3d opted into per game.
+- **D3DMetal is engine-wide.** With a GPTK linked, every game on the WineCX engine that
+  does not choose `dxmt` or `dxvk` runs D3DMetal, and Wine's `wined3d` is not reachable on
+  that engine (use the WineHQ engine for it). A `dxmt`/`dxvk` game still gets Apple's
+  `d3d10`/`d3d12` builtins. `wineboot --update` copies `lib/wine` builtins into a prefix, so
+  Apple's forwarders can end up in a prefix's `system32`, as they do under Whisky. No game was
+  launched in this work.
 - **Upstream maturity.** The runtimes are CI builds from one maintainer, tagged automatically.
   The `runtime-v4.5.1xx` tags carry only a version table. The 11.15 notes
   ([v4.5.0](https://github.com/dappermint/winecx-gptk/releases/tag/v4.5.0),
@@ -140,7 +187,8 @@ layout and the marker. D3DMetal has no i386 half, so 32-bit games cannot use it.
 - **DXVK.** The archive's DXVK has no `dxgi.dll` for either arch. A 32-bit game on DXVK paired
   with Wine's dxgi can fail with "Adapter is not a DXVK adapter" (winecx-gptk `build.yml`
   comment).
-- **Licences.** Wine is LGPL-2.1+, DXMT MIT, DXVK zlib, MoltenVK Apache-2.0. The tarball also
+- **Licences.** Wine is LGPL-2.1+, DXMT master LGPL-2.1+ (source at
+  https://github.com/3Shain/dxmt/tree/e94c312f5c054263acf261cfa109edf13e757587), DXVK zlib, MoltenVK Apache-2.0. The tarball also
   bundles nixpkgs libraries: ffmpeg 7.1.1 built `--enable-gpl` with x264/x265 (GPL-3.0+),
   and gstreamer's fdk-aac plugin. It ships **no licence texts**, and winecx-gptk has no
   licence of its own. NotProton only downloads the upstream release on the user's machine

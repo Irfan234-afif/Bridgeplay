@@ -48,9 +48,11 @@ license check is skipped only for loaders whose hash pins the free build.
 against. Differences from CrossOver to be aware of:
 
 - It is an x86_64 build and runs under Rosetta 2, like the Rosetta build of CrossOver.
-- Direct3D 10/11 goes through [DXMT](https://github.com/3Shain/dxmt) (MIT), downloaded and pinned
-  alongside Wine, which translates straight to Metal. Wine's own wined3d cannot reach feature level 11
-  on macOS OpenGL. D3DMetal is Apple's and only works with CrossOver's Wine, so it is not used.
+- Direct3D 10/11 goes through [DXMT](https://github.com/3Shain/dxmt) (master `e94c312`, LGPL-2.1+,
+  see `docs/DXMT.md`), downloaded and pinned alongside Wine, which translates straight to Metal.
+  Wine's own wined3d cannot reach feature level 11 on macOS OpenGL. D3DMetal is Apple's and needs
+  CrossOver's Wine changes, so this engine does not use it; the WineCX engine can, with a Game
+  Porting Toolkit you supply (`docs/WINECX.md`).
 - DXMT needs macdrv functions upstream Wine hides; NotProton ships a rebuilt `winemac.so`
   that exports them (see `winemac-patch/`).
 - D3D 12 has no fast path; vkd3d over the bundled MoltenVK is limited.

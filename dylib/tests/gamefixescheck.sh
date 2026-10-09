@@ -6,7 +6,7 @@ SRC="${1:-$(dirname "$0")/../feats/compat_run.sh}"
 
 functions=""
 for name in gamefix_log valid_dll_overrides gamefix_reason gamefix_read gamefix_apply_env \
-	load_gamefixes resolve_msync graphics_log backend_dlls managed_dlls backend_available \
+	load_gamefixes resolve_msync graphics_log d3dmetal_engine backend_dlls managed_dlls backend_available \
 	backend_record pe_word pe_words pe_rva_offset imports_d3d12 select_backend stage_backend_file restore_stock_dll \
 	activate_backend record_backend compose_dll_overrides; do
 	body=$(sed -n "/^$name() {\$/,/^}\$/p" "$SRC")
@@ -41,7 +41,7 @@ new_case() {
 		"$case_dir/game"
 	for arch in x86_64-windows i386-windows; do
 		mkdir -p "$case_dir/engine/lib/wine/$arch"
-		for dll in dxgi d3d11 d3d10core d3d12 d3d9; do
+		for dll in dxgi d3d10 d3d11 d3d10core d3d12 d3d9; do
 			printf 'stock %s %s\n' "$arch" "$dll" > "$case_dir/engine/lib/wine/$arch/$dll.dll"
 		done
 	done
@@ -53,6 +53,18 @@ engine() {
 		case "$file" in
 			d3dmetal.enabled) mkdir -p "$case_dir/engine/lib/notproton-backends"
 				: > "$case_dir/engine/lib/notproton-backends/d3dmetal.enabled" ;;
+			# WinecxD3DMetal.link: Wine's four set aside, Apple's forwarders linked in their place.
+			d3dmetal-linked)
+				stock="$case_dir/engine/lib/notproton-backends/wine-stock/x86_64-windows"
+				mkdir -p "$stock" "$case_dir/gptk"
+				: > "$case_dir/engine/lib/notproton-backends/d3dmetal.enabled"
+				for dll in dxgi d3d10 d3d11 d3d12; do
+					mv "$case_dir/engine/lib/wine/x86_64-windows/$dll.dll" "$stock/$dll.dll"
+					printf 'apple %s\n' "$dll" > "$case_dir/gptk/$dll.dll"
+					ln -s "$case_dir/gptk/$dll.dll" "$case_dir/engine/lib/wine/x86_64-windows/$dll.dll"
+				done
+				printf 'apple nvapi64\n' > "$case_dir/gptk/nvapi64.dll"
+				ln -s "$case_dir/gptk/nvapi64.dll" "$case_dir/engine/lib/wine/x86_64-windows/nvapi64.dll" ;;
 			msync) : > "$case_dir/engine/.notproton-msync" ;;
 			empty) mkdir -p "$case_dir/engine/lib/notproton-backends" ;;
 			*) mkdir -p "$case_dir/engine/lib/notproton-backends/${file%/*}"
@@ -83,7 +95,7 @@ launch() {
 		STEAM_COMPAT_DATA_PATH="$case_dir/data" WINEPREFIX="$case_dir/data/pfx" \
 		sh -ec '
 			eval "$functions"
-			gamefix_keys="" gamefix_backend="" gamefix_dlloverrides="" gamefix_msync="" gamefix_args=""
+			gamefix_keys="" gamefix_backend="" gamefix_dlloverrides="" gamefix_msync="" gamefix_nvapi="" gamefix_args=""
 			backend_root="$CX_ROOT/lib/notproton-backends"
 			load_gamefixes || true
 			resolve_msync
@@ -265,7 +277,7 @@ new_case
 full_engine
 engine d3dmetal.enabled
 user_conf 'BACKEND=dxmt'
-for pair in D3DMetal:d3dmetal dxmt:dxmt DXVK:dxvk wined3d:wined3d OpenGL:wined3d wine:wined3d; do
+for pair in D3DMetal:d3dmetal dxmt:dxmt DXVK:dxvk wined3d:d3dmetal OpenGL:d3dmetal wine:d3dmetal; do
 	launch waitforexitandrun "$case_dir/game/game.exe" CX_GRAPHICS_BACKEND="${pair%%:*}"
 	is "CX_GRAPHICS_BACKEND=${pair%%:*} beats the conf as ${pair#*:}" "${pair#*:}" "$(got backend)"
 done
@@ -276,8 +288,14 @@ is "an unknown value falls through to the conf" "dxmt" "$(got backend)"
 has "and is logged" "CX_GRAPHICS_BACKEND is not a backend this engine maps, ignored" "$case_dir/log"
 launch waitforexitandrun "$case_dir/game/game.exe" CX_GRAPHICS_BACKEND=
 is "an empty value falls through to the conf" "dxmt" "$(got backend)"
-launch waitforexitandrun "$case_dir/game/game.exe" CX_GRAPHICS_BACKEND=dxvk NOTPROTON_BACKEND=wined3d
-is "NOTPROTON_BACKEND beats CX_GRAPHICS_BACKEND" "wined3d" "$(got backend)"
+launch waitforexitandrun "$case_dir/game/game.exe" CX_GRAPHICS_BACKEND=dxvk NOTPROTON_BACKEND=dxmt
+is "NOTPROTON_BACKEND beats CX_GRAPHICS_BACKEND" "dxmt" "$(got backend)"
+new_case
+full_engine
+for pair in wined3d:wined3d OpenGL:wined3d wine:wined3d; do
+	launch waitforexitandrun "$case_dir/game/game.exe" CX_GRAPHICS_BACKEND="${pair%%:*}"
+	is "without D3DMetal CX_GRAPHICS_BACKEND=${pair%%:*} is ${pair#*:}" "${pair#*:}" "$(got backend)"
+done
 
 echo "== fallback when the engine lacks a backend"
 new_case
@@ -304,10 +322,69 @@ engine d3dmetal.enabled
 launch waitforexitandrun "$case_dir/game/game.exe" NOTPROTON_BACKEND=d3dmetal
 is "d3dmetal with the marker" "d3dmetal" "$(got backend)"
 is "selects D3DMetal in the engine" "d3dmetal" "$(got CX_GRAPHICS_BACKEND)"
-is "and keeps every backend DLL builtin" "d3d10core,d3d11,dxgi=b;$trio" "$(got WINEDLLOVERRIDES)"
+is "and keeps every D3D DLL builtin, d3d10 and d3d12 too" "d3d10,d3d10core,d3d11,d3d12,dxgi=b;$trio" "$(got WINEDLLOVERRIDES)"
 launch waitforexitandrun "$case_dir/game/game.exe" NOTPROTON_BACKEND=d3dmetal CX_GRAPHICS_BACKEND=dxmt
 is "NOTPROTON_BACKEND=d3dmetal sets CX_GRAPHICS_BACKEND over the panel's" "d3dmetal" "$(got CX_GRAPHICS_BACKEND)"
 has "and says so" "CX_GRAPHICS_BACKEND=dxmt replaced by d3dmetal" "$case_dir/log"
+
+echo "== WineCX with D3DMetal linked as the builtin"
+new_case
+full_engine
+engine d3dmetal-linked
+launch waitforexitandrun 'steam://rungameid/4242'
+is "the default is d3dmetal" "d3dmetal" "$(got backend)"
+has "logged as default" "backend=d3dmetal (default)" "$case_dir/log"
+is "every D3D DLL is builtin, Apple's nvapi64 disabled" "d3d10,d3d10core,d3d11,d3d12,dxgi=b;nvapi64=d;$trio" "$(got WINEDLLOVERRIDES)"
+is "CX_GRAPHICS_BACKEND is exported" "d3dmetal" "$(got CX_GRAPHICS_BACKEND)"
+launch waitforexitandrun "$case_dir/game/game.exe"
+is "a D3D11 game auto-detects d3dmetal" "d3dmetal" "$(got backend)"
+has "with the reason" "auto-detected, the engine has D3DMetal" "$case_dir/log"
+pe_fixture "$case_dir/game/game.exe" 64 import
+launch waitforexitandrun "$case_dir/game/game.exe"
+is "a D3D12 game auto-detects d3dmetal, not wined3d" "d3dmetal" "$(got backend)"
+has "with the reason" "backend=d3dmetal (auto-detected, the game imports d3d12.dll)" "$case_dir/log"
+launch waitforexitandrun "$case_dir/game/game.exe" NOTPROTON_BACKEND=wined3d
+is "an explicit wined3d runs d3dmetal" "d3dmetal" "$(got backend)"
+has "and says why" "wined3d is not available (D3DMetal replaces Wine's Direct3D in this engine), falling back to d3dmetal" "$case_dir/log"
+user_conf 'BACKEND=wined3d'
+launch waitforexitandrun "$case_dir/game/game.exe"
+is "so does a conf BACKEND=wined3d" "d3dmetal" "$(got backend)"
+user_conf 'BACKEND=dxmt'
+launch waitforexitandrun "$case_dir/game/game.exe"
+is "dxmt still works per game" "dxmt" "$(got backend)"
+is "as natives, with Apple's d3d10 and d3d12 builtin" "d3d10core,d3d11,dxgi=n,b;d3d10,d3d12=b;nvapi64=d;$trio" "$(got WINEDLLOVERRIDES)"
+is "dxmt dxgi is in system32" "backend dxmt/x86_64-windows/dxgi.dll" "$(sys system32 dxgi)"
+is "and CX_GRAPHICS_BACKEND is left alone" "<unset>" "$(got CX_GRAPHICS_BACKEND)"
+user_conf 'BACKEND=dxvk'
+launch waitforexitandrun "$case_dir/game/game.exe"
+is "dxvk still works per game" "d3d10core,d3d11=n,b;d3d10,d3d12,dxgi=b;nvapi64=d;$trio" "$(got WINEDLLOVERRIDES)"
+is "the stale dxmt dxgi goes back to Wine's set-aside copy, never Apple's" "stock x86_64-windows dxgi" "$(sys system32 dxgi)"
+user_conf ''
+launch waitforexitandrun "$case_dir/game/game.exe"
+is "back on d3dmetal, dxvk's d3d11 goes back to Wine's copy" "stock x86_64-windows d3d11" "$(sys system32 d3d11)"
+is "and nothing of Apple's is copied into the prefix" "0" "$(grep -rl '^apple ' "$case_dir/data/pfx" | wc -l | tr -d ' ')"
+user_conf 'NVAPI=1'
+launch waitforexitandrun "$case_dir/game/game.exe"
+is "a conf NVAPI=1 turns Apple's nvapi64 on" "d3d10,d3d10core,d3d11,d3d12,dxgi=b;nvapi64=b;$trio" "$(got WINEDLLOVERRIDES)"
+user_conf 'NVAPI=1' 'BACKEND=dxmt'
+launch waitforexitandrun "$case_dir/game/game.exe"
+is "but not for dxmt" "d3d10core,d3d11,dxgi=n,b;d3d10,d3d12=b;nvapi64=d;$trio" "$(got WINEDLLOVERRIDES)"
+has "and says so" "NVAPI=1 not applied, dxmt is not d3dmetal" "$case_dir/log"
+user_conf 'NVAPI=yes'
+launch waitforexitandrun "$case_dir/game/game.exe"
+has "NVAPI must be 0 or 1" "rejected NVAPI: not 0 or 1" "$case_dir/log"
+new_case
+engine d3dmetal-linked empty
+launch waitforexitandrun "$case_dir/game/game.exe" NOTPROTON_BACKEND=dxmt
+is "a missing dxmt falls back to d3dmetal, not wined3d" "d3dmetal" "$(got backend)"
+new_case
+full_engine
+engine d3dmetal-linked
+chmod 500 "$case_dir/data/pfx/drive_c/windows/system32"
+launch waitforexitandrun "$case_dir/game/game.exe" NOTPROTON_BACKEND=dxmt
+chmod 700 "$case_dir/data/pfx/drive_c/windows/system32"
+is "a backend that cannot be staged falls back to d3dmetal" "d3dmetal" "$(got backend)"
+has "with the reason" "dxmt could not be staged, falling back to d3dmetal" "$case_dir/log"
 
 echo "== legacy layout"
 new_case
@@ -424,6 +501,43 @@ out=$(env -i PATH="$PATH" forward="$forward" VKD3D_CONFIG=dxr MVK_CONFIG_LOG_LEV
 	DXVK_HUD=fps NOTPROTON_UNRELATED=1 sh -c 'set --; eval "$forward"; printf "%s\n" "$@"' | grep -v '^--env$' | sort | tr '\n' ' ')
 is "VKD3D_, MVK_, STAGING_ and WINE_ topology variables are forwarded" \
 	"DXVK_HUD=fps MVK_CONFIG_LOG_LEVEL=1 STAGING_SHARED_MEMORY=1 VKD3D_CONFIG=dxr WINE_CPU_TOPOLOGY=4:0,1,2,3 WINE_LARGE_ADDRESS_AWARE=1 " "$out"
+
+echo "== the wineserver directory self-heal"
+heal=$(sed -n '/^heal_wine_tmp() {$/,/^}$/p' "$SRC")
+[ -n "$heal" ] || { echo "FAIL: heal_wine_tmp not found in $SRC"; exit 1; }
+first_wine=$(grep -nE '"\$WINE(LOADER|SERVER)" (-[kw]|wineboot|reg|"\$)' "$SRC" | head -1 | cut -d: -f1)
+called=$(grep -n '^heal_wine_tmp /tmp$' "$SRC" | head -1 | cut -d: -f1)
+is "it runs on /tmp before the first wine or wineserver call" "yes" \
+	"$([ -n "$called" ] && [ -n "$first_wine" ] && [ "$called" -lt "$first_wine" ] && echo yes || echo no)"
+fake_tmp="$work/tmproot"
+mkdir -p "$fake_tmp"
+wine_dir="$fake_tmp/.wine-$(id -u)"
+heal_log="$work/heal.log"
+run_heal() { : > "$heal_log"; log="$heal_log" heal="$heal" sh -ec 'eval "$heal"; heal_wine_tmp "$1"' heal "$fake_tmp"; }
+run_heal
+is "no directory, nothing logged" "" "$(cat "$heal_log")"
+mkdir "$wine_dir"
+chmod 755 "$wine_dir"
+run_heal
+is "a 755 directory of ours goes back to 700" "700" "$(stat -f %Lp "$wine_dir")"
+has "and is logged" "was mode 755, set to 700" "$heal_log"
+run_heal
+is "a 700 directory is left as it is, silently" "" "$(cat "$heal_log")"
+rmdir "$wine_dir"
+mkdir "$work/elsewhere"
+chmod 755 "$work/elsewhere"
+ln -s "$work/elsewhere" "$wine_dir"
+run_heal
+is "a symlink is never followed" "755" "$(stat -f %Lp "$work/elsewhere")"
+is "nor replaced" "yes" "$([ -L "$wine_dir" ] && echo yes || echo no)"
+has "and is warned about" "is a symlink, left alone" "$heal_log"
+rm "$wine_dir"
+printf x > "$wine_dir"
+chmod 644 "$wine_dir"
+run_heal
+is "a file is left alone" "644" "$(stat -f %Lp "$wine_dir")"
+has "and is warned about" "is not a directory (Regular File), left alone" "$heal_log"
+rm "$wine_dir"
 
 if [ "$fails" -eq 0 ]; then
 	echo "==> gamefixescheck: all assertions hold"
