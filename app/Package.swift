@@ -44,6 +44,8 @@ let package = Package(
                 .copy("Resources/detour2-winecx-11.15.bin"),
                 .copy("Resources/detour32-winecx-11.15.bin"),
                 .copy("Resources/winemac-winecx-11.15.so"),
+                .copy("Resources/winebus-winecx-11.15.so"),
+                .copy("Resources/libSDL2-2.0.0.dylib"),
             ],
             swiftSettings: [.swiftLanguageMode(.v6)]
         ),

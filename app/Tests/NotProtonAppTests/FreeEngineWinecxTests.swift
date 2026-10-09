@@ -112,6 +112,39 @@ struct FreeEngineWinecxTests {
         }
     }
 
+    // docs/WINECX.md, Controllers: winebus.so with SDL2 in lib/wine, and the libSDL2 it
+    // dlopens by leaf name in lib/, where its @loader_path/../../ rpath points.
+    @Test("The SDL2 winebus.so and its libSDL2 ship with the app and are laid into the engine")
+    func gamepadSupport() throws {
+        let files = FreeEngineWinecx.current.gamepad
+        #expect(Set(files.map(\.path)) == ["lib/wine/x86_64-unix/winebus.so", "lib/libSDL2-2.0.0.dylib"])
+        let table = FreeEngineWinecx.expectedFiles()
+        for file in files {
+            let bundled = try #require(Bundle.module.url(forResource: file.resource, withExtension: file.ext))
+            #expect(Digest.sha256IfPresent(bundled) == file.sha256, "\(file.resource)")
+            #expect(table[file.path] == file.sha256, "\(file.path)")
+        }
+
+        let root = try makeDirectory("gamepad")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let bus = root.appending(path: "lib/wine/x86_64-unix/winebus.so")
+        try FileManager.default.createDirectory(at: bus.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try Data("winecx's own winebus.so, built without SDL2".utf8).write(to: bus)
+        let before = FreeEngineWinecx.layoutProblems(root: root)
+        for file in files { #expect(before.contains(file.path), "\(file.path)") }
+
+        try FreeEngineWinecx.installBundled(files, root: root)
+        let after = FreeEngineWinecx.layoutProblems(root: root)
+        for file in files {
+            #expect(Digest.sha256IfPresent(root.appending(path: file.path)) == file.sha256, "\(file.path)")
+            #expect(!after.contains(file.path), "\(file.path)")
+        }
+        let wrong = files.map {
+            WinecxBundledFile(resource: $0.resource, ext: $0.ext, path: $0.path, sha256: String(repeating: "0", count: 64))
+        }
+        #expect(throws: StepFailure.self) { try FreeEngineWinecx.installBundled(wrong, root: root) }
+    }
+
     @Test("Each free engine is current, outdated or missing on its own pins")
     func perEngineState() throws {
         let winehqBuild = try #require(SupportedRunners.build(id: FreeEngine.current.build))

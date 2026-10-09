@@ -58,6 +58,9 @@ lib/wine/x86_64-unix/winemetal.so                 DXMT master, replacing the arc
 lib/wine/{x86_64,i386}-windows/winemetal.dll      DXMT master, replacing the archive's
 lib/notproton-backends/dxmt/{x86_64,i386}-windows/{d3d11,d3d10core,dxgi}.dll   DXMT master, marker stripped
 lib/notproton-backends/dxvk/{x86_64,i386}-windows/{d3d11,d3d10core}.dll        from the archive
+lib/wine/x86_64-unix/winemac.so                   Retina fix, replacing the archive's (below)
+lib/wine/x86_64-unix/winebus.so                   built with SDL2, replacing the archive's (Controllers)
+lib/libSDL2-2.0.0.dylib                           SDL 2.32.8, x86_64, for winebus.so (Controllers)
 ```
 
 DXMT comes from `dxmt-e94c312.tar.gz` (the WineHQ engine's pin, shared download cache).
@@ -80,6 +83,46 @@ half-size drawable and showed only the top-left quarter. NotProton installs
 `winemac-winecx-11.15.so`, built from winecx `5b45f45` with
 `winemac-patch/winecx-d3dmetal-retina.patch` (`winemac-patch/README.md`), pinned as
 `FreeEngineWinecx.current.macDriver`.
+
+## Controllers
+
+The runtime's CI built `winebus.so` without SDL2 (`SONAME_LIBSDL2` undefined, its log says
+`sdl_bus_init SDL support not compiled in!`), and its XBOX bus needs `IOUSBLib.h`, which the
+macOS 26 SDK lacks. A gamepad then had no path into Wine: winebus ignores the IOHID bus's raw
+HID device for a gamepad unless that device has `Hidraw=1`, and with it the pad comes in as
+`is_hidraw 1, is_gamepad 0`, which XInput never opens.
+
+NotProton installs `winebus-winecx-11.15.so`: winecx `5b45f45`'s own, built with
+`SONAME_LIBSDL2` = `libSDL2-2.0.0.dylib`, the name the WineHQ engine's `winebus.so` dlopens.
+SDL's bus then presents the pad as a gamepad (`is_gamepad 1`), the device XInput opens.
+dyld resolves the leaf name through the caller's `LC_RPATH`s, and `winebus.so` carries
+`@loader_path/../../` (the CI adds it to every unix module), so the library sits in `lib/`.
+That `libSDL2-2.0.0.dylib` is the WineHQ engine runner's x86_64 SDL 2.32.8 (zlib license,
+`NOTICE`), signed ad hoc and otherwise unchanged: a SwiftPM release build runs `strip` on
+every unsigned Mach-O resource, which would change its bytes and break the pin. The PE half `winebus.sys` is unchanged: it starts the SDL bus
+either way, and only the unix half lacked it.
+
+A per-device `Hidraw=1` under `HKLM\System\CurrentControlSet\Services\winebus\Devices\<vid>/<pid>`
+makes winebus take the raw IOHID device and ignore SDL's for that pad, so XInput loses it
+again; leave that key off for XInput pads.
+
+To rebuild it, in the configured winecx build tree from `winemac-patch/README.md` (same
+flags, `MACOSX_DEPLOYMENT_TARGET=26.0`), compile the unix objects of
+`dlls/winebus.sys/winebus.so` with `-DSONAME_LIBSDL2=\"libSDL2-2.0.0.dylib\"` added to
+`CFLAGS` and SDL2 2.32 headers on the include path (`SDL2_CFLAGS`; only `bus_sdl.o`
+changes), then link and sign the way the runtime's was:
+
+    clang -arch x86_64 -o winebus.so -dynamiclib -install_name @rpath/winebus.so \
+      -Wl,-rpath,@loader_path/ dlls/winebus.sys/{bus_iohid,bus_sdl,bus_udev,bus_xbox360,hid,unixlib}.o \
+      <runtime>/ntdll.so -framework IOKit -framework CoreFoundation
+    codesign -fs - winebus.so
+    install_name_tool -add_rpath @loader_path/../../ winebus.so
+    codesign -fs - winebus.so
+
+Built this way without the define, the result matches the runtime's `winebus.so` in every
+section and in all 171 symbols and their addresses, with the same load commands in the same
+order; only `__LINKEDIT`, the UUID and the linker's tool version differ. The pins are
+`FreeEngineWinecx.current.gamepad`.
 
 ## D3DMetal: the builtin model
 

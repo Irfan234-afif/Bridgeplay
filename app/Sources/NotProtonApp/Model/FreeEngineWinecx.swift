@@ -16,6 +16,16 @@ struct WinecxBackendFile: Sendable, Equatable {
     let sha256: String
 }
 
+// A file NotProton ships in its own bundle and lays into the engine, checked against its pin.
+struct WinecxBundledFile: Sendable, Equatable {
+    // Resource name and extension in the app bundle.
+    let resource: String
+    let ext: String
+    // Path below the engine root.
+    let path: String
+    let sha256: String
+}
+
 struct WinecxRelease: Sendable {
     let build: String
     // The winecx-gptk runtime version, which is what its WhiskyWineVersion.plist carries.
@@ -38,6 +48,12 @@ struct WinecxRelease: Sendable {
     // winemac-patch/winecx-d3dmetal-retina.patch, so D3DMetal sizes a Retina-mode
     // swapchain in Win32 pixels rather than points.
     let macDriver: String
+    // Controller support. The runtime's CI built winebus.so without SDL2, so a controller
+    // only reached Wine through the IOHID bus, as a raw HID device XInput does not open.
+    // NotProton ships winecx's winebus.so rebuilt with SDL2 and the x86_64 libSDL2 it
+    // dlopens by leaf name, which dyld finds through winebus.so's @loader_path/../../
+    // rpath, i.e. in lib/.
+    let gamepad: [WinecxBundledFile]
 }
 
 enum FreeEngineWinecx {
@@ -80,7 +96,16 @@ enum FreeEngineWinecx {
             "d3d12.dll": "c6e285308bb3241efca3d94da4746b16a526a9fb5113f61922e7bd86694bebf9",
             "dxgi.dll": "f1f24da777c65a583b29f74475c6a9464da35068d75def6cee806268def9ecbb",
         ],
-        macDriver: "c611031855e596b2aeb2d2ea2c2ddef8cb843376d85ccf8bbe10c4fc727a527e"
+        macDriver: "c611031855e596b2aeb2d2ea2c2ddef8cb843376d85ccf8bbe10c4fc727a527e",
+        // winebus.so: winecx 5b45f45 built with SONAME_LIBSDL2 (docs/WINECX.md). libSDL2:
+        // SDL 2.32.8 (zlib license, NOTICE), the WineHQ engine runner's copy signed ad hoc,
+        // since a release build strips unsigned Mach-O resources and would break the pin.
+        gamepad: [
+            WinecxBundledFile(resource: "winebus-winecx-11.15", ext: "so", path: "lib/wine/x86_64-unix/winebus.so",
+                              sha256: "1bc53184f5d026ab84a26cf6ef721348fc3b028c019ff969e69eb6cf9b9d1af9"),
+            WinecxBundledFile(resource: "libSDL2-2.0.0", ext: "dylib", path: "lib/libSDL2-2.0.0.dylib",
+                              sha256: "605724f463875e945ca4a79a1db7bf35384d912fa5387f3042a27a42e878db19"),
+        ]
     )
 
     // Appended to SupportedRunners.all. The hash-pinned loader is what makes it free, so a
@@ -175,6 +200,7 @@ enum FreeEngineWinecx {
     // checks them, since they are either Wine's own or links into a Game Porting Toolkit.
     static func expectedFiles(_ release: WinecxRelease = current) -> [String: String] {
         var table: [String: String] = [FreeEngine.macDriverPath: release.macDriver]
+        for file in release.gamepad { table[file.path] = file.sha256 }
         for file in release.backends { table["\(backendsPath)/\(file.destination)"] = file.sha256 }
         for path in release.renderer.files.keys {
             table[release.renderer.installPath(of: path)] = release.renderer.installedHash(of: path)
@@ -263,6 +289,7 @@ enum FreeEngineWinecx {
         try fm.createDirectory(at: root.deletingLastPathComponent(), withIntermediateDirectories: true)
         try fm.moveItem(at: wine, to: root)
         try FreeEngine.installMacDriver(root: root, build: release.build, sha256: release.macDriver, step: step)
+        try installBundled(release.gamepad, root: root)
 
         let libraries = wine.deletingLastPathComponent()
         for file in release.backends {
@@ -317,6 +344,22 @@ enum FreeEngineWinecx {
         }
         try fm.moveItem(at: shaped, to: target)
         return CrossOverSource.inspect(bundle: target)
+    }
+
+    // Puts each bundled file, checked against its pin, over or beside the engine's own.
+    static func installBundled(_ files: [WinecxBundledFile], root: URL) throws {
+        let fm = FileManager.default
+        for file in files {
+            guard let source = Bundle.module.url(forResource: file.resource, withExtension: file.ext),
+                  Digest.sha256IfPresent(source) == file.sha256
+            else {
+                throw StepFailure(step: step, detail: "NotProton is missing its \(file.resource).\(file.ext).")
+            }
+            let destination = root.appending(path: file.path)
+            try fm.createDirectory(at: destination.deletingLastPathComponent(), withIntermediateDirectories: true)
+            try? fm.removeItem(at: destination)
+            try fm.copyItem(at: source, to: destination)
+        }
     }
 
     private static func untar(_ archive: URL, into directory: URL) throws {

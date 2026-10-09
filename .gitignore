@@ -4,6 +4,8 @@ out/
 *.o
 *.a
 *.dylib
+# The x86_64 SDL2 FreeEngineWinecx installs for winebus.so (docs/WINECX.md).
+!app/Sources/NotProtonApp/Resources/libSDL2-2.0.0.dylib
 .DS_Store
 
 vendor/dobby/
