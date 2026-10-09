@@ -1,0 +1,433 @@
+#!/bin/sh
+# shellcheck disable=SC2016 # the sh -ec programs expand their own variables
+set -e
+SRC="${1:-$(dirname "$0")/../feats/compat_run.sh}"
+[ -f "$SRC" ] || { echo "gamefixescheck: $SRC not present, skipped"; exit 0; }
+
+functions=""
+for name in gamefix_log valid_dll_overrides gamefix_reason gamefix_read gamefix_apply_env \
+	load_gamefixes resolve_msync graphics_log backend_dlls managed_dlls backend_available \
+	backend_record pe_word pe_words pe_rva_offset imports_d3d12 select_backend stage_backend_file restore_stock_dll \
+	activate_backend record_backend compose_dll_overrides; do
+	body=$(sed -n "/^$name() {\$/,/^}\$/p" "$SRC")
+	[ -n "$body" ] || { echo "FAIL: $name not found in $SRC"; exit 1; }
+	functions="$functions
+$body"
+done
+bridge_line=$(grep 'export WINEDLLOVERRIDES=' "$SRC" | grep 'lsteamclient=b' | sed 's/^[[:space:]]*//')
+[ -n "$bridge_line" ] || { echo "FAIL: the bridge WINEDLLOVERRIDES line not found"; exit 1; }
+forward=$(sed -n '/^for name in $(env /,/^done$/p' "$SRC")
+[ -n "$forward" ] || { echo "FAIL: the launcher environment loop not found"; exit 1; }
+append_args=$(sed -n '/^if \[ -n "\$gamefix_args" \]; then$/,/^fi$/p' "$SRC")
+[ -n "$append_args" ] || { echo "FAIL: the ARGS append not found"; exit 1; }
+
+work=$(mktemp -d)
+trap 'rm -rf "$work"' EXIT
+
+fails=0
+ok() { printf '  ok    %s\n' "$1"; }
+bad() { printf '  FAIL  %s\n         want [%s]\n         got  [%s]\n' "$1" "$2" "$3"; fails=$((fails + 1)); }
+is() { if [ "$2" = "$3" ]; then ok "$1"; else bad "$1" "$2" "$3"; fi; }
+has() { if grep -qF -- "$2" "$3"; then ok "$1"; else bad "$1" "a line with $2" "$(cat "$3")"; fi; }
+lacks() { if grep -qF -- "$2" "$3"; then bad "$1" "no line with $2" "$(cat "$3")"; else ok "$1"; fi; }
+
+# A fresh compatdata, support folder and engine per case. LAYOUT is a list of
+# backend/arch/name.dll files, "legacy" for no notproton-backends folder.
+case_dir=""
+new_case() {
+	case_dir=$(mktemp -d "$work/case.XXXXXX")
+	mkdir -p "$case_dir/support/gamefixes-default" "$case_dir/support/gamefixes" \
+		"$case_dir/data/pfx/drive_c/windows/system32" "$case_dir/data/pfx/drive_c/windows/syswow64" \
+		"$case_dir/game"
+	for arch in x86_64-windows i386-windows; do
+		mkdir -p "$case_dir/engine/lib/wine/$arch"
+		for dll in dxgi d3d11 d3d10core d3d12 d3d9; do
+			printf 'stock %s %s\n' "$arch" "$dll" > "$case_dir/engine/lib/wine/$arch/$dll.dll"
+		done
+	done
+	: > "$case_dir/log"
+	printf 'MZ plain d3d11 game\n' > "$case_dir/game/game.exe"
+}
+engine() {
+	for file in "$@"; do
+		case "$file" in
+			d3dmetal.enabled) mkdir -p "$case_dir/engine/lib/notproton-backends"
+				: > "$case_dir/engine/lib/notproton-backends/d3dmetal.enabled" ;;
+			msync) : > "$case_dir/engine/.notproton-msync" ;;
+			empty) mkdir -p "$case_dir/engine/lib/notproton-backends" ;;
+			*) mkdir -p "$case_dir/engine/lib/notproton-backends/${file%/*}"
+				printf 'backend %s\n' "$file" > "$case_dir/engine/lib/notproton-backends/$file" ;;
+		esac
+	done
+}
+full_engine() {
+	engine dxmt/x86_64-windows/dxgi.dll dxmt/x86_64-windows/d3d11.dll \
+		dxmt/x86_64-windows/d3d10core.dll dxmt/x86_64-windows/winemetal.dll \
+		dxvk/x86_64-windows/d3d11.dll dxvk/x86_64-windows/d3d10core.dll \
+		dxvk/i386-windows/d3d11.dll dxvk/i386-windows/d3d10core.dll
+}
+default_conf() { printf '%s\n' "$@" > "$case_dir/support/gamefixes-default/4242.conf"; }
+user_conf() { printf '%s\n' "$@" > "$case_dir/support/gamefixes/4242.conf"; }
+sys() { cat "$case_dir/data/pfx/drive_c/windows/$1/$2.dll" 2>/dev/null || echo missing; }
+
+# Runs the script's sequence: conf, msync, backend, overrides, bridge trio. ENV holds the
+# launch options. Prints KEY=value lines for the outcome.
+launch() {
+	verb=$1
+	target=$2
+	shift 2
+	env -i PATH="$PATH" HOME="$HOME" "$@" \
+		functions="$functions" bridge_line="$bridge_line" \
+		app_id=4242 verb="$verb" log="$case_dir/log" \
+		np_support="$case_dir/support" CX_ROOT="$case_dir/engine" \
+		STEAM_COMPAT_DATA_PATH="$case_dir/data" WINEPREFIX="$case_dir/data/pfx" \
+		sh -ec '
+			eval "$functions"
+			gamefix_keys="" gamefix_backend="" gamefix_dlloverrides="" gamefix_msync="" gamefix_args=""
+			backend_root="$CX_ROOT/lib/notproton-backends"
+			load_gamefixes || true
+			resolve_msync
+			export WINEMSYNC="${WINEMSYNC:-0}"
+			select_backend "$1"
+			activate_backend || true
+			record_backend || true
+			graphics_log "backend=$backend ($backend_from)"
+			compose_dll_overrides
+			eval "$bridge_line"
+			for v in backend WINEDLLOVERRIDES WINEMSYNC msync_from NOTPROTON_RETINA CX_GRAPHICS_BACKEND \
+				DXVK_HUD VKD3D_CONFIG WINEDEBUG MTL_HUD_ENABLED gamefix_args; do
+				eval "printf \"%s=%s\\n\" \$v \"\${$v-<unset>}\""
+			done
+		' launch "$target" > "$case_dir/out" 2>&1 || echo "launch exited $?" >> "$case_dir/out"
+}
+got() { sed -n "s/^$1=//p" "$case_dir/out"; }
+trio="steamclient=n;steamclient64=n;lsteamclient=b"
+
+# Minimal PE images: one .rdata section at RVA 0x1000 (file 0x200) holding the import
+# descriptors, KERNEL32.dll at file 0x300 and the string D3D12.dll at file 0x310. "import"
+# lists D3D12.dll as a second descriptor, "string" only carries the string.
+le() {
+	v=$1 n=$2 bytes=""
+	while [ "$n" -gt 0 ]; do
+		bytes="$bytes$(printf '\\%03o' $((v & 255)))"
+		v=$((v >> 8)) n=$((n - 1))
+	done
+	printf '%s' "$bytes"
+}
+put() {
+	# shellcheck disable=SC2059 # the escapes are the bytes to write
+	printf "$3" | dd of="$1" bs=1 seek="$2" conv=notrunc 2>/dev/null
+}
+pe_fixture() {
+	dd if=/dev/zero of="$1" bs=1024 count=1 2>/dev/null
+	put "$1" 0 'MZ'
+	put "$1" 60 "$(le 64 4)"
+	put "$1" 64 'PE\000\000'
+	put "$1" 68 "$(le 34404 2)"
+	put "$1" 70 "$(le 1 2)"
+	if [ "$2" = 64 ]; then osize=240 magic=523 dirs=200; else osize=224 magic=267 dirs=184; fi
+	put "$1" 84 "$(le "$osize" 2)"
+	put "$1" 88 "$(le "$magic" 2)"
+	put "$1" $((dirs - 4)) "$(le 16 4)"
+	put "$1" $((dirs + 8)) "$(le 4096 4)"
+	put "$1" $((dirs + 12)) "$(le 60 4)"
+	sec=$((88 + osize))
+	put "$1" "$sec" '.rdata'
+	put "$1" $((sec + 8)) "$(le 512 4)"
+	put "$1" $((sec + 12)) "$(le 4096 4)"
+	put "$1" $((sec + 16)) "$(le 512 4)"
+	put "$1" $((sec + 20)) "$(le 512 4)"
+	put "$1" 524 "$(le 4352 4)"
+	put "$1" 528 "$(le 4480 4)"
+	put "$1" 768 'KERNEL32.dll\000'
+	put "$1" 784 'D3D12.dll\000'
+	if [ "$3" = import ]; then
+		put "$1" 544 "$(le 4368 4)"
+		put "$1" 548 "$(le 4488 4)"
+	fi
+}
+
+echo "== parser: allow-list and rejections"
+new_case
+full_engine
+default_conf '# shipped fix' '' '  DXVK_HUD=fps  ' "VKD3D_CONFIG=dxr$(printf '\r')" \
+	'WINEDEBUG=-all' 'PATH=/evil' 'DYLD_INSERT_LIBRARIES=/evil.dylib' 'lower=1' 'no equals sign' \
+	"DXMT_A=\$(touch $case_dir/pwned)" 'DXMT_B=`touch pwned`' 'DXMT_C="quoted"' "DXMT_D='single'" \
+	'BACKEND=vulkan' 'MSYNC=2' 'RETINA=yes' 'DLLOVERRIDES=dxgi=native' 'DLLOVERRIDES=;=n' \
+	'DXMT_=1' 'MTL_HUD_ENABLED=1'
+launch waitforexitandrun "$case_dir/game/game.exe"
+is "a padded value is trimmed" "fps" "$(got DXVK_HUD)"
+is "a CRLF line ends cleanly" "dxr" "$(got VKD3D_CONFIG)"
+is "WINEDEBUG is allowed" "-all" "$(got WINEDEBUG)"
+is "MTL_HUD_ENABLED is allowed" "1" "$(got MTL_HUD_ENABLED)"
+is "PATH is not on the allow-list" "0" "$(grep -c '^PATH=/evil' "$case_dir/out" || true)"
+has "PATH is logged as rejected" "line 6 rejected PATH: not on the allow-list" "$case_dir/log"
+has "DYLD_INSERT_LIBRARIES is rejected" "rejected DYLD_INSERT_LIBRARIES: not on the allow-list" "$case_dir/log"
+has "a lower-case key is rejected" "line 8 rejected: not KEY=VALUE" "$case_dir/log"
+has "a line without = is rejected" "line 9 rejected: not KEY=VALUE" "$case_dir/log"
+has "\$( is rejected" "rejected DXMT_A: a backtick" "$case_dir/log"
+is "and never runs" "no" "$([ -e "$case_dir/pwned" ] && echo yes || echo no)"
+has "a backtick is rejected" "rejected DXMT_B: a backtick" "$case_dir/log"
+has "double quotes are rejected" "rejected DXMT_C: a backtick" "$case_dir/log"
+has "single quotes are rejected" "rejected DXMT_D: a backtick" "$case_dir/log"
+has "an unknown backend is rejected" "rejected BACKEND: not dxmt, dxvk, wined3d or d3dmetal" "$case_dir/log"
+has "MSYNC must be 0 or 1" "rejected MSYNC: not 0 or 1" "$case_dir/log"
+has "RETINA must be 0 or 1" "rejected RETINA: not 0 or 1" "$case_dir/log"
+has "a bad override order is rejected" "line 17 rejected DLLOVERRIDES: not Wine override syntax" "$case_dir/log"
+has "an override without a name is rejected" "line 18 rejected DLLOVERRIDES: not Wine override syntax" "$case_dir/log"
+has "a bare prefix is not a variable" "rejected DXMT_: not on the allow-list" "$case_dir/log"
+has "applied values are logged" "applied DXVK_HUD=fps from the default conf" "$case_dir/log"
+
+echo "== precedence: launch options > user conf > default conf > auto > default"
+new_case
+full_engine
+default_conf 'DXVK_HUD=1' 'BACKEND=dxmt' 'WINEDEBUG=+loaddll' 'DLLOVERRIDES=xinput1_3=n,b;dinput8=n,b'
+user_conf 'DXVK_HUD=fps' 'BACKEND=dxvk' 'DLLOVERRIDES=dinput8=b'
+launch waitforexitandrun "$case_dir/game/game.exe" WINEDEBUG=-all
+is "user conf beats default conf" "fps" "$(got DXVK_HUD)"
+is "launch options beat both confs" "-all" "$(got WINEDEBUG)"
+has "the kept launch option is logged" "WINEDEBUG kept from the launch options, the default conf value is not applied" "$case_dir/log"
+has "the user conf replacing a key is logged" "user conf line 1 replaces the earlier DXVK_HUD" "$case_dir/log"
+is "user conf BACKEND beats default conf BACKEND" "dxvk" "$(got backend)"
+is "the later file wins DLLOVERRIDES whole" \
+	"d3d10core,d3d11=n,b;dxgi=b;dinput8=b;$trio" "$(got WINEDLLOVERRIDES)"
+new_case
+full_engine
+user_conf 'BACKEND=dxvk' 'DLLOVERRIDES=dinput8=n,b;dxgi=n'
+launch waitforexitandrun "$case_dir/game/game.exe" NOTPROTON_BACKEND=wined3d WINEDLLOVERRIDES='dinput8=b'
+is "NOTPROTON_BACKEND beats the conf" "wined3d" "$(got backend)"
+is "overrides run backend, conf, launch options, then the Steam trio" \
+	"d3d10core,d3d11,dxgi=b;dinput8=n,b;dxgi=n;dinput8=b;$trio" "$(got WINEDLLOVERRIDES)"
+new_case
+full_engine
+default_conf 'BACKEND=dxvk'
+pe_fixture "$case_dir/game/game.exe" 64 import
+launch waitforexitandrun "$case_dir/game/game.exe"
+is "a conf BACKEND beats auto-detection" "dxvk" "$(got backend)"
+new_case
+full_engine
+launch waitforexitandrun "$case_dir/game/game.exe" NOTPROTON_BACKEND=metal
+is "an invalid NOTPROTON_BACKEND falls through to auto" "dxmt" "$(got backend)"
+has "and is logged" "NOTPROTON_BACKEND is not dxmt, dxvk, wined3d or d3dmetal, ignored" "$case_dir/log"
+
+echo "== auto-detect reads the import table"
+new_case
+full_engine
+pe_fixture "$case_dir/game/game.exe" 64 import
+launch waitforexitandrun "$case_dir/game/game.exe"
+is "a PE32+ game importing D3D12.dll gets wined3d" "wined3d" "$(got backend)"
+has "the reason is logged" "auto-detected, the game imports d3d12.dll" "$case_dir/log"
+pe_fixture "$case_dir/game/game.exe" 32 import
+launch waitforexitandrun "$case_dir/game/game.exe"
+is "so does a PE32 game" "wined3d" "$(got backend)"
+pe_fixture "$case_dir/game/game.exe" 64 string
+launch waitforexitandrun "$case_dir/game/game.exe"
+is "the string d3d12.dll in .rdata alone does not count" "dxmt" "$(got backend)"
+pe_fixture "$case_dir/game/game.exe" 32 string
+launch waitforexitandrun "$case_dir/game/game.exe"
+is "nor in a PE32 game" "dxmt" "$(got backend)"
+pe_fixture "$case_dir/game/game.exe" 64 import
+dd if="$case_dir/game/game.exe" of="$case_dir/game/cut.exe" bs=600 count=1 2>/dev/null
+launch waitforexitandrun "$case_dir/game/cut.exe"
+is "an import name cut off by a short file detects nothing" "dxmt" "$(got backend)"
+dd if="$case_dir/game/game.exe" of="$case_dir/game/cut.exe" bs=100 count=1 2>/dev/null
+launch waitforexitandrun "$case_dir/game/cut.exe"
+is "a header cut off detects nothing" "dxmt" "$(got backend)"
+put "$case_dir/game/game.exe" 60 "$(le 4000000000 4)"
+launch waitforexitandrun "$case_dir/game/game.exe"
+is "a PE header offset past the end detects nothing" "dxmt" "$(got backend)"
+printf 'MZ\0\0kernel32.dll\0D3D12.DLL\0' > "$case_dir/game/game.exe"
+launch waitforexitandrun "$case_dir/game/game.exe"
+is "an MZ file that is no PE detects nothing" "dxmt" "$(got backend)"
+pe_fixture "$case_dir/game/game.exe" 64 string
+pe_fixture "$case_dir/game/Engine.dll" 64 import
+launch waitforexitandrun "$case_dir/game/game.exe"
+is "a DLL beside the game does not count" "dxmt" "$(got backend)"
+new_case
+full_engine
+pe_fixture "$case_dir/game/game.exe" 64 import
+launch waitforexitandrun "$case_dir/game/game.exe" NOTPROTON_BACKEND=dxmt
+is "NOTPROTON_BACKEND beats auto-detection" "dxmt" "$(got backend)"
+new_case
+full_engine
+launch waitforexitandrun 'steam://rungameid/4242'
+is "a target that is no file gets the default" "dxmt" "$(got backend)"
+has "logged as default" "backend=dxmt (default)" "$case_dir/log"
+new_case
+full_engine
+pe_fixture "$case_dir/game/game.exe" 64 import
+launch waitforexitandrun "$case_dir/game/game.exe"
+launch run "$case_dir/game/iscriptevaluator.exe"
+is "a helper keeps the backend the game last ran with" "wined3d" "$(got backend)"
+
+echo "== the Steam panel's CX_GRAPHICS_BACKEND"
+new_case
+full_engine
+engine d3dmetal.enabled
+user_conf 'BACKEND=dxmt'
+for pair in D3DMetal:d3dmetal dxmt:dxmt DXVK:dxvk wined3d:wined3d OpenGL:wined3d wine:wined3d; do
+	launch waitforexitandrun "$case_dir/game/game.exe" CX_GRAPHICS_BACKEND="${pair%%:*}"
+	is "CX_GRAPHICS_BACKEND=${pair%%:*} beats the conf as ${pair#*:}" "${pair#*:}" "$(got backend)"
+done
+launch waitforexitandrun "$case_dir/game/game.exe" CX_GRAPHICS_BACKEND=D3DMetal
+is "d3dmetal still exports the lower-case name" "d3dmetal" "$(got CX_GRAPHICS_BACKEND)"
+launch waitforexitandrun "$case_dir/game/game.exe" CX_GRAPHICS_BACKEND=vulkan
+is "an unknown value falls through to the conf" "dxmt" "$(got backend)"
+has "and is logged" "CX_GRAPHICS_BACKEND is not a backend this engine maps, ignored" "$case_dir/log"
+launch waitforexitandrun "$case_dir/game/game.exe" CX_GRAPHICS_BACKEND=
+is "an empty value falls through to the conf" "dxmt" "$(got backend)"
+launch waitforexitandrun "$case_dir/game/game.exe" CX_GRAPHICS_BACKEND=dxvk NOTPROTON_BACKEND=wined3d
+is "NOTPROTON_BACKEND beats CX_GRAPHICS_BACKEND" "wined3d" "$(got backend)"
+
+echo "== fallback when the engine lacks a backend"
+new_case
+engine dxmt/x86_64-windows/dxgi.dll dxmt/x86_64-windows/d3d11.dll dxmt/x86_64-windows/d3d10core.dll
+launch waitforexitandrun "$case_dir/game/game.exe" NOTPROTON_BACKEND=dxvk
+is "dxvk falls back to dxmt" "dxmt" "$(got backend)"
+has "with the reason" "dxvk is not available (no x86_64 DLLs in notproton-backends/dxvk), falling back to dxmt" "$case_dir/log"
+new_case
+engine empty
+launch waitforexitandrun "$case_dir/game/game.exe" NOTPROTON_BACKEND=dxvk
+is "dxvk falls through dxmt to wined3d" "wined3d" "$(got backend)"
+new_case
+engine dxvk/x86_64-windows/d3d11.dll
+launch waitforexitandrun "$case_dir/game/game.exe"
+is "the dxmt default falls back to wined3d" "wined3d" "$(got backend)"
+new_case
+full_engine
+launch waitforexitandrun "$case_dir/game/game.exe" NOTPROTON_BACKEND=d3dmetal
+is "d3dmetal without the marker falls back to dxmt" "dxmt" "$(got backend)"
+is "and leaves CX_GRAPHICS_BACKEND alone" "<unset>" "$(got CX_GRAPHICS_BACKEND)"
+new_case
+full_engine
+engine d3dmetal.enabled
+launch waitforexitandrun "$case_dir/game/game.exe" NOTPROTON_BACKEND=d3dmetal
+is "d3dmetal with the marker" "d3dmetal" "$(got backend)"
+is "selects D3DMetal in the engine" "d3dmetal" "$(got CX_GRAPHICS_BACKEND)"
+is "and keeps every backend DLL builtin" "d3d10core,d3d11,dxgi=b;$trio" "$(got WINEDLLOVERRIDES)"
+launch waitforexitandrun "$case_dir/game/game.exe" NOTPROTON_BACKEND=d3dmetal CX_GRAPHICS_BACKEND=dxmt
+is "NOTPROTON_BACKEND=d3dmetal sets CX_GRAPHICS_BACKEND over the panel's" "d3dmetal" "$(got CX_GRAPHICS_BACKEND)"
+has "and says so" "CX_GRAPHICS_BACKEND=dxmt replaced by d3dmetal" "$case_dir/log"
+
+echo "== legacy layout"
+new_case
+user_conf 'BACKEND=dxvk' 'DLLOVERRIDES=dinput8=n,b'
+cp "$case_dir/engine/lib/wine/x86_64-windows/dxgi.dll" "$case_dir/data/pfx/drive_c/windows/system32/dxgi.dll"
+launch waitforexitandrun "$case_dir/game/game.exe"
+is "the backend is the baked-in one" "dxmt-builtin" "$(got backend)"
+is "only the conf and the trio reach the overrides" "dinput8=n,b;$trio" "$(got WINEDLLOVERRIDES)"
+is "nothing is copied" "stock x86_64-windows dxgi" "$(sys system32 dxgi)"
+has "the ignored request is logged" "requested backend dxvk ignored" "$case_dir/log"
+is "the state file records it" "dxmt-builtin" "$(sed -n 1p "$case_dir/data/notproton-backend")"
+
+echo "== activation and switching"
+new_case
+full_engine
+launch waitforexitandrun "$case_dir/game/game.exe"
+is "dxmt sets what it ships native" "d3d10core,d3d11,dxgi=n,b;$trio" "$(got WINEDLLOVERRIDES)"
+is "dxmt dxgi is in system32" "backend dxmt/x86_64-windows/dxgi.dll" "$(sys system32 dxgi)"
+is "winemetal stays with Wine" "missing" "$(sys system32 winemetal)"
+is "dxmt has no i386, syswow64 is untouched" "missing" "$(sys syswow64 dxgi)"
+is "the state file records dxmt" "dxmt" "$(sed -n 1p "$case_dir/data/notproton-backend")"
+: > "$case_dir/log"
+launch waitforexitandrun "$case_dir/game/game.exe"
+lacks "a second launch copies nothing" "staged" "$case_dir/log"
+launch waitforexitandrun "$case_dir/game/game.exe" NOTPROTON_BACKEND=dxvk
+is "dxvk sets only d3d11 and d3d10core native, dxgi stays Wine's" \
+	"d3d10core,d3d11=n,b;dxgi=b;$trio" "$(got WINEDLLOVERRIDES)"
+is "the stale dxmt dxgi goes back to Wine's" "stock x86_64-windows dxgi" "$(sys system32 dxgi)"
+is "dxvk d3d11 replaces dxmt's" "backend dxvk/x86_64-windows/d3d11.dll" "$(sys system32 d3d11)"
+is "dxvk i386 lands in syswow64" "backend dxvk/i386-windows/d3d11.dll" "$(sys syswow64 d3d11)"
+has "the switch is logged" "backend switched from dxmt to dxvk" "$case_dir/log"
+launch waitforexitandrun "$case_dir/game/game.exe"
+is "back on dxmt, the stale i386 dxvk d3d11 goes back to Wine's" "stock i386-windows d3d11" "$(sys syswow64 d3d11)"
+launch waitforexitandrun "$case_dir/game/game.exe" NOTPROTON_BACKEND=wined3d
+is "wined3d keeps every backend DLL builtin" "d3d10core,d3d11,dxgi=b;$trio" "$(got WINEDLLOVERRIDES)"
+is "and puts Wine's dxgi back" "stock x86_64-windows dxgi" "$(sys system32 dxgi)"
+is "and Wine's d3d11" "stock x86_64-windows d3d11" "$(sys system32 d3d11)"
+printf 'user reshade\n' > "$case_dir/data/pfx/drive_c/windows/system32/dxgi.dll"
+launch waitforexitandrun "$case_dir/game/game.exe" NOTPROTON_BACKEND=wined3d
+is "a DLL the user put there is left alone" "user reshade" "$(sys system32 dxgi)"
+new_case
+full_engine
+chmod 500 "$case_dir/data/pfx/drive_c/windows/system32"
+launch waitforexitandrun "$case_dir/game/game.exe"
+chmod 700 "$case_dir/data/pfx/drive_c/windows/system32"
+is "a backend that cannot be staged falls back to wined3d" "wined3d" "$(got backend)"
+has "with the reason" "dxmt could not be staged, falling back to wined3d" "$case_dir/log"
+
+echo "== msync"
+new_case
+full_engine
+launch waitforexitandrun "$case_dir/game/game.exe"
+is "the free engine keeps msync off" "0 default" "$(got WINEMSYNC) $(got msync_from)"
+new_case
+full_engine
+engine msync
+launch waitforexitandrun "$case_dir/game/game.exe"
+is "an engine with msync turns it on" "1 engine" "$(got WINEMSYNC) $(got msync_from)"
+printf 0 > "$case_dir/data/notproton-msync"
+launch waitforexitandrun "$case_dir/game/game.exe"
+is "over an older carried-over 0" "1 engine" "$(got WINEMSYNC) $(got msync_from)"
+user_conf 'MSYNC=0'
+launch waitforexitandrun "$case_dir/game/game.exe"
+is "a conf MSYNC=0 turns it off" "0 gamefix" "$(got WINEMSYNC) $(got msync_from)"
+launch waitforexitandrun "$case_dir/game/game.exe" WINEMSYNC=1
+is "launch options beat the conf" "1 environment" "$(got WINEMSYNC) $(got msync_from)"
+new_case
+full_engine
+user_conf 'MSYNC=1'
+printf 1 > "$case_dir/data/notproton-msync"
+launch waitforexitandrun "$case_dir/game/game.exe"
+is "without the marker a conf MSYNC=1 keeps the carried-over value" "1 carried-over" "$(got WINEMSYNC) $(got msync_from)"
+has "and says why" "MSYNC=1 not applied, the engine has no .notproton-msync" "$case_dir/log"
+
+echo "== ARGS"
+new_case
+full_engine
+default_conf 'ARGS=-dx12'
+user_conf 'ARGS=-dx11  -windowed +exec=autoexec.cfg'
+launch waitforexitandrun "$case_dir/game/game.exe"
+is "the user conf ARGS wins" "-dx11  -windowed +exec=autoexec.cfg" "$(got gamefix_args)"
+launch run "$case_dir/game/iscriptevaluator.exe"
+is "helpers get no ARGS" "" "$(got gamefix_args)"
+has "and the log says so" "ARGS not applied, run is not the game launch" "$case_dir/log"
+for bad_args in '-dx11 ;reboot' '-a *' '-a $HOME' '-a|b' '-a&' '-a>b' '-a\b' '-a?'; do
+	new_case
+	full_engine
+	user_conf "ARGS=$bad_args"
+	launch waitforexitandrun "$case_dir/game/game.exe"
+	is "ARGS=$bad_args is rejected" "" "$(got gamefix_args)"
+	has "and logged" "rejected ARGS: an argument with characters outside" "$case_dir/log"
+done
+out=$(gamefix_args='-dx11  -windowed +exec=autoexec.cfg' log=/dev/null append_args="$append_args" \
+	sh -ec 'eval "$append_args"; printf "[%s]" "$@"' sh /g/game.exe -novid 'two words')
+is "ARGS come after the launch options' own arguments, split on spaces" \
+	"[/g/game.exe][-novid][two words][-dx11][-windowed][+exec=autoexec.cfg]" "$out"
+out=$(gamefix_args='' log=/dev/null append_args="$append_args" \
+	sh -ec 'eval "$append_args"; printf "[%s]" "$@"' sh /g/game.exe -novid)
+is "no ARGS leaves the command line alone" "[/g/game.exe][-novid]" "$out"
+
+echo "== RETINA"
+new_case
+full_engine
+user_conf 'RETINA=1'
+launch waitforexitandrun "$case_dir/game/game.exe"
+is "RETINA maps to NOTPROTON_RETINA" "1" "$(got NOTPROTON_RETINA)"
+launch waitforexitandrun "$case_dir/game/game.exe" NOTPROTON_RETINA=0
+is "the High Resolution launch option wins" "0" "$(got NOTPROTON_RETINA)"
+
+echo "== the launcher receives the allow-listed variables"
+set --
+out=$(env -i PATH="$PATH" forward="$forward" VKD3D_CONFIG=dxr MVK_CONFIG_LOG_LEVEL=1 \
+	STAGING_SHARED_MEMORY=1 WINE_CPU_TOPOLOGY=4:0,1,2,3 WINE_LARGE_ADDRESS_AWARE=1 \
+	DXVK_HUD=fps NOTPROTON_UNRELATED=1 sh -c 'set --; eval "$forward"; printf "%s\n" "$@"' | grep -v '^--env$' | sort | tr '\n' ' ')
+is "VKD3D_, MVK_, STAGING_ and WINE_ topology variables are forwarded" \
+	"DXVK_HUD=fps MVK_CONFIG_LOG_LEVEL=1 STAGING_SHARED_MEMORY=1 VKD3D_CONFIG=dxr WINE_CPU_TOPOLOGY=4:0,1,2,3 WINE_LARGE_ADDRESS_AWARE=1 " "$out"
+
+if [ "$fails" -eq 0 ]; then
+	echo "==> gamefixescheck: all assertions hold"
+else
+	echo "==> gamefixescheck: $fails failed"
+	exit 1
+fi

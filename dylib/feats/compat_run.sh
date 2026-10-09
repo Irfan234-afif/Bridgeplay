@@ -105,6 +105,468 @@ case "$app_id" in ''|0) app_id=$(basename "$STEAM_COMPAT_DATA_PATH" 2>/dev/null)
 case "$app_id" in ''|*[!0-9]*) app_id=0 ;; esac
 echo "app_id=$app_id (STEAM_COMPAT_APP_ID=$STEAM_COMPAT_APP_ID)" >> "$log" 2>&1 || true
 
+# Per-game fixes: the shipped gamefixes-default/<appid>.conf, then the user's
+# gamefixes/<appid>.conf, the later file winning per key. KEY=VALUE lines are checked
+# against an allow-list and never sourced, and the launch options win over both files.
+gamefix_keys=""
+gamefix_backend=""
+gamefix_dlloverrides=""
+gamefix_msync=""
+gamefix_args=""
+
+gamefix_log() {
+  echo "gamefix: $*" >> "$log" 2>&1 || true
+}
+
+# Wine syntax: name[,name...]=[n|b|n,b|b,n|d] entries joined by semicolons.
+valid_dll_overrides() {
+  rest=$1
+  [ -n "$rest" ] || return 1
+  while [ -n "$rest" ]; do
+    entry=${rest%%;*}
+    case "$rest" in *';'*) rest=${rest#*;} ;; *) rest="" ;; esac
+    [ -n "$entry" ] || continue
+    case "$entry" in *=*) ;; *) return 1 ;; esac
+    case "${entry%%=*}" in ''|,*|*,|*,,*|*[!A-Za-z0-9_.,+-]*) return 1 ;; esac
+    case "${entry#*=}" in ''|n|b|d|n,b|b,n) ;; *) return 1 ;; esac
+  done
+}
+
+# Prints why a pair is refused, and nothing when it is allowed.
+gamefix_reason() {
+  # shellcheck disable=SC2016 # the patterns match these characters literally
+  case "$2" in
+    *'`'*|*'$('*|*'"'*|*"'"*) echo "a backtick, \$( or a quote in the value"; return 0 ;;
+    *[[:cntrl:]]*) echo "a control character in the value"; return 0 ;;
+  esac
+  if [ "${#2}" -gt 1024 ]; then echo "a value over 1024 characters"; return 0; fi
+  case "$1" in
+    BACKEND)
+      case "$2" in dxmt|dxvk|wined3d|d3dmetal) ;; *) echo "not dxmt, dxvk, wined3d or d3dmetal" ;; esac ;;
+    MSYNC|RETINA)
+      case "$2" in 0|1) ;; *) echo "not 0 or 1" ;; esac ;;
+    DLLOVERRIDES)
+      valid_dll_overrides "$2" || echo "not Wine override syntax" ;;
+    ARGS)
+      # Space-separated arguments, each of A-Za-z0-9_+./:=,- only, so none can glob or quote.
+      case "$2" in *[!A-Za-z0-9_+./:=,\ -]*) echo "an argument with characters outside A-Za-z0-9_+./:=,-" ;; esac ;;
+    MTL_HUD_ENABLED|WINEDEBUG|WINE_LARGE_ADDRESS_AWARE|WINE_CPU_TOPOLOGY) ;;
+    DXMT_?*|DXVK_?*|MVK_?*|VKD3D_?*|D3DM_?*|STAGING_?*) ;;
+    *) echo "not on the allow-list" ;;
+  esac
+}
+
+gamefix_read() {
+  [ -f "$1" ] || return 0
+  if [ ! -r "$1" ] || [ "$(stat -f %z "$1" 2>/dev/null || echo 0)" -gt 65536 ]; then
+    gamefix_log "$2 conf $1 is unreadable or over 64 KiB, ignored"
+    return 0
+  fi
+  gamefix_log "reading the $2 conf $1"
+  lineno=0
+  while IFS= read -r line || [ -n "$line" ]; do
+    lineno=$((lineno + 1))
+    while :; do case "$line" in [[:space:]]*) line=${line#?} ;; *) break ;; esac; done
+    while :; do case "$line" in *[[:space:]]) line=${line%?} ;; *) break ;; esac; done
+    case "$line" in ''|'#'*) continue ;; esac
+    key=${line%%=*}
+    case "$line" in
+      [A-Z]*=*) case "$key" in *[!A-Z0-9_]*) key="" ;; esac ;;
+      *) key="" ;;
+    esac
+    if [ -z "$key" ]; then
+      gamefix_log "$2 conf line $lineno rejected: not KEY=VALUE"
+      continue
+    fi
+    value=${line#*=}
+    reason=$(gamefix_reason "$key" "$value")
+    if [ -n "$reason" ]; then
+      gamefix_log "$2 conf line $lineno rejected $key: $reason"
+      continue
+    fi
+    case " $gamefix_keys " in
+      *" $key "*) gamefix_log "$2 conf line $lineno replaces the earlier $key" ;;
+      *) gamefix_keys="${gamefix_keys:+$gamefix_keys }$key" ;;
+    esac
+    # key is [A-Z0-9_] only, so the eval names a variable and copies the value verbatim
+    eval "gamefix_value_$key=\$value gamefix_from_$key=\$2"
+  done < "$1"
+}
+
+gamefix_apply_env() {
+  eval "launch_set=\${$1+x}"
+  if [ -n "$launch_set" ]; then
+    gamefix_log "$1 kept from the launch options, the $3 conf value is not applied"
+  else
+    export "$1=$2"
+    gamefix_log "applied $1=$2 from the $3 conf"
+  fi
+}
+
+load_gamefixes() {
+  case "$app_id" in ''|0) return 0 ;; esac
+  gamefix_read "$np_support/gamefixes-default/$app_id.conf" default
+  gamefix_read "$np_support/gamefixes/$app_id.conf" user
+  for key in $gamefix_keys; do
+    eval "value=\$gamefix_value_$key from=\$gamefix_from_$key"
+    # shellcheck disable=SC2154 # eval assigns from on the line above
+    case "$key" in
+      BACKEND) gamefix_backend=$value; gamefix_log "BACKEND=$value from the $from conf" ;;
+      DLLOVERRIDES) gamefix_dlloverrides=$value
+        gamefix_log "DLLOVERRIDES=$value from the $from conf, launch options still win per DLL" ;;
+      MSYNC) gamefix_msync=$value; gamefix_log "MSYNC=$value from the $from conf" ;;
+      ARGS)
+        if [ "$verb" = waitforexitandrun ]; then
+          gamefix_args=$value
+          gamefix_log "ARGS=$value from the $from conf, added after the launch options' arguments"
+        else
+          gamefix_log "ARGS not applied, $verb is not the game launch"
+        fi ;;
+      RETINA) gamefix_apply_env NOTPROTON_RETINA "$value" "$from" ;;
+      *) gamefix_apply_env "$key" "$value" "$from" ;;
+    esac
+  done
+}
+
+# Launch options > gamefix MSYNC > an engine with msync > the prefix's last choice > off.
+resolve_msync() {
+  msync_from=environment
+  [ -z "$WINEMSYNC" ] || return 0
+  engine_msync=0
+  [ ! -e "$CX_ROOT/.notproton-msync" ] || engine_msync=1
+  case "$gamefix_msync" in
+    0) WINEMSYNC=0; msync_from=gamefix; return 0 ;;
+    1)
+      if [ "$engine_msync" -eq 1 ]; then WINEMSYNC=1; msync_from=gamefix; return 0; fi
+      gamefix_log "MSYNC=1 not applied, the engine has no .notproton-msync" ;;
+  esac
+  if [ "$engine_msync" -eq 1 ]; then WINEMSYNC=1; msync_from=engine; return 0; fi
+  if [ -r "$STEAM_COMPAT_DATA_PATH/notproton-msync" ]; then
+    WINEMSYNC=$(tr -d ' \t\n' \
+      < "$STEAM_COMPAT_DATA_PATH/notproton-msync" 2>/dev/null || true)
+    msync_from=carried-over
+  fi
+  [ -n "$WINEMSYNC" ] || msync_from=default
+}
+
+# Graphics backends. The engine keeps Wine's own dxgi/d3d11/d3d10core/d3d12 in lib/wine and
+# ships the alternatives under lib/notproton-backends/<name>/<arch>-windows. An engine
+# without that folder bakes its DLLs into lib/wine, so nothing is swapped there.
+backend_root="$CX_ROOT/lib/notproton-backends"
+backend=""
+backend_from=""
+backend_overrides=""
+
+graphics_log() {
+  echo "graphics: $*" >> "$log" 2>&1 || true
+}
+
+# The lower-case module names of the DLLs in one backend folder, winemetal left to lib/wine.
+backend_dlls() {
+  for f in "$1"/*.[dD][lL][lL]; do
+    [ -f "$f" ] || continue
+    name=${f##*/}
+    name=$(printf '%s' "${name%.*}" | tr '[:upper:]' '[:lower:]')
+    case "$name" in ''|*[!a-z0-9_]*|winemetal) continue ;; esac
+    printf '%s\n' "$name"
+  done
+}
+
+# Every DLL some backend ships, so a copy one of them left in the prefix can be overridden.
+managed_dlls() {
+  {
+    printf '%s\n' dxgi d3d11 d3d10core
+    for dir in "$backend_root"/*/x86_64-windows "$backend_root"/*/i386-windows; do
+      [ ! -d "$dir" ] || backend_dlls "$dir"
+    done
+  } | sort -u
+}
+
+backend_available() {
+  case "$1" in
+    wined3d) return 0 ;;
+    d3dmetal) [ -f "$backend_root/d3dmetal.enabled" ] ;;
+    dxmt|dxvk) [ -n "$(backend_dlls "$backend_root/$1/x86_64-windows")" ] ;;
+    *) return 1 ;;
+  esac
+}
+
+backend_record() {
+  record="$STEAM_COMPAT_DATA_PATH/notproton-backend"
+  [ -n "$STEAM_COMPAT_DATA_PATH" ] && [ -f "$record" ] && [ ! -L "$record" ] || return 1
+  recorded=$(sed -n 1p "$record" 2>/dev/null) || return 1
+  case "$recorded" in
+    dxmt|dxvk|wined3d|d3dmetal|dxmt-builtin) printf '%s' "$recorded" ;;
+    *) return 1 ;;
+  esac
+}
+
+# One little-endian unsigned word of 1, 2 or 4 bytes, inside the file only.
+pe_word() {
+  [ "$2" -ge 0 ] && [ $(($2 + $3)) -le "$pe_size" ] || return 1
+  word=$(od -A n -t "u$3" -j "$2" -N "$3" "$1" 2>/dev/null | tr -d ' \n')
+  case "$word" in ''|*[!0-9]*) return 1 ;; esac
+  printf '%s' "$word"
+}
+
+# Count 4-byte words, all of them inside the file, space-separated.
+pe_words() {
+  [ "$2" -ge 0 ] && [ $(($2 + $3 * 4)) -le "$pe_size" ] || return 1
+  od -A n -v -t u4 -j "$2" -N $(($3 * 4)) "$1" 2>/dev/null | tr -s ' \n' '  '
+}
+
+# The file offset of an RVA, from the section table words in pe_sections.
+pe_rva_offset() {
+  rva=$1
+  # shellcheck disable=SC2086 # the table is a list of numbers and has to split
+  set -- $pe_sections
+  while [ "$#" -ge 10 ]; do
+    span=$3
+    [ "$5" -le "$span" ] || span=$5
+    if [ "$rva" -ge "$4" ] && [ "$rva" -lt $(($4 + span)) ]; then
+      [ $((rva - $4)) -lt "$5" ] || return 1
+      offset=$((rva - $4 + $6))
+      [ "$offset" -lt "$pe_size" ] || return 1
+      printf '%s' "$offset"
+      return 0
+    fi
+    shift 10
+  done
+  return 1
+}
+
+# A game whose exe imports d3d12.dll is D3D12, which needs Wine's own dxgi (vkd3d), since
+# DXMT's dxgi refuses swap chains for devices it did not make. Only the static import
+# table counts, and anything that does not parse as a PE detects nothing.
+imports_d3d12() {
+  pe=$1
+  [ -f "$pe" ] || return 1
+  pe_size=$(stat -f %z "$pe" 2>/dev/null) || return 1
+  [ "$(od -A n -t x1 -N 2 "$pe" 2>/dev/null | tr -d ' \n')" = 4d5a ] || return 1
+  header=$(pe_word "$pe" 60 4) || return 1
+  [ "$(od -A n -t x1 -j "$header" -N 4 "$pe" 2>/dev/null | tr -d ' \n')" = 50450000 ] || return 1
+  section_count=$(pe_word "$pe" $((header + 6)) 2) || return 1
+  optional_size=$(pe_word "$pe" $((header + 20)) 2) || return 1
+  optional=$((header + 24))
+  case "$(pe_word "$pe" "$optional" 2)" in
+    267) directories=$((optional + 96)) ;;
+    523) directories=$((optional + 112)) ;;
+    *) return 1 ;;
+  esac
+  directory_count=$(pe_word "$pe" $((directories - 4)) 4) || return 1
+  [ "$directory_count" -ge 2 ] && [ $((directories + 16)) -le $((optional + optional_size)) ] || return 1
+  import_rva=$(pe_word "$pe" $((directories + 8)) 4) || return 1
+  [ "$import_rva" -gt 0 ] && [ "$section_count" -ge 1 ] && [ "$section_count" -le 96 ] || return 1
+  pe_sections=$(pe_words "$pe" $((optional + optional_size)) $((section_count * 10))) || return 1
+  imports=$(pe_rva_offset "$import_rva") || return 1
+  descriptors=$(((pe_size - imports) / 20))
+  [ "$descriptors" -le 512 ] || descriptors=512
+  [ "$descriptors" -ge 1 ] || return 1
+  table=$(pe_words "$pe" "$imports" $((descriptors * 5))) || return 1
+  # shellcheck disable=SC2086 # the table is a list of numbers and has to split
+  set -- $table
+  while [ "$#" -ge 5 ]; do
+    [ "$1$4$5" != 000 ] || return 1
+    if [ "$4" -gt 0 ] && name_at=$(pe_rva_offset "$4"); then
+      module=$(dd if="$pe" bs=1 skip="$name_at" count=16 2>/dev/null \
+        | LC_ALL=C tr '\0' '\n' | head -n 1 | LC_ALL=C tr '[:upper:]' '[:lower:]')
+      [ "$module" != d3d12.dll ] || return 0
+    fi
+    shift 5
+  done
+  return 1
+}
+
+# NOTPROTON_BACKEND > CX_GRAPHICS_BACKEND > gamefix BACKEND > auto-detect > dxmt, then down
+# to what the engine has.
+select_backend() {
+  wanted=""
+  backend_from=""
+  if [ ! -d "$backend_root" ]; then
+    backend=dxmt-builtin
+    backend_from="legacy engine layout, no lib/notproton-backends"
+    if [ -n "${NOTPROTON_BACKEND:-}$gamefix_backend" ]; then
+      graphics_log "requested backend ${NOTPROTON_BACKEND:-$gamefix_backend} ignored, the engine bakes its graphics DLLs into lib/wine"
+    fi
+    return 0
+  fi
+  case "${NOTPROTON_BACKEND:-}" in
+    '') ;;
+    dxmt|dxvk|wined3d|d3dmetal)
+      wanted=$NOTPROTON_BACKEND
+      backend_from="NOTPROTON_BACKEND in the launch options" ;;
+    *) graphics_log "NOTPROTON_BACKEND is not dxmt, dxvk, wined3d or d3dmetal, ignored" ;;
+  esac
+  # The Steam panel's Graphics menu writes CX_GRAPHICS_BACKEND.
+  if [ -z "$wanted" ] && [ -n "${CX_GRAPHICS_BACKEND:-}" ]; then
+    case "$(printf '%s' "$CX_GRAPHICS_BACKEND" | tr '[:upper:]' '[:lower:]')" in
+      d3dmetal) wanted=d3dmetal ;;
+      dxmt) wanted=dxmt ;;
+      dxvk) wanted=dxvk ;;
+      wined3d|opengl|wine) wanted=wined3d ;;
+      *) graphics_log "CX_GRAPHICS_BACKEND is not a backend this engine maps, ignored" ;;
+    esac
+    [ -z "$wanted" ] || backend_from="CX_GRAPHICS_BACKEND in the launch options"
+  fi
+  if [ -z "$wanted" ] && [ -n "$gamefix_backend" ]; then
+    wanted=$gamefix_backend
+    backend_from="BACKEND in the gamefix conf"
+  fi
+  # A helper has no game to inspect, so it keeps what the game last ran with.
+  if [ -z "$wanted" ] && [ "$verb" != waitforexitandrun ] \
+    && recorded=$(backend_record) && [ "$recorded" != dxmt-builtin ]; then
+    wanted=$recorded
+    backend_from="carried over from the last launch"
+  fi
+  if [ -z "$wanted" ] && [ "$verb" = waitforexitandrun ] && [ -f "$1" ]; then
+    if imports_d3d12 "$1"; then
+      wanted=wined3d
+      backend_from="auto-detected, the game imports d3d12.dll"
+    else
+      wanted=dxmt
+      backend_from="auto-detected, the game does not import d3d12.dll"
+    fi
+  fi
+  if [ -z "$wanted" ]; then
+    wanted=dxmt
+    backend_from=default
+  fi
+  backend=$wanted
+  while ! backend_available "$backend"; do
+    case "$backend" in
+      d3dmetal) why="no d3dmetal.enabled marker"; next=dxmt ;;
+      dxvk) why="no x86_64 DLLs in notproton-backends/dxvk"; next=dxmt ;;
+      *) why="no x86_64 DLLs in notproton-backends/$backend"; next=wined3d ;;
+    esac
+    graphics_log "$backend is not available ($why), falling back to $next"
+    backend_from="$backend_from, fell back from $backend"
+    backend=$next
+  done
+}
+
+# Returns 0 when the destination already matches or was replaced.
+stage_backend_file() {
+  [ -f "$1" ] && [ ! -d "$2" ] || return 1
+  if [ -f "$2" ] && [ ! -L "$2" ] \
+    && [ "$(stat -f %z "$1" 2>/dev/null)" = "$(stat -f %z "$2" 2>/dev/null)" ] \
+    && cmp -s "$1" "$2"; then
+    return 0
+  fi
+  staging="$2.notproton.$$"
+  rm -f "$staging" 2>/dev/null || true
+  if { cp -c -f "$1" "$staging" 2>/dev/null || cp -f "$1" "$staging" 2>> "$log"; } \
+    && mv -f "$staging" "$2" 2>> "$log"; then
+    graphics_log "staged ${1#"$CX_ROOT/"} as ${2#"$WINEPREFIX/"}"
+    return 0
+  fi
+  rm -f "$staging" 2>/dev/null || true
+  return 1
+}
+
+# A prefix copy identical to some backend's DLL was put there by a launch, so it goes
+# back to Wine's own. Anything else in the prefix is left alone.
+restore_stock_dll() {
+  [ -f "$3" ] && [ ! -L "$3" ] || return 0
+  stock="$CX_ROOT/lib/wine/$1/$2.dll"
+  [ -f "$stock" ] || return 0
+  ! cmp -s "$stock" "$3" || return 0
+  for theirs in "$backend_root"/*/"$1"/*.[dD][lL][lL]; do
+    [ -f "$theirs" ] || continue
+    base=${theirs##*/}
+    [ "$(printf '%s' "${base%.*}" | tr '[:upper:]' '[:lower:]')" = "$2" ] || continue
+    if cmp -s "$theirs" "$3"; then
+      stage_backend_file "$stock" "$3"
+      return
+    fi
+  done
+  return 0
+}
+
+# Copies the chosen backend's DLLs into the prefix and sets them native, and sets every
+# other DLL a backend could have left there builtin.
+activate_backend() {
+  backend_overrides=""
+  [ "$backend" != dxmt-builtin ] || return 0
+  managed=$(managed_dlls)
+  shipped=""
+  case "$backend" in
+    dxmt|dxvk) shipped=$({ backend_dlls "$backend_root/$backend/x86_64-windows"
+      backend_dlls "$backend_root/$backend/i386-windows"; } | sort -u | tr '\n' ' ') ;;
+  esac
+  staging_failed=0
+  for pair in x86_64-windows:system32 i386-windows:syswow64; do
+    arch=${pair%%:*}
+    dir="$WINEPREFIX/drive_c/windows/${pair##*:}"
+    [ -n "$WINEPREFIX" ] && [ -d "$dir" ] || continue
+    ships=""
+    case "$backend" in
+      dxmt|dxvk) ships=$(backend_dlls "$backend_root/$backend/$arch" | tr '\n' ' ') ;;
+    esac
+    for name in $managed; do
+      case " $ships " in
+        *" $name "*)
+          if ! stage_backend_file "$backend_root/$backend/$arch/$name.dll" "$dir/$name.dll"; then
+            graphics_log "could not stage $backend $arch/$name.dll into the prefix"
+            staging_failed=1
+          fi ;;
+        *)
+          restore_stock_dll "$arch" "$name" "$dir/$name.dll" \
+            || graphics_log "could not restore Wine's $arch/$name.dll in the prefix" ;;
+      esac
+    done
+  done
+  if [ "$staging_failed" -eq 1 ]; then
+    graphics_log "$backend could not be staged, falling back to wined3d"
+    backend=wined3d
+    backend_from="$backend_from, fell back after staging failed"
+    activate_backend
+    return
+  fi
+  native=""
+  builtin=""
+  for name in $managed; do
+    case " $shipped " in
+      *" $name "*) native="${native:+$native,}$name" ;;
+      *) builtin="${builtin:+$builtin,}$name" ;;
+    esac
+  done
+  backend_overrides="${native:+$native=n,b}"
+  [ -z "$builtin" ] || backend_overrides="${backend_overrides:+$backend_overrides;}$builtin=b"
+  if [ "$backend" = d3dmetal ]; then
+    if [ -n "${CX_GRAPHICS_BACKEND:-}" ] && [ "$CX_GRAPHICS_BACKEND" != d3dmetal ]; then
+      graphics_log "CX_GRAPHICS_BACKEND=$CX_GRAPHICS_BACKEND replaced by d3dmetal"
+    fi
+    export CX_GRAPHICS_BACKEND=d3dmetal
+  fi
+}
+
+record_backend() {
+  [ -n "$STEAM_COMPAT_DATA_PATH" ] || return 0
+  record="$STEAM_COMPAT_DATA_PATH/notproton-backend"
+  [ ! -L "$record" ] || return 0
+  previous=$(backend_record) || previous=""
+  if [ -n "$previous" ] && [ "$previous" != "$backend" ]; then
+    graphics_log "backend switched from $previous to $backend"
+  fi
+  if ! { printf '%s\n%s\n' "$backend" "$backend_from" > "$record.new" \
+    && mv -f "$record.new" "$record"; } 2>/dev/null; then
+    rm -f "$record.new" 2>/dev/null || true
+    graphics_log "could not record the backend in $record"
+  fi
+}
+
+# Last entry wins: backend, then the gamefix conf, then the launch options.
+compose_dll_overrides() {
+  composed=$backend_overrides
+  for part in "$gamefix_dlloverrides" "${WINEDLLOVERRIDES:-}"; do
+    [ -n "$part" ] || continue
+    composed="${composed:+$composed;}$part"
+  done
+  [ -z "$composed" ] || export WINEDLLOVERRIDES="$composed"
+}
+
+load_gamefixes || true
+
 # Steam does not set SteamAppId or SteamGameId for helpers like the install-script
 # evaluator. If they are set, SteamAPI_Init registers the helper as the running game so the
 # real launch fails with AppError_16. Not applicable to non-Steam shortcuts, which come in
@@ -883,13 +1345,7 @@ if [ -n "$STEAM_COMPAT_DATA_PATH" ]; then
   export WINEPREFIX="$STEAM_COMPAT_DATA_PATH/pfx"
   stage_step="prefix lock"
   prepare_prefix_directory
-  msync_from=environment
-  if [ -z "$WINEMSYNC" ] && [ -r "$STEAM_COMPAT_DATA_PATH/notproton-msync" ]; then
-    WINEMSYNC=$(tr -d ' \t\n' \
-      < "$STEAM_COMPAT_DATA_PATH/notproton-msync" 2>/dev/null || true)
-    msync_from=carried-over
-  fi
-  [ -n "$WINEMSYNC" ] || msync_from=default
+  resolve_msync
   export WINEMSYNC="${WINEMSYNC:-0}"
   printf '%s' "$WINEMSYNC" \
     > "$STEAM_COMPAT_DATA_PATH/notproton-msync" 2>/dev/null || true
@@ -916,6 +1372,14 @@ if [ -n "$STEAM_COMPAT_DATA_PATH" ]; then
   stage_step="game drive"
   map_game_drive
 fi
+
+stage_step="graphics backend"
+select_backend "$1"
+activate_backend || true
+record_backend || true
+graphics_log "backend=$backend ($backend_from)"
+compose_dll_overrides
+[ -z "$backend_overrides" ] || graphics_log "backend overrides $backend_overrides"
 
 bridge_src="$np_support/bridge"
 prefix_steam="$WINEPREFIX/drive_c/Program Files (x86)/Steam"
@@ -1374,13 +1838,18 @@ terminate() {
 trap terminate TERM INT HUP
 
 game_cwd="$(pwd)"
+if [ -n "$gamefix_args" ]; then
+  # shellcheck disable=SC2086 # ARGS tokens hold no spaces or glob characters and have to split
+  set -- "$@" $gamefix_args
+  echo "gamefix: game arguments are now: $*" >> "$log" 2>&1 || true
+fi
 if [ -n "$STEAM_DYLD_INSERT_LIBRARIES" ]; then
   echo "=== overlay injected from $STEAM_DYLD_INSERT_LIBRARIES ===" >> "$log" 2>&1 || true
 else
   echo "=== client staged no overlay renderer, overlay disabled ===" >> "$log" 2>&1 || true
 fi
 set -- --args "$shim_exe" "$@"
-for name in $(env | sed -nE 's/^(CX_APPLEGPTK_LIBD3DSHARED_PATH|Steam[A-Za-z0-9]*|(CX_GRAPHICS|D3DM_|DXMT_|DXVK_|MTL_|ROSETTA_)[A-Z0-9_]*)=.*/\1/p'); do
+for name in $(env | sed -nE 's/^(CX_APPLEGPTK_LIBD3DSHARED_PATH|WINE_LARGE_ADDRESS_AWARE|WINE_CPU_TOPOLOGY|Steam[A-Za-z0-9]*|(CX_GRAPHICS|D3DM_|DXMT_|DXVK_|MVK_|VKD3D_|STAGING_|MTL_|ROSETTA_)[A-Z0-9_]*)=.*/\1/p'); do
   eval "value=\$$name"
   # shellcheck disable=SC2154 # eval assigns value on the line above
   set -- --env "$name=$value" "$@"
