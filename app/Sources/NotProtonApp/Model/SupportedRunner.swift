@@ -92,7 +92,7 @@ enum SupportedRunners {
     // First entry is what windows-only games get when Steam has no mapping.
     static let toolPreference = [
         legacyToolName, "notproton-fex", "notproton-fex-rosetta", "notproton-preview",
-        "notproton-fex-41069", "notproton-fex-rosetta-41069", "notproton-preview-41069", "notproton-26.3", "notproton-winehq",
+        "notproton-fex-41069", "notproton-fex-rosetta-41069", "notproton-preview-41069", "notproton-26.3", "notproton-winecx", "notproton-winehq",
     ]
 
     static let legacyToolName = "notproton"

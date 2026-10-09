@@ -247,6 +247,7 @@ gamefix_apply_env() {
 
 load_gamefixes() {
   case "$app_id" in ''|0) return 0 ;; esac
+  gamefix_read "$np_support/gamefixes/default.conf" global
   gamefix_read "$np_support/gamefixes-default/$app_id.conf" default
   gamefix_read "$np_support/gamefixes/$app_id.conf" user
   for key in $gamefix_keys; do
