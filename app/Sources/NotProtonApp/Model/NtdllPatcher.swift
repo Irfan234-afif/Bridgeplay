@@ -285,6 +285,7 @@ enum NtdllPatcher {
                 imageBase: 0x7bc0_0000
             ),
         ],
+        FreeEngineWinecx.runnerBuild.id: FreeEngineWinecx.ntdllPatches,
     ]
 
     static func patches(for build: RunnerBuild) -> [NtdllPatch] {

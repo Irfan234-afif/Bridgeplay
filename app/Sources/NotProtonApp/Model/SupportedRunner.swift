@@ -251,6 +251,7 @@ enum SupportedRunners {
             ],
             isFree: true
         ),
+        FreeEngineWinecx.runnerBuild,
     ]
 
     static func build(loaderSHA256 hash: String) -> RunnerBuild? {
