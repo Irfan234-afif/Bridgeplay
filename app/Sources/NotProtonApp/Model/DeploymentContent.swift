@@ -107,7 +107,8 @@ enum DeploymentContent {
     static func files(
         payload: InstallPayload.Located, bridgePayload: BridgePayload.Located,
         app: URL, bridge: URL, signatures: URL, overlayShim: URL, iconmaker: URL, appinfo: URL,
-        compatTools: URL, tools: [InstalledTool], runners: URL
+        compatTools: URL, tools: [InstalledTool], runners: URL,
+        gamefixes: URL = SupportPaths.gamefixesDefault
     ) -> [File] {
         var files = [
             File(source: payload.dylib, destination: SupportPaths.Steam.deployedDylib(inBundle: app),
@@ -119,6 +120,10 @@ enum DeploymentContent {
         files += payload.signatures.map {
             File(source: $0, destination: signatures.appending(path: $0.lastPathComponent),
                  name: "signatures/\($0.lastPathComponent)")
+        }
+        files += payload.gamefixes.map {
+            File(source: $0, destination: gamefixes.appending(path: $0.lastPathComponent),
+                 name: "gamefixes-default/\($0.lastPathComponent)")
         }
         for entry in bridgePayload.sources {
             files += entry.bridgePaths.map {

@@ -100,7 +100,8 @@ enum SteamInstaller {
         let files = DeploymentContent.files(
             payload: payload, bridgePayload: bridgeLocated, app: app, bridge: bridge,
             signatures: signatures, overlayShim: overlayShim, iconmaker: iconmaker, appinfo: appinfo,
-            compatTools: compatTools, tools: tools, runners: runners)
+            compatTools: compatTools, tools: tools, runners: runners,
+            gamefixes: support.appending(path: "gamefixes-default"))
         let content = try DeploymentContent.inspect(files: files, bundled: build, installed: previousBuild,
                                                    legacyVersion: SteamBundle.deployedVersion(at: deployedVersion))
         guard content != .newerInstalled else {
@@ -149,6 +150,8 @@ enum SteamInstaller {
         for file in files where file.destination != dylib {
             try installIfChanged(file)
         }
+        pruneGamefixes(keeping: payload.gamefixes.map(\.lastPathComponent),
+                       in: deployedVersion.deletingLastPathComponent().appending(path: "gamefixes-default"))
 
         var backedUp = false
         if patching {
@@ -214,6 +217,15 @@ enum SteamInstaller {
         try write(outcome.version, to: deployedVersion)
         try atomicReplace(DeploymentContent.record(beside: deployedVersion),
                           with: JSONEncoder().encode(outcome.build), step: step)
+    }
+
+    // The shipped defaults are replaced as a set, so a fix dropped from the app stops applying.
+    static func pruneGamefixes(keeping names: [String], in directory: URL) {
+        let fm = FileManager.default
+        let entries = (try? fm.contentsOfDirectory(at: directory, includingPropertiesForKeys: nil)) ?? []
+        for entry in entries where !names.contains(entry.lastPathComponent) {
+            try? fm.removeItem(at: entry)
+        }
     }
 
     static func installIfChanged(_ file: DeploymentContent.File) throws {

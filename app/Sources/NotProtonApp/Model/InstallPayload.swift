@@ -14,6 +14,8 @@ enum InstallPayload {
         let builtAt: Int64
 
         let signatures: [URL]
+        // payload/gamefixes/*.conf, installed into SupportPaths.gamefixesDefault.
+        var gamefixes: [URL] = []
     }
 
     static func root(in bundle: Bundle = .module) throws -> URL {
@@ -28,6 +30,12 @@ enum InstallPayload {
 
     static func locate(in bundle: Bundle = .module) throws -> Located {
         try locate(root: try root(in: bundle))
+    }
+
+    static func locateGamefixes(in root: URL) throws -> [URL] {
+        ((try? FileManager.default.contentsOfDirectory(
+            at: root.appending(path: "gamefixes"), includingPropertiesForKeys: nil
+        )) ?? []).filter { $0.pathExtension == "conf" }.sorted { $0.lastPathComponent < $1.lastPathComponent }
     }
 
     static func locate(root: URL) throws -> Located {
@@ -72,9 +80,12 @@ enum InstallPayload {
             )
         }
 
+        let gamefixes = try locateGamefixes(in: root)
+
         return Located(
             dylib: dylib, overlayShim: shim, iconmaker: iconmaker,
-            appinfo: appinfo, run: run, builtAt: builtAt, signatures: signatures
+            appinfo: appinfo, run: run, builtAt: builtAt, signatures: signatures,
+            gamefixes: gamefixes
         )
     }
 }
