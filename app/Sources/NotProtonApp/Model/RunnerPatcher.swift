@@ -248,8 +248,11 @@ enum RunnerPatcher {
     static func isHardened(_ loader: URL) -> Bool {
         guard let result = try? Shell.run(
             "/usr/bin/codesign", ["-dv", signingTarget(for: loader).path(percentEncoded: false)]
-        ), result.status == 0 else { return true }
+        ) else { return true }
         let described = result.stderr + result.stdout
+        // An unsigned loader (WineCX ships one) has no hardened runtime, so dyld already
+        // honours DYLD_* and there is nothing to extend.
+        if result.status != 0 { return !described.contains("not signed at all") }
         return described.split(separator: "\n").contains {
             $0.hasPrefix("CodeDirectory") && $0.contains("runtime")
         }
