@@ -309,9 +309,10 @@ enum WinecxD3DMetal {
     // its own D3DMetal and is never written to.
     @discardableResult
     static func refresh(
-        root: URL, roots: [URL] = searchRoots(), stock: [String: String] = FreeEngineWinecx.current.d3dStock
+        root: URL, roots: [URL] = searchRoots(), stock: [String: String]? = nil
     ) -> Payload? {
-        guard isWinecx(root: root) else { return nil }
+        guard let release = FreeEngineWinecx.release(forRoot: root) else { return nil }
+        let stock = stock ?? release.d3dStock
         guard let payload = locate(in: roots) else {
             unlink(root: root)
             return nil
@@ -328,7 +329,6 @@ enum WinecxD3DMetal {
     }
 
     static func isWinecx(root: URL) -> Bool {
-        let loader = Clean.copy(of: CrossOverSource.unixLoader(inRoot: root))
-        return Digest.sha256IfPresent(loader) == FreeEngineWinecx.runnerBuild.loaderSHA256
+        FreeEngineWinecx.release(forRoot: root) != nil
     }
 }

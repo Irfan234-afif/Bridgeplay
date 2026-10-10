@@ -121,6 +121,21 @@ PINNED = {
          'exports': {'LdrGetDllHandle': 0x7bc12a60, 'LdrLoadDll': 0x7bc13600,
                      'NtProtectVirtualMemory': 0x7bc0d764, 'NtOpenFile': 0x7bc0d594,
                      'NtReadFile': 0x7bc0d2c4, 'NtClose': 0x7bc0d354}},
+    # WineCX 11.17 (dappermint winecx-gptk runtime 4.7.3)
+    '8b32c9f6f71b4f15fcaccb19b0f2adab9391ae73ad539cae9e136f8ee7d24128':
+        {'hookRVA': 0x52de3, 'stolen': '4883bc24f000000000', 'caveRVA': 0x83360, 'caveSize': 3232,
+         'resume': 0x52dec, 'wm': 'rbx', 'load_path': 0xd0,
+         'payload': 'e1bbd185b19de3e23d627ae3a8bf25ed1b767bff5690102c5312a5ed3813e736',
+         'exports': {'LdrGetDllHandle': 0x170017950, 'LdrLoadDll': 0x1700184c0,
+                     'NtProtectVirtualMemory': 0x17000f690, 'NtOpenFile': 0x17000f2f0,
+                     'NtReadFile': 0x17000ed50, 'NtClose': 0x17000ee70}},
+    'cc8a9035cea0e26c5d333ef220f1becefc27ae44d2cdcdaea3278e8739d26fd9':
+        {'hookRVA': 0x4f880, 'stolen': 'f645b4027529', 'caveRVA': 0x808a0, 'caveSize': 1888,
+         'resume': 0x4f886, 'wm': 'ebx', 'load_path': -0x5c,
+         'payload': '0676104e0bd56c4a1e8c473d9cbcd21fb2ba105fc7dc6cf5a70d37692c129e28',
+         'exports': {'LdrGetDllHandle': 0x7bc12aa0, 'LdrLoadDll': 0x7bc13640,
+                     'NtProtectVirtualMemory': 0x7bc0d7a4, 'NtOpenFile': 0x7bc0d5d4,
+                     'NtReadFile': 0x7bc0d304, 'NtClose': 0x7bc0d394}},
 }
 EXPORTS = ['LdrGetDllHandle', 'LdrLoadDll', 'NtProtectVirtualMemory',
            'NtOpenFile', 'NtReadFile', 'NtClose']

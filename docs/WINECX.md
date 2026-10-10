@@ -1,9 +1,29 @@
 # WineCX engine
 
 NotProton's second free engine. WineCX is CodeWeavers' open-source (LGPL) CrossOver 26.3
-Wine changes, rebased by dappermint onto upstream wine-11.15
-([dappermint/winecx](https://github.com/dappermint/winecx), branch `wine1115`). It is built in
-CI into a Whisky runtime by [dappermint/winecx-gptk](https://github.com/dappermint/winecx-gptk).
+Wine changes, rebased by dappermint onto upstream Wine
+([dappermint/winecx](https://github.com/dappermint/winecx)). It is built in CI into a Whisky
+runtime by [dappermint/winecx-gptk](https://github.com/dappermint/winecx-gptk).
+
+Two releases are pinned side by side (`FreeEngineWinecx.releases`):
+
+| Build | Runtime | winecx | Wine | Tool | Bundle |
+|---|---|---|---|---|---|
+| `winecx-11.17` (current) | 4.7.3 | `e0aa380` | 11.17 | `notproton-winecx` | `WineCX 11.17.app` |
+| `winecx-11.15` | 4.5.125 | `5b45f45` | 11.15 | `notproton-winecx-11.15` | `WineCX 11.15.app` |
+
+The WineCX row installs the current one. Each release is its own runner build with its own
+pins, ntdll detours and Steam tool, so the 11.15 engine stays installed and selectable. While
+11.17 is not installed, the 11.15 build answers to `notproton-winecx` (`CompatTool.standsInFor`),
+so games mapped to that name keep working until the update. A prefix claimed by one build is
+refused by the other (`refuse_other_build` in `compat_run.sh`): rebuild it in NotProton, or pick
+"WineCX 11.15" in the game's Compatibility settings.
+
+4.7.3 over 4.5.125: msync fixes (wake one waiter, skip wake syscalls nobody waits on, sleep
+instead of spinning while a wait registers, unregister on contention), kernelbase
+`FlsGetValue2` for Unity 6000.3, dxgi `CheckInterfaceSupport` for `IDXGIDevice`, winemac no
+longer hiding the client view on a window-surface flush, win32u reporting the adapter
+D3DMetal was told to use, and the Wine 11.16 and 11.17 merges.
 
 Compared with the WineHQ 11.15 engine it adds:
 
@@ -16,12 +36,28 @@ Compared with the WineHQ 11.15 engine it adds:
   `e94c312` build as the WineHQ engine ([DXMT.md](DXMT.md)), not the archive's 0.80. The
   builtin Direct3D is Wine's own, or D3DMetal once a Game Porting Toolkit is linked.
 
-In NotProton it is build `winecx-11.15`, tool `notproton-winecx`, shown as "WineCX 11.15
-(msync, D3DMetal)". Like the WineHQ engine it needs no CrossOver license. The licence check
+In NotProton the current build is `winecx-11.17`, tool `notproton-winecx`, shown as "WineCX
+11.17 (msync, D3DMetal)". Like the WineHQ engine it needs no CrossOver license. The licence check
 treats it as free only because the loader hash matches the pinned one, so a CrossOver install
 can never pass as it.
 
 ## Artifact
+
+### 4.7.3 (current)
+
+| | |
+|---|---|
+| File | `Libraries.tar.gz`, 461,131,598 bytes |
+| URL | https://github.com/dappermint/winecx-gptk/releases/download/runtime-v4.7.3/Libraries.tar.gz |
+| sha256 | `a4b5d63493f80698cce5cad8e7212d9a51c8292037b00c478f4652636fcfd331` |
+| Source | winecx `e0aa380780b73e20fabcfe78fd42713b94929a53`, built by winecx-gptk `0bf3eabc2f0d95154282eb86b11205cbbaae6c65` |
+| Base | Wine 11.17 (`VERSION`) |
+| Arch, target | x86_64 only, minos 26.0, same layout as 4.5.125 |
+
+No Whisky mirror carries 4.7.3, so the only base is the winecx-gptk release. Its DXVK
+repack is byte-identical to 4.5.125's.
+
+### 4.5.125
 
 | | |
 |---|---|
@@ -49,8 +85,8 @@ stripped, which NotProton does not use. `Libraries/DXVK/{x64,x32}` holds DXVK. A
 
 ## What NotProton lays out
 
-The engine root (`…/WineCX 11.15.app/Contents/SharedSupport/CrossOver`, cloned into the runner
-`runners/crossover-winecx-11.15`) is the archive's `Libraries/Wine`, plus:
+The engine root (`…/WineCX 11.17.app/Contents/SharedSupport/CrossOver`, cloned into the runner
+`runners/crossover-winecx-11.17`; likewise for 11.15) is the archive's `Libraries/Wine`, plus:
 
 ```
 .notproton-msync                                  engine supports msync
@@ -60,6 +96,7 @@ lib/notproton-backends/dxmt/{x86_64,i386}-windows/{d3d11,d3d10core,dxgi}.dll   D
 lib/notproton-backends/dxvk/{x86_64,i386}-windows/{d3d11,d3d10core}.dll        from the archive
 lib/wine/x86_64-unix/winemac.so                   Retina fix, replacing the archive's (below)
 lib/wine/x86_64-unix/winebus.so                   built with SDL2, replacing the archive's (Controllers)
+lib/wine/x86_64-windows/winebus.sys               11.17 only: map-key fix, replacing the archive's (Controllers)
 lib/libSDL2-2.0.0.dylib                           SDL 2.32.8, x86_64, for winebus.so (Controllers)
 ```
 
@@ -82,9 +119,10 @@ swapchain from its view's frame in points, so with High Resolution (Retina) on, 
 half-size drawable and showed only the top-left quarter, and a `ResizeBuffers` from
 `WM_SIZE` read the view's frame before it had followed the window, so the swapchain kept
 its old size (Ravenswatch: 3024x1752 stretched over a 3024x1964 screen). NotProton installs
-`winemac-winecx-11.15.so`, built from winecx `5b45f45` with
-`winemac-patch/winecx-d3dmetal-retina.patch` (`winemac-patch/README.md`), pinned as
-`FreeEngineWinecx.current.macDriver`.
+`winemac-winecx-<build>.so`, built from winecx `e0aa380` with
+`winemac-patch/winecx-11.17-d3dmetal-retina.patch` (11.17) or from `5b45f45` with
+`winemac-patch/winecx-d3dmetal-retina.patch` (11.15), see `winemac-patch/README.md`, pinned as
+each release's `macDriver`.
 
 ## Controllers
 
@@ -94,7 +132,7 @@ macOS 26 SDK lacks. A gamepad then had no path into Wine: winebus ignores the IO
 HID device for a gamepad unless that device has `Hidraw=1`, and with it the pad comes in as
 `is_hidraw 1, is_gamepad 0`, which XInput never opens.
 
-NotProton installs `winebus-winecx-11.15.so`: winecx `5b45f45`'s own, built with
+NotProton installs `winebus-winecx-<build>.so`: that winecx tree's own, built with
 `SONAME_LIBSDL2` = `libSDL2-2.0.0.dylib`, the name the WineHQ engine's `winebus.so` dlopens.
 SDL's bus then presents the pad as a gamepad (`is_gamepad 1`), the device XInput opens.
 dyld resolves the leaf name through the caller's `LC_RPATH`s, and `winebus.so` carries
@@ -123,8 +161,19 @@ changes), then link and sign the way the runtime's was:
 
 Built this way without the define, the result matches the runtime's `winebus.so` in every
 section and in all 171 symbols and their addresses, with the same load commands in the same
-order; only `__LINKEDIT`, the UUID and the linker's tool version differ. The pins are
-`FreeEngineWinecx.current.gamepad`.
+order; only `__LINKEDIT`, the UUID and the linker's tool version differ. For 11.17 the same
+recipe without the define reproduces the runtime's `winebus.so` in every section, symbol and
+load command. The pins are each release's `gamepad`.
+
+The PE half's `sdl_bus_load_mappings` (`dlls/winebus.sys/main.c`) stored each mapping at
+`mappings[count]` after `count++`, so it wrote one slot past the string it had just allocated,
+and terminated `mappings[len]` instead of the string. Any `map` value under the winebus key
+then corrupted the heap and took winebus, and every pad, down. Wine master still has it
+(checked 2026-10-10). 11.17 ships `winebus-winecx-11.17.sys`, built from `e0aa380` with
+`winebus-patch/winecx-sdl-mappings.patch` by the tree's own rule (mingw-w64 gcc, then
+`x86_64-w64-mingw32-strip --strip-debug` as the CI does). Built without the patch, the result
+is byte-identical to the runtime's `winebus.sys` except the PE timestamp, checksum and build
+id. 11.15 keeps the runtime's own `winebus.sys`, so the `map` key is still unsafe there.
 
 ## D3DMetal: the builtin model
 
@@ -257,10 +306,27 @@ folder.
 tar -xzf Libraries.tar.gz
 cd ntdll-patch
 python3 resolve.py ../Libraries/Wine          # self-tests against PINNED
-./build.sh   ../Libraries/Wine/lib/wine/x86_64-windows/ntdll.dll winecx-11.15
-./build32.sh ../Libraries/Wine/lib/wine/i386-windows/ntdll.dll  winecx-11.15
+./build.sh   ../Libraries/Wine/lib/wine/x86_64-windows/ntdll.dll winecx-<11.17|11.15>
+./build32.sh ../Libraries/Wine/lib/wine/i386-windows/ntdll.dll  winecx-<11.17|11.15>
 python3 apply.py <ntdll.dll> <out> <detour bin>   # patched hashes
 ```
+
+4.7.3 (`winecx-11.17`): both detours fit in `.text` padding.
+
+| Pin | sha256 |
+|---|---|
+| loader `lib/wine/x86_64-unix/wine` | `a680abba30b4888355adb39d8b62255e43546eb33d163897260627f7741ef648` |
+| clean x86_64 ntdll | `8b32c9f6f71b4f15fcaccb19b0f2adab9391ae73ad539cae9e136f8ee7d24128` |
+| patched x86_64 ntdll | `4573d521671a48212670e7543aa9ebf0921e383dada69477f677f435df2bef5a` |
+| clean i386 ntdll | `cc8a9035cea0e26c5d333ef220f1becefc27ae44d2cdcdaea3278e8739d26fd9` |
+| patched i386 ntdll | `8ad83740df2da5e79ed435e4bc57e82b4b6a4b984fbec73e1160ca81dfce1b44` |
+| `detour2-winecx-11.17.bin` | `e1bbd185b19de3e23d627ae3a8bf25ed1b767bff5690102c5312a5ed3813e736` |
+| `detour32-winecx-11.17.bin` | `0676104e0bd56c4a1e8c473d9cbcd21fb2ba105fc7dc6cf5a70d37692c129e28` |
+| `winemac-winecx-11.17.so` | `aa192f846ad15d56de200fc92752eaf2d455700846ae2cf1ccc7b27b535f1c00` |
+| `winebus-winecx-11.17.so` | `6223c035c824c90708abbc3e733f8d1d6ed6b8b4e9a3e1a5c813493ceba50473` |
+| `winebus-winecx-11.17.sys` | `da108d1c3788fa32807ef08c4d26d8a89812c230317ffa7ba5111e126bda607c` |
+
+4.5.125 (`winecx-11.15`):
 
 | Pin | sha256 |
 |---|---|
@@ -272,6 +338,6 @@ python3 apply.py <ntdll.dll> <out> <detour bin>   # patched hashes
 | `detour2-winecx-11.15.bin` | `fde56854b9a7a32da19babe2427d19ff6a6b83de1917fe8d32aaddd2991fc6b9` |
 | `detour32-winecx-11.15.bin` | `37daf5f795535df91bc8fcbd356f22f4fd1ab379ec4acc97ddff44037d265556` |
 
-The unpack test (`FreeEngineWinecxTests.unpacksRealArchive`) checks all of this against the
-real archive when `NOTPROTON_WINECX_ARCHIVE` points at it, or when it sits in NotProton's
-download cache.
+The unpack test (`FreeEngineWinecxTests.unpacksRealArchive`, once per release) checks all of
+this against the real archive when `NOTPROTON_WINECX_ARCHIVE` points at it, or when it sits in
+NotProton's download cache.

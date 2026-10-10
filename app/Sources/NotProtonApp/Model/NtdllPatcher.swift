@@ -285,8 +285,7 @@ enum NtdllPatcher {
                 imageBase: 0x7bc0_0000
             ),
         ],
-        FreeEngineWinecx.runnerBuild.id: FreeEngineWinecx.ntdllPatches,
-    ]
+    ].merging(FreeEngineWinecx.releases.map { ($0.runner.id, $0.ntdllPatches) }) { pinned, _ in pinned }
 
     static func patches(for build: RunnerBuild) -> [NtdllPatch] {
         byBuild[build.id] ?? []

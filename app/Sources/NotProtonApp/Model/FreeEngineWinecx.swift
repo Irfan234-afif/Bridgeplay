@@ -1,6 +1,7 @@
 // The second free engine: WineCX, CodeWeavers' LGPL CrossOver 26.3 Wine changes rebased
-// onto wine-11.15 by dappermint (github.com/dappermint/winecx, wine1115 branch) and built
-// into a Whisky runtime by dappermint/winecx-gptk's CI. Over the WineHQ engine it adds
+// onto upstream Wine by dappermint (github.com/dappermint/winecx) and built into a Whisky
+// runtime by dappermint/winecx-gptk's CI. The current release is Wine 11.17; the 11.15 one
+// stays installable and selectable beside it. Over the WineHQ engine it adds
 // msync and the CrossOver hooks Apple's D3DMetal needs. DXMT (the same master build as the
 // WineHQ engine, not the archive's 0.80) and DXVK are backends a game opts into; Wine's own
 // Direct3D, or D3DMetal once a user's Game Porting Toolkit is linked, is the builtin.
@@ -54,17 +55,152 @@ struct WinecxRelease: Sendable {
     // dlopens by leaf name, which dyld finds through winebus.so's @loader_path/../../
     // rpath, i.e. in lib/.
     let gamepad: [WinecxBundledFile]
+    // The runner build this release unpacks to, keyed by its pinned loader, and the ntdll
+    // detours for it (NtdllPatcher.byBuild).
+    let runner: RunnerBuild
+    let ntdllPatches: [NtdllPatch]
 }
 
 enum FreeEngineWinecx {
 
     static let step = "Download free WineCX engine"
 
+    // What the WineCX row installs and what the notproton-winecx tool runs once it is
+    // installed. The 11.15 release stays a separate build with its own runner and tool.
+    static let current = v1117
+    static let previous = v1115
+    static let releases = [current, previous]
+
+    // The runner build of the current release.
+    static var runnerBuild: RunnerBuild { current.runner }
+    static var ntdllPatches: [NtdllPatch] { current.ntdllPatches }
+    static var runnerBuilds: [RunnerBuild] { releases.map(\.runner) }
+
+    static func release(build id: String) -> WinecxRelease? {
+        releases.first { $0.build == id }
+    }
+
+    // The release whose pinned loader a tree carries, which is what makes it that WineCX.
+    static func release(forRoot root: URL) -> WinecxRelease? {
+        let loader = Clean.copy(of: CrossOverSource.unixLoader(inRoot: root))
+        guard let hash = Digest.sha256IfPresent(loader) else { return nil }
+        return releases.first { $0.runner.loaderSHA256 == hash }
+    }
+
+    // DXVK-macOS 1.10.3 is the same repack in both runtimes. nvapi64 and nvngx are left out
+    // for the reason FreeEngine gives. The repack ships no dxgi, and its DLLs carry no
+    // builtin marker.
+    private static let dxvk: [WinecxBackendFile] = [
+        WinecxBackendFile(source: "DXVK/x64/d3d10core.dll", destination: "dxvk/x86_64-windows/d3d10core.dll",
+                          sha256: "0fa08bba860c63e3abeeabfc96d0e7aa327411a975f8f23d2dc63594ef5f796e"),
+        WinecxBackendFile(source: "DXVK/x64/d3d11.dll", destination: "dxvk/x86_64-windows/d3d11.dll",
+                          sha256: "0ff0b0835dde29556bd01dfce7b1ae348d7f229cb1e1a37cc71ea1a028beeca4"),
+        WinecxBackendFile(source: "DXVK/x32/d3d10core.dll", destination: "dxvk/i386-windows/d3d10core.dll",
+                          sha256: "2277187a4e13fc2049fe28cb8dd05b34b48c68031c386c3597ba0e18b0c3d327"),
+        WinecxBackendFile(source: "DXVK/x32/d3d11.dll", destination: "dxvk/i386-windows/d3d11.dll",
+                          sha256: "f79d417f675d00008375eb4ea2318af6fcd0b27971d604d3cf345a0dcfa998a0"),
+    ]
+
+    // SDL 2.32.8 (zlib license, NOTICE), the WineHQ engine runner's copy signed ad hoc,
+    // since a release build strips unsigned Mach-O resources and would break the pin.
+    private static let sdl = WinecxBundledFile(
+        resource: "libSDL2-2.0.0", ext: "dylib", path: "lib/libSDL2-2.0.0.dylib",
+        sha256: "605724f463875e945ca4a79a1db7bf35384d912fa5387f3042a27a42e878db19")
+
+    // runtime 4.7.3: winecx e0aa380 (Wine 11.17), built by winecx-gptk 0bf3eab, minos 26.0.
+    // Over 4.5.125 it carries the later msync fixes, kernelbase's FlsGetValue2 for Unity
+    // 6000.3, dxgi's CheckInterfaceSupport, the winemac client-view flush fix and the
+    // Wine 11.16 and 11.17 merges.
+    static let v1117 = WinecxRelease(
+        build: "winecx-11.17",
+        runtime: "4.7.3",
+        archive: "Libraries.tar.gz",
+        sha256: "a4b5d63493f80698cce5cad8e7212d9a51c8292037b00c478f4652636fcfd331",
+        bases: [
+            URL(string: "https://github.com/dappermint/winecx-gptk/releases/download/runtime-v4.7.3")!,
+        ],
+        bundleName: "WineCX 11.17.app",
+        wineTree: "Libraries/Wine",
+        backends: dxvk,
+        renderer: FreeEngine.dxmt,
+        d3dStock: [
+            "d3d10.dll": "9a9efe0cdaad2f41b0c5fe0f216c97720cdf82b21fbbb6e59f361112cdc4ccc3",
+            "d3d11.dll": "0a3d9e758a491c99d34dce1aa4ee744671d1faeef498c6dfc5d26eecb9dff7ec",
+            "d3d12.dll": "974e132bcafb150bb97f33fa63199346a3b942b3e09d6d06c0cbc1755f30afa5",
+            "dxgi.dll": "6f7cf2d60c991ad26b60316935bb9d3587b0c83cc01991bf55564bcfbfa47e09",
+        ],
+        macDriver: "aa192f846ad15d56de200fc92752eaf2d455700846ae2cf1ccc7b27b535f1c00",
+        // winebus.so: winecx e0aa380 built with SONAME_LIBSDL2. winebus.sys: the same tree's
+        // PE half with sdl_bus_load_mappings fixed (winebus-patch/), so a winebus "map" key
+        // no longer writes past the array and takes every pad down with it.
+        gamepad: [
+            WinecxBundledFile(resource: "winebus-winecx-11.17", ext: "so", path: "lib/wine/x86_64-unix/winebus.so",
+                              sha256: "6223c035c824c90708abbc3e733f8d1d6ed6b8b4e9a3e1a5c813493ceba50473"),
+            WinecxBundledFile(resource: "winebus-winecx-11.17", ext: "sys",
+                              path: "lib/wine/x86_64-windows/winebus.sys",
+                              sha256: "da108d1c3788fa32807ef08c4d26d8a89812c230317ffa7ba5111e126bda607c"),
+            sdl,
+        ],
+        runner: RunnerBuild(
+            bundleVersion: "winecx-11.17",
+            releaseVersion: "WineCX 11.17",
+            flavor: nil,
+            loaderSHA256: "a680abba30b4888355adb39d8b62255e43546eb33d163897260627f7741ef648",
+            cleanNtdll: [
+                .x86_64Windows: "8b32c9f6f71b4f15fcaccb19b0f2adab9391ae73ad539cae9e136f8ee7d24128",
+                .i386Windows: "cc8a9035cea0e26c5d333ef220f1becefc27ae44d2cdcdaea3278e8739d26fd9",
+            ],
+            patchedNtdll: [
+                .x86_64Windows: "4573d521671a48212670e7543aa9ebf0921e383dada69477f677f435df2bef5a",
+                .i386Windows: "8ad83740df2da5e79ed435e4bc57e82b4b6a4b984fbec73e1160ca81dfce1b44",
+            ],
+            tools: [
+                CompatTool(name: "notproton-winecx", flavor: .rosetta, display: "WineCX 11.17 (msync, D3DMetal)"),
+            ],
+            isFree: true
+        ),
+        ntdllPatches: [
+            // From ntdll-patch/resolve.py on the archive's ntdlls, payloads from build.sh and
+            // build32.sh with the variant winecx-11.17. Both detours fit in .text padding.
+            NtdllPatch(
+                arch: .x86_64Windows,
+                payloadResource: "detour2-winecx-11.17",
+                payloadSHA256: "e1bbd185b19de3e23d627ae3a8bf25ed1b767bff5690102c5312a5ed3813e736",
+                caveRVA: 0x83360,
+                payloadRVA: 0x83360,
+                hooks: [
+                    NtdllHook(rva: 0x52de3,
+                              stolen: [0x48, 0x83, 0xbc, 0x24, 0xf0, 0x00, 0x00, 0x00, 0x00]),
+                ],
+                caveSize: 3232,
+                cavePad: 0x00,
+                machine: 0x8664,
+                magic: 0x20b,
+                imageBase: 0x1_7000_0000
+            ),
+            NtdllPatch(
+                arch: .i386Windows,
+                payloadResource: "detour32-winecx-11.17",
+                payloadSHA256: "0676104e0bd56c4a1e8c473d9cbcd21fb2ba105fc7dc6cf5a70d37692c129e28",
+                caveRVA: 0x808a0,
+                payloadRVA: 0x808a0,
+                hooks: [
+                    NtdllHook(rva: 0x4f880, stolen: [0xf6, 0x45, 0xb4, 0x02, 0x75, 0x29]),
+                ],
+                caveSize: 1888,
+                cavePad: 0x00,
+                machine: 0x14c,
+                magic: 0x10b,
+                imageBase: 0x7bc0_0000
+            ),
+        ]
+    )
+
     // runtime 4.5.125 is the last wine1115 build (winecx 5b45f45, built from winecx-gptk
-    // 7a0349b, minos 26.0). It is the 11.15 the bridge components are built against, and
-    // the only 11.15 runtime with the msync spin fixes. The same bytes are mirrored on
-    // dappermint/Whisky, which is what Whisky itself downloads.
-    static let current = WinecxRelease(
+    // 7a0349b, minos 26.0). The same bytes are mirrored on dappermint/Whisky, which is what
+    // Whisky itself downloads. Its tool is notproton-winecx-11.15, and it answers to
+    // notproton-winecx while 11.17 is not installed (CompatTool.standsInFor).
+    static let v1115 = WinecxRelease(
         build: "winecx-11.15",
         runtime: "4.5.125",
         archive: "Libraries.tar.gz",
@@ -75,18 +211,7 @@ enum FreeEngineWinecx {
         ],
         bundleName: "WineCX 11.15.app",
         wineTree: "Libraries/Wine",
-        // nvapi64 and nvngx are left out for the reason FreeEngine gives. The DXVK-macOS
-        // 1.10.3 repack ships no dxgi, and its DLLs carry no builtin marker.
-        backends: [
-            WinecxBackendFile(source: "DXVK/x64/d3d10core.dll", destination: "dxvk/x86_64-windows/d3d10core.dll",
-                              sha256: "0fa08bba860c63e3abeeabfc96d0e7aa327411a975f8f23d2dc63594ef5f796e"),
-            WinecxBackendFile(source: "DXVK/x64/d3d11.dll", destination: "dxvk/x86_64-windows/d3d11.dll",
-                              sha256: "0ff0b0835dde29556bd01dfce7b1ae348d7f229cb1e1a37cc71ea1a028beeca4"),
-            WinecxBackendFile(source: "DXVK/x32/d3d10core.dll", destination: "dxvk/i386-windows/d3d10core.dll",
-                              sha256: "2277187a4e13fc2049fe28cb8dd05b34b48c68031c386c3597ba0e18b0c3d327"),
-            WinecxBackendFile(source: "DXVK/x32/d3d11.dll", destination: "dxvk/i386-windows/d3d11.dll",
-                              sha256: "f79d417f675d00008375eb4ea2318af6fcd0b27971d604d3cf345a0dcfa998a0"),
-        ],
+        backends: dxvk,
         // winecx's winemac.so already exports the macdrv_functions DXMT reads, and that
         // table is unchanged between 0.80 and master, so DXMT needs no winemac-patch.
         renderer: FreeEngine.dxmt,
@@ -97,76 +222,72 @@ enum FreeEngineWinecx {
             "dxgi.dll": "f1f24da777c65a583b29f74475c6a9464da35068d75def6cee806268def9ecbb",
         ],
         macDriver: "76d8f93839386f37e8badf0c82bb31b5ead22ac580f17896f9d2a729af0fc147",
-        // winebus.so: winecx 5b45f45 built with SONAME_LIBSDL2 (docs/WINECX.md). libSDL2:
-        // SDL 2.32.8 (zlib license, NOTICE), the WineHQ engine runner's copy signed ad hoc,
-        // since a release build strips unsigned Mach-O resources and would break the pin.
+        // winebus.so: winecx 5b45f45 built with SONAME_LIBSDL2 (docs/WINECX.md).
         gamepad: [
             WinecxBundledFile(resource: "winebus-winecx-11.15", ext: "so", path: "lib/wine/x86_64-unix/winebus.so",
                               sha256: "1bc53184f5d026ab84a26cf6ef721348fc3b028c019ff969e69eb6cf9b9d1af9"),
-            WinecxBundledFile(resource: "libSDL2-2.0.0", ext: "dylib", path: "lib/libSDL2-2.0.0.dylib",
-                              sha256: "605724f463875e945ca4a79a1db7bf35384d912fa5387f3042a27a42e878db19"),
+            sdl,
+        ],
+        // The hash-pinned loader is what makes it free, so a CrossOver install can never be
+        // taken for it.
+        runner: RunnerBuild(
+            bundleVersion: "winecx-11.15",
+            releaseVersion: "WineCX 11.15",
+            flavor: nil,
+            loaderSHA256: "a4b677428a6834f97f536a84d32c5da982c9a449e5d483c6be3d1c9b8f308998",
+            cleanNtdll: [
+                .x86_64Windows: "5710d16382c7a822ed8b1cba58d95fd86fe01905f039c296ca7224abff8f98e8",
+                .i386Windows: "e1b208073c804a443e64ada577899d96a5c8eaee435813e4a30e0d143bca6e3c",
+            ],
+            patchedNtdll: [
+                .x86_64Windows: "4efd956e573726777827cddaa89ef3b7f72d6cfd7b8e2049e41f5f5bdf4a6306",
+                .i386Windows: "23ee72664f172d38d76ecb8969d5c5af7e6828864dfe298338ed0e773910bc5d",
+            ],
+            tools: [
+                CompatTool(name: "notproton-winecx-11.15", flavor: .rosetta, display: "WineCX 11.15 (msync, D3DMetal)",
+                           standsInFor: "notproton-winecx"),
+            ],
+            isFree: true
+        ),
+        // From ntdll-patch/resolve.py on the archive's ntdlls, payloads from build.sh and
+        // build32.sh with the variant winecx-11.15. The x86_64 hook is the CrossOver one
+        // (cmp [rsp+0xf0], 0), and its .text padding holds the detour; the i386 padding does
+        // not, so that one gets the appended section.
+        ntdllPatches: [
+            NtdllPatch(
+                arch: .x86_64Windows,
+                payloadResource: "detour2-winecx-11.15",
+                payloadSHA256: "fde56854b9a7a32da19babe2427d19ff6a6b83de1917fe8d32aaddd2991fc6b9",
+                caveRVA: 0x82b20,
+                payloadRVA: 0x82b20,
+                hooks: [
+                    NtdllHook(rva: 0x52e43,
+                              stolen: [0x48, 0x83, 0xbc, 0x24, 0xf0, 0x00, 0x00, 0x00, 0x00]),
+                ],
+                caveSize: 1248,
+                cavePad: 0x00,
+                machine: 0x8664,
+                magic: 0x20b,
+                imageBase: 0x1_7000_0000
+            ),
+            NtdllPatch(
+                arch: .i386Windows,
+                payloadResource: "detour32-winecx-11.15",
+                payloadSHA256: "37daf5f795535df91bc8fcbd356f22f4fd1ab379ec4acc97ddff44037d265556",
+                caveRVA: 0xb9000,
+                payloadRVA: 0xb9000,
+                hooks: [
+                    NtdllHook(rva: 0x4f7c0, stolen: [0xf6, 0x45, 0xb4, 0x02, 0x75, 0x29]),
+                ],
+                caveSize: 0x1000,
+                cavePad: 0x00,
+                machine: 0x14c,
+                magic: 0x10b,
+                imageBase: 0x7bc0_0000,
+                placement: .section
+            ),
         ]
     )
-
-    // Appended to SupportedRunners.all. The hash-pinned loader is what makes it free, so a
-    // CrossOver install can never be taken for it.
-    static let runnerBuild = RunnerBuild(
-        bundleVersion: "winecx-11.15",
-        releaseVersion: "WineCX 11.15",
-        flavor: nil,
-        loaderSHA256: "a4b677428a6834f97f536a84d32c5da982c9a449e5d483c6be3d1c9b8f308998",
-        cleanNtdll: [
-            .x86_64Windows: "5710d16382c7a822ed8b1cba58d95fd86fe01905f039c296ca7224abff8f98e8",
-            .i386Windows: "e1b208073c804a443e64ada577899d96a5c8eaee435813e4a30e0d143bca6e3c",
-        ],
-        patchedNtdll: [
-            .x86_64Windows: "4efd956e573726777827cddaa89ef3b7f72d6cfd7b8e2049e41f5f5bdf4a6306",
-            .i386Windows: "23ee72664f172d38d76ecb8969d5c5af7e6828864dfe298338ed0e773910bc5d",
-        ],
-        tools: [
-            CompatTool(name: "notproton-winecx", flavor: .rosetta, display: "WineCX 11.15 (msync, D3DMetal)"),
-        ],
-        isFree: true
-    )
-
-    // Appended to NtdllPatcher.byBuild. From ntdll-patch/resolve.py on the archive's ntdlls,
-    // payloads from build.sh and build32.sh with the variant winecx-11.15. The x86_64 hook is
-    // the CrossOver one (cmp [rsp+0xf0], 0), and its .text padding holds the detour; the
-    // i386 padding does not, so that one gets the appended section.
-    static let ntdllPatches: [NtdllPatch] = [
-        NtdllPatch(
-            arch: .x86_64Windows,
-            payloadResource: "detour2-winecx-11.15",
-            payloadSHA256: "fde56854b9a7a32da19babe2427d19ff6a6b83de1917fe8d32aaddd2991fc6b9",
-            caveRVA: 0x82b20,
-            payloadRVA: 0x82b20,
-            hooks: [
-                NtdllHook(rva: 0x52e43,
-                          stolen: [0x48, 0x83, 0xbc, 0x24, 0xf0, 0x00, 0x00, 0x00, 0x00]),
-            ],
-            caveSize: 1248,
-            cavePad: 0x00,
-            machine: 0x8664,
-            magic: 0x20b,
-            imageBase: 0x1_7000_0000
-        ),
-        NtdllPatch(
-            arch: .i386Windows,
-            payloadResource: "detour32-winecx-11.15",
-            payloadSHA256: "37daf5f795535df91bc8fcbd356f22f4fd1ab379ec4acc97ddff44037d265556",
-            caveRVA: 0xb9000,
-            payloadRVA: 0xb9000,
-            hooks: [
-                NtdllHook(rva: 0x4f7c0, stolen: [0xf6, 0x45, 0xb4, 0x02, 0x75, 0x29]),
-            ],
-            caveSize: 0x1000,
-            cavePad: 0x00,
-            machine: 0x14c,
-            magic: 0x10b,
-            imageBase: 0x7bc0_0000,
-            placement: .section
-        ),
-    ]
 
     // Runtime contract with compat_run.sh: the engine root says it can run msync, and the
     // backends sit outside lib/wine, whose Direct3D builtins are Wine's own or, with
@@ -174,9 +295,9 @@ enum FreeEngineWinecx {
     static let backendsPath = "lib/notproton-backends"
     static let msyncMarkerPath = ".notproton-msync"
 
-    static var downloads: URL {
+    static func downloads(for release: WinecxRelease = current) -> URL {
         SupportPaths.home.appending(
-            path: "Library/Caches/\(SupportPaths.supportDirName)/engines/winecx-\(current.runtime)",
+            path: "Library/Caches/\(SupportPaths.supportDirName)/engines/winecx-\(release.runtime)",
             directoryHint: .isDirectory
         )
     }
@@ -247,7 +368,7 @@ enum FreeEngineWinecx {
     ) async throws -> CrossOverInstall {
         let archive = try await PinnedDownload.obtain(
             file: release.archive, sha256: release.sha256, bases: release.bases,
-            into: downloads, step: step, source: "GitHub",
+            into: downloads(for: release), step: step, source: "GitHub",
             report: { report(.downloading($0)) }
         )
         let renderer = try await PinnedDownload.obtain(

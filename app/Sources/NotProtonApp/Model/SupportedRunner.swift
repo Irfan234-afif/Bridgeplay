@@ -73,6 +73,10 @@ struct CompatTool: Sendable, Hashable, Identifiable {
     let flavor: Flavor
     let display: String
 
+    // A tool name this one serves while no installed build serves it, so games mapped to it
+    // keep their tool when the build that now owns the name is not installed yet.
+    var standsInFor: String? = nil
+
     var id: String { name }
 
     var prefixArch: PrefixArch { flavor == .fex ? .arm64 : .x86_64 }
@@ -92,7 +96,8 @@ enum SupportedRunners {
     // First entry is what windows-only games get when Steam has no mapping.
     static let toolPreference = [
         legacyToolName, "notproton-fex", "notproton-fex-rosetta", "notproton-preview",
-        "notproton-fex-41069", "notproton-fex-rosetta-41069", "notproton-preview-41069", "notproton-26.3", "notproton-winecx", "notproton-winehq",
+        "notproton-fex-41069", "notproton-fex-rosetta-41069", "notproton-preview-41069", "notproton-26.3", "notproton-winecx",
+        "notproton-winecx-11.15", "notproton-winehq",
     ]
 
     static let legacyToolName = "notproton"
@@ -111,9 +116,12 @@ enum SupportedRunners {
         case .build(let id): id
         case .nobody: nil
         }
-        let served = all.filter { installed.contains($0.id) }.flatMap { build in
+        let builds = all.filter { installed.contains($0.id) }
+        let owned = Set(builds.flatMap(\.tools).map(\.name))
+        let served = builds.flatMap { build in
             build.tools.enumerated().map { index, tool in
-                let name = build.id == holder && index == 0 ? legacyToolName : tool.name
+                var name = build.id == holder && index == 0 ? legacyToolName : tool.name
+                if let standIn = tool.standsInFor, !owned.contains(standIn) { name = standIn }
                 return InstalledTool(
                     tool: CompatTool(name: name, flavor: tool.flavor, display: tool.display), build: build.id
                 )
@@ -251,8 +259,7 @@ enum SupportedRunners {
             ],
             isFree: true
         ),
-        FreeEngineWinecx.runnerBuild,
-    ]
+    ] + FreeEngineWinecx.runnerBuilds
 
     static func build(loaderSHA256 hash: String) -> RunnerBuild? {
         all.lazy.compactMap { $0.matching(loaderSHA256: hash) }.first

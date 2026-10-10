@@ -12,25 +12,53 @@ struct FreeEngineWinecxTests {
         return url
     }
 
-    @Test("The pinned release names a free build NotProton knows how to patch")
-    func releaseIsSupported() throws {
-        let build = try #require(SupportedRunners.build(id: FreeEngineWinecx.current.build))
-        #expect(build == FreeEngineWinecx.runnerBuild)
+    @Test("Each pinned release names a free build NotProton knows how to patch",
+          arguments: FreeEngineWinecx.releases.map(\.build))
+    func releaseIsSupported(id: String) throws {
+        let release = try #require(FreeEngineWinecx.release(build: id))
+        let build = try #require(SupportedRunners.build(id: id))
+        #expect(build == release.runner)
         #expect(build.isFree)
         #expect(Set(NtdllPatcher.patches(for: build).map(\.arch)) == [.x86_64Windows, .i386Windows])
+        #expect(NtdllPatcher.patches(for: build).map(\.payloadResource).allSatisfy { $0.hasSuffix(id) })
         #expect(SupportedRunners.build(loaderSHA256: build.loaderSHA256)?.id == build.id)
-        #expect(build.tools.map(\.name) == ["notproton-winecx"])
-        #expect(build.tools.first?.display == "WineCX 11.15 (msync, D3DMetal)")
+        #expect(build.tools.count == 1)
+        #expect(build.tools.first?.display == "\(build.releaseVersion) (msync, D3DMetal)")
         #expect(build.tools.first?.flavor == .rosetta)
+        #expect(release.bundleName == "\(build.releaseVersion).app")
+    }
+
+    @Test("11.17 is the current release and owns notproton-winecx; 11.15 stays selectable beside it")
+    func currentAndPrevious() throws {
+        #expect(FreeEngineWinecx.current.build == "winecx-11.17")
+        #expect(FreeEngineWinecx.previous.build == "winecx-11.15")
+        #expect(FreeEngineWinecx.runnerBuild == FreeEngineWinecx.current.runner)
+        #expect(FreeEngineWinecx.current.runner.tools.map(\.name) == ["notproton-winecx"])
+        #expect(FreeEngineWinecx.previous.runner.tools.map(\.name) == ["notproton-winecx-11.15"])
+        let current = FreeEngineWinecx.current.runner
+        let previous = FreeEngineWinecx.previous.runner
+
+        // Both installed: each serves its own tool, the current one first.
+        let both = SupportedRunners.tools(for: [previous, current])
+        #expect(both.map(\.name) == ["notproton-winecx", "notproton-winecx-11.15"])
+        #expect(both.map(\.build) == ["winecx-11.17", "winecx-11.15"])
+        // Only 11.15 installed: it keeps answering to notproton-winecx, so games mapped to
+        // that name keep their tool until 11.17 is set up.
+        let old = SupportedRunners.tools(for: [previous])
+        #expect(old.map(\.name) == ["notproton-winecx"])
+        #expect(old.map(\.build) == ["winecx-11.15"])
+        #expect(old.first?.display == "WineCX 11.15 (msync, D3DMetal)")
+        #expect(SupportedRunners.tools(for: [current]).map(\.name) == ["notproton-winecx"])
     }
 
     @Test("Both free engines stay separate builds with their own loaders and tools")
     func coexistsWithWineHQ() throws {
         let free = SupportedRunners.all.filter(\.isFree)
-        #expect(Set(free.map(\.id)) == [FreeEngine.current.build, FreeEngineWinecx.current.build])
+        #expect(Set(free.map(\.id)) == Set([FreeEngine.current.build] + FreeEngineWinecx.releases.map(\.build)))
         #expect(Set(free.map(\.loaderSHA256)).count == free.count)
         #expect(Set(free.flatMap(\.tools).map(\.name)).count == free.flatMap(\.tools).count)
-        #expect(FreeEngineWinecx.current.bundleName != FreeEngine.current.bundleName)
+        #expect(Set(FreeEngineWinecx.releases.map(\.bundleName) + [FreeEngine.current.bundleName]).count
+            == FreeEngineWinecx.releases.count + 1)
     }
 
     // The license gate keys on the loader hash alone: a CrossOver-shaped tree whose loader
@@ -40,16 +68,20 @@ struct FreeEngineWinecxTests {
         let engines = try makeDirectory("engines")
         defer { try? FileManager.default.removeItem(at: engines) }
 
-        let root = FreeEngineWinecx.bundle(engines: engines).appending(path: "Contents/SharedSupport/CrossOver")
-        let loader = CrossOverSource.unixLoader(inRoot: root)
-        try FileManager.default.createDirectory(at: loader.deletingLastPathComponent(), withIntermediateDirectories: true)
-        try Data("not winecx".utf8).write(to: loader)
-        try Data("winecx-11.15\n".utf8).write(to: FreeEngineWinecx.msyncMarker(in: root))
+        for release in FreeEngineWinecx.releases {
+            let root = FreeEngineWinecx.bundle(for: release, engines: engines)
+                .appending(path: "Contents/SharedSupport/CrossOver")
+            let loader = CrossOverSource.unixLoader(inRoot: root)
+            try FileManager.default.createDirectory(at: loader.deletingLastPathComponent(), withIntermediateDirectories: true)
+            try Data("not winecx".utf8).write(to: loader)
+            try Data("\(release.build)\n".utf8).write(to: FreeEngineWinecx.msyncMarker(in: root))
 
-        #expect(CrossOverLicense.freeBuild(at: root) == nil)
-        #expect(!CrossOverLicense.check(crossOverRoot: root, searchDirs: []).licensed)
-        #expect(!FreeEngineWinecx.isInstalled(engines: engines))
-        #expect(!WinecxD3DMetal.isWinecx(root: root))
+            #expect(CrossOverLicense.freeBuild(at: root) == nil)
+            #expect(!CrossOverLicense.check(crossOverRoot: root, searchDirs: []).licensed)
+            #expect(!FreeEngineWinecx.isInstalled(release, engines: engines))
+            #expect(!WinecxD3DMetal.isWinecx(root: root))
+            #expect(FreeEngineWinecx.release(forRoot: root) == nil)
+        }
     }
 
     @Test("Backends follow the compat_run.sh layout and never shadow lib/wine")
@@ -89,9 +121,10 @@ struct FreeEngineWinecxTests {
 
     // winemac-patch/winecx-d3dmetal-retina.patch: an engine with winecx's own winemac.so is
     // outdated, and the copy NotProton installs is the one it pins.
-    @Test("The patched winemac.so ships with the app and replaces winecx's own")
-    func patchedMacDriver() throws {
-        let release = FreeEngineWinecx.current
+    @Test("The patched winemac.so ships with the app and replaces winecx's own",
+          arguments: FreeEngineWinecx.releases.map(\.build))
+    func patchedMacDriver(id: String) throws {
+        let release = try #require(FreeEngineWinecx.release(build: id))
         let bundled = try #require(Bundle.module.url(forResource: "winemac-\(release.build)", withExtension: "so"))
         #expect(Digest.sha256IfPresent(bundled) == release.macDriver)
 
@@ -100,12 +133,12 @@ struct FreeEngineWinecxTests {
         let driver = root.appending(path: FreeEngine.macDriverPath)
         try FileManager.default.createDirectory(at: driver.deletingLastPathComponent(), withIntermediateDirectories: true)
         try Data("winecx's own winemac.so".utf8).write(to: driver)
-        #expect(FreeEngineWinecx.layoutProblems(root: root).contains(FreeEngine.macDriverPath))
+        #expect(FreeEngineWinecx.layoutProblems(root: root, release: release).contains(FreeEngine.macDriverPath))
 
         try FreeEngine.installMacDriver(root: root, build: release.build, sha256: release.macDriver,
                                         step: FreeEngineWinecx.step)
         #expect(Digest.sha256IfPresent(driver) == release.macDriver)
-        #expect(!FreeEngineWinecx.layoutProblems(root: root).contains(FreeEngine.macDriverPath))
+        #expect(!FreeEngineWinecx.layoutProblems(root: root, release: release).contains(FreeEngine.macDriverPath))
         #expect(throws: StepFailure.self) {
             try FreeEngine.installMacDriver(root: root, build: release.build, sha256: String(repeating: "0", count: 64),
                                             step: FreeEngineWinecx.step)
@@ -114,11 +147,16 @@ struct FreeEngineWinecxTests {
 
     // docs/WINECX.md, Controllers: winebus.so with SDL2 in lib/wine, and the libSDL2 it
     // dlopens by leaf name in lib/, where its @loader_path/../../ rpath points.
-    @Test("The SDL2 winebus.so and its libSDL2 ship with the app and are laid into the engine")
-    func gamepadSupport() throws {
-        let files = FreeEngineWinecx.current.gamepad
-        #expect(Set(files.map(\.path)) == ["lib/wine/x86_64-unix/winebus.so", "lib/libSDL2-2.0.0.dylib"])
-        let table = FreeEngineWinecx.expectedFiles()
+    @Test("The SDL2 winebus.so and its libSDL2 ship with the app and are laid into the engine",
+          arguments: FreeEngineWinecx.releases.map(\.build))
+    func gamepadSupport(id: String) throws {
+        let release = try #require(FreeEngineWinecx.release(build: id))
+        let files = release.gamepad
+        var paths: Set<String> = ["lib/wine/x86_64-unix/winebus.so", "lib/libSDL2-2.0.0.dylib"]
+        // 11.17 also ships winebus.sys with sdl_bus_load_mappings fixed (winebus-patch/).
+        if release.build == "winecx-11.17" { paths.insert("lib/wine/x86_64-windows/winebus.sys") }
+        #expect(Set(files.map(\.path)) == paths)
+        let table = FreeEngineWinecx.expectedFiles(release)
         for file in files {
             let bundled = try #require(Bundle.module.url(forResource: file.resource, withExtension: file.ext))
             #expect(Digest.sha256IfPresent(bundled) == file.sha256, "\(file.resource)")
@@ -130,11 +168,11 @@ struct FreeEngineWinecxTests {
         let bus = root.appending(path: "lib/wine/x86_64-unix/winebus.so")
         try FileManager.default.createDirectory(at: bus.deletingLastPathComponent(), withIntermediateDirectories: true)
         try Data("winecx's own winebus.so, built without SDL2".utf8).write(to: bus)
-        let before = FreeEngineWinecx.layoutProblems(root: root)
+        let before = FreeEngineWinecx.layoutProblems(root: root, release: release)
         for file in files { #expect(before.contains(file.path), "\(file.path)") }
 
         try FreeEngineWinecx.installBundled(files, root: root)
-        let after = FreeEngineWinecx.layoutProblems(root: root)
+        let after = FreeEngineWinecx.layoutProblems(root: root, release: release)
         for file in files {
             #expect(Digest.sha256IfPresent(root.appending(path: file.path)) == file.sha256, "\(file.path)")
             #expect(!after.contains(file.path), "\(file.path)")
@@ -151,7 +189,7 @@ struct FreeEngineWinecxTests {
         let winecxBuild = try #require(SupportedRunners.build(id: FreeEngineWinecx.current.build))
         let winehq = CrossOverInstall(bundle: URL(filePath: "/e/WineHQ 11.15.app"), releaseVersion: nil,
                                       support: .supported(winehqBuild))
-        let winecx = CrossOverInstall(bundle: URL(filePath: "/e/WineCX 11.15.app"), releaseVersion: nil,
+        let winecx = CrossOverInstall(bundle: URL(filePath: "/e/WineCX 11.17.app"), releaseVersion: nil,
                                       support: .supported(winecxBuild))
         let both = [winehq, winecx]
         #expect(FreeEngineStatus.state(build: winehqBuild.id, installs: both, current: [winecxBuild.id]) == .outdated)
@@ -162,16 +200,25 @@ struct FreeEngineWinecxTests {
         #expect(FreeEngineStatus.capture(both).current.isEmpty)
         // Steam lists one tool per engine.
         let tools = SupportedRunners.tools(for: [winehqBuild, winecxBuild]).map(\.display)
-        #expect(Set(tools) == ["WineHQ 11.15 - Rosetta", "WineCX 11.15 (msync, D3DMetal)"])
+        #expect(Set(tools) == ["WineHQ 11.15 - Rosetta", "WineCX 11.17 (msync, D3DMetal)"])
+        // The 11.15 engine is judged by its own pins, not by 11.17's.
+        let previousBuild = try #require(SupportedRunners.build(id: FreeEngineWinecx.previous.build))
+        let previous = CrossOverInstall(bundle: URL(filePath: "/e/WineCX 11.15.app"), releaseVersion: nil,
+                                        support: .supported(previousBuild))
+        #expect(!FreeEngineStatus.isCurrent(previous))
+        #expect(FreeEngineStatus.state(build: previousBuild.id, installs: [previous], current: [previousBuild.id])
+            == .current)
     }
 
     @Test("Downloads come only from the pinned GitHub release mirrors")
     func pinnedSources() {
-        let release = FreeEngineWinecx.current
-        #expect(release.sha256 == "6db83765d9bd9d9941cacf8e09d2b8a3014738305ca4672d2188f3e6e51fae87")
-        #expect(release.bases.allSatisfy { $0.host() == "github.com" })
-        #expect(release.bases.allSatisfy { $0.path().hasSuffix(release.runtime) })
-        #expect(FreeEngineWinecx.downloads.lastPathComponent == "winecx-\(release.runtime)")
+        #expect(FreeEngineWinecx.current.sha256 == "a4b5d63493f80698cce5cad8e7212d9a51c8292037b00c478f4652636fcfd331")
+        #expect(FreeEngineWinecx.previous.sha256 == "6db83765d9bd9d9941cacf8e09d2b8a3014738305ca4672d2188f3e6e51fae87")
+        for release in FreeEngineWinecx.releases {
+            #expect(release.bases.allSatisfy { $0.host() == "github.com" })
+            #expect(release.bases.allSatisfy { $0.path().hasSuffix(release.runtime) })
+            #expect(FreeEngineWinecx.downloads(for: release).lastPathComponent == "winecx-\(release.runtime)")
+        }
     }
 
     // MARK: - D3DMetal linking
@@ -419,18 +466,20 @@ struct FreeEngineWinecxTests {
 
     // MARK: - Against the real archive
 
-    // Runs once the archive is in NotProton's cache, or at NOTPROTON_WINECX_ARCHIVE.
-    private static var realArchive: URL? {
+    // Runs once a release's archive is in NotProton's cache, or at NOTPROTON_WINECX_ARCHIVE.
+    private static func realArchive(_ release: WinecxRelease) -> URL? {
         let candidates = [
             ProcessInfo.processInfo.environment["NOTPROTON_WINECX_ARCHIVE"].map { URL(filePath: $0) },
-            FreeEngineWinecx.downloads.appending(path: FreeEngineWinecx.current.archive),
+            FreeEngineWinecx.downloads(for: release).appending(path: release.archive),
         ].compactMap { $0 }
-        return candidates.first { Digest.sha256IfPresent($0) == FreeEngineWinecx.current.sha256 }
+        return candidates.first { Digest.sha256IfPresent($0) == release.sha256 }
     }
 
-    @Test("Unpacking the real archive yields a free, patchable engine with the runtime contract")
-    func unpacksRealArchive() async throws {
-        guard let archive = Self.realArchive else { return }
+    @Test("Unpacking the real archive yields a free, patchable engine with the runtime contract",
+          arguments: FreeEngineWinecx.releases.map(\.build))
+    func unpacksRealArchive(id: String) async throws {
+        let release = try #require(FreeEngineWinecx.release(build: id))
+        guard let archive = Self.realArchive(release) else { return }
         // Fetched into the engine cache the way FreeEngineWinecx.install does, when missing.
         let dxmt = FreeEngine.dxmt
         let renderer = try await PinnedDownload.obtain(
@@ -444,17 +493,17 @@ struct FreeEngineWinecxTests {
         let engines = base.appending(path: "engines")
         let gptk = try makePayload(in: base.appending(path: "gptk"))
         let install = try FreeEngineWinecx.unpack(
-            archive, renderer: renderer, release: FreeEngineWinecx.current, engines: engines, gptkRoots: [gptk]
+            archive, renderer: renderer, release: release, engines: engines, gptkRoots: [gptk]
         )
         guard case .supported(let build) = install.support else {
             Issue.record("unpacked engine is \(install.support)")
             return
         }
         let root = install.crossOverRoot
-        #expect(build.id == FreeEngineWinecx.current.build)
+        #expect(build.id == release.build)
         #expect(install.isFree)
-        #expect(FreeEngineWinecx.isInstalled(engines: engines))
-        #expect(FreeEngineWinecx.hasBackends(root: root))
+        #expect(FreeEngineWinecx.isInstalled(release, engines: engines))
+        #expect(FreeEngineWinecx.hasBackends(root: root, release: release))
         #expect(CrossOverLicense.check(crossOverRoot: root).licensed)
         try RunnerInstaller.verifyClone(build: build, root: root)
 
@@ -466,19 +515,19 @@ struct FreeEngineWinecxTests {
             #expect(Digest.sha256(of: patched) == build.patchedNtdll[patch.arch])
         }
 
-        #expect(FreeEngineWinecx.layoutProblems(root: root).isEmpty)
+        #expect(FreeEngineWinecx.layoutProblems(root: root, release: release).isEmpty)
         // Master's winemetal replaced the archive's, and its DLLs are natives.
-        for (path, hash) in FreeEngineWinecx.expectedFiles() {
+        for (path, hash) in FreeEngineWinecx.expectedFiles(release) {
             #expect(Digest.sha256IfPresent(root.appending(path: path)) == hash, "\(path)")
         }
         #expect(!WinecxD3DMetal.isBuiltin(root.appending(path: "lib/notproton-backends/dxmt/x86_64-windows/d3d11.dll")))
         #expect(WinecxD3DMetal.isBuiltin(root.appending(path: "lib/wine/x86_64-windows/winemetal.dll")))
-        #expect(try String(contentsOf: FreeEngineWinecx.msyncMarker(in: root), encoding: .utf8) == "winecx-11.15\n")
+        #expect(try String(contentsOf: FreeEngineWinecx.msyncMarker(in: root), encoding: .utf8) == "\(release.build)\n")
 
         // The fixture GPTK was linked as the builtins, with Wine's own set aside under their pins.
         #expect(WinecxD3DMetal.isLinked(root: root))
         #expect(fm.fileExists(atPath: root.appending(path: "lib/external/README").path(percentEncoded: false)))
-        for (name, hash) in FreeEngineWinecx.current.d3dStock {
+        for (name, hash) in release.d3dStock {
             #expect(Digest.sha256IfPresent(root.appending(path: "\(WinecxD3DMetal.stockPath)/\(name)")) == hash)
         }
 
@@ -487,14 +536,14 @@ struct FreeEngineWinecxTests {
         let cloned = try RunnerInstaller.clone(from: install, runners: runners)
         let runnerRoot = SupportPaths.clonedRoot(forBuild: cloned.id, runners: runners)
         #expect(WinecxD3DMetal.isLinked(root: runnerRoot))
-        #expect(FreeEngineWinecx.layoutProblems(root: runnerRoot).isEmpty)
+        #expect(FreeEngineWinecx.layoutProblems(root: runnerRoot, release: release).isEmpty)
         try fm.removeItem(at: gptk)
         #expect(SystemStatus.relinkGameportingToolkit(engines: engines, runners: runners, roots: [gptk]) == nil)
         for tree in [root, runnerRoot] {
             #expect(!WinecxD3DMetal.isLinked(root: tree))
             #expect(!fm.fileExists(atPath: WinecxD3DMetal.enabledMarker(in: tree).path(percentEncoded: false)))
-            #expect(FreeEngineWinecx.layoutProblems(root: tree).isEmpty, "\(tree)")
-            for (name, hash) in FreeEngineWinecx.current.d3dStock {
+            #expect(FreeEngineWinecx.layoutProblems(root: tree, release: release).isEmpty, "\(tree)")
+            for (name, hash) in release.d3dStock {
                 #expect(Digest.sha256IfPresent(tree.appending(path: "lib/wine/x86_64-windows/\(name)")) == hash)
             }
         }

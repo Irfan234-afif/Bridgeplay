@@ -75,11 +75,12 @@ enum FreeEngineStatus {
 
     // Each free engine is judged against its own pins.
     static func isCurrent(_ install: CrossOverInstall) -> Bool {
-        switch buildID(of: install) {
-        case FreeEngine.current.build: FreeEngine.hasRenderer(root: install.crossOverRoot)
-        case FreeEngineWinecx.current.build: FreeEngineWinecx.hasBackends(root: install.crossOverRoot)
-        default: false
+        guard let id = buildID(of: install) else { return false }
+        if id == FreeEngine.current.build { return FreeEngine.hasRenderer(root: install.crossOverRoot) }
+        if let release = FreeEngineWinecx.release(build: id) {
+            return FreeEngineWinecx.hasBackends(root: install.crossOverRoot, release: release)
         }
+        return false
     }
 
     static func capture(_ installs: [CrossOverInstall]) -> (current: Set<String>, gptkSource: String?) {
@@ -88,7 +89,7 @@ enum FreeEngineStatus {
         for install in installs where install.isFree {
             guard let id = buildID(of: install) else { continue }
             if isCurrent(install) { current.insert(id) }
-            if id == FreeEngineWinecx.current.build, gptk == nil {
+            if FreeEngineWinecx.release(build: id) != nil, gptk == nil {
                 gptk = WinecxD3DMetal.linkedSource(root: install.crossOverRoot)
             }
         }
@@ -471,10 +472,13 @@ final class SystemStatus {
         runners: URL = SupportPaths.runners,
         roots: [URL] = WinecxD3DMetal.searchRoots()
     ) -> String? {
-        let engine = SupportPaths.crossOverRoot(inBundle: FreeEngineWinecx.bundle(engines: engines))
-        let runner = SupportPaths.clonedRoot(forBuild: FreeEngineWinecx.current.build, runners: runners)
+        // Every WineCX release on disk, engine and runner, so each carries the same Direct3D.
+        let trees = FreeEngineWinecx.releases.flatMap { release in
+            [SupportPaths.crossOverRoot(inBundle: FreeEngineWinecx.bundle(for: release, engines: engines)),
+             SupportPaths.clonedRoot(forBuild: release.build, runners: runners)]
+        }
         var linked: String?
-        for root in [engine, runner] {
+        for root in trees {
             if let payload = WinecxD3DMetal.refresh(root: root, roots: roots) {
                 linked = linked ?? payload.libRoot.standardizedFileURL.path(percentEncoded: false)
             }

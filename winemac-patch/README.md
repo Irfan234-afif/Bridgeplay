@@ -63,3 +63,21 @@ Built this way without the patch, the result matches the runtime's `winemac.so` 
 section (`__text`, `__cstring`, `__const`, `__data`, objc) and in its 2147 symbols; only
 `__LINKEDIT` and the SDK's framework versions differ. Then update `macDriver` in
 `FreeEngineWinecx.swift` with the sha256.
+
+### 11.17: `winecx-11.17-d3dmetal-retina.patch`
+
+The same change re-derived against winecx `e0aa380` (runtime 4.7.3). 565f638 only adds the
+`raw` argument to `macdrv_CreateClientSurface`; the proxy and the d3dmetal.c hooks apply as
+they were. CW HACK 22435 had to change: Wine 11.17 no longer exports `client_surface_update`
+from win32u (only `client_surface_present`, `update_client_surfaces` and friends are in
+`gdi_driver.h`), so the 11.15 hunk fails to link. The 11.17 hunk calls
+`client_surface_present()` instead, which recomputes the rects and runs the driver's `update`
+exactly as `client_surface_update()` did, then `present`, which makes the surface the window's
+client view. To keep that a no-op it only touches the D3DMetal surface that already is
+`data->client_view` (the one D3DMetal last presented), not every surface in the list.
+
+Build as above from `e0aa380`, with two differences in the link: no `-framework CoreVideo`
+(11.17's `cocoa_window.m` dropped `WineDisplayLink`, and the Makefile rule with it), and the
+CI's `install_name_tool -add_rpath @loader_path/../../` before the final `codesign -fs -`.
+Built this way without the patch, the result matches the runtime 4.7.3 `winemac.so` in every
+section, all 2095 symbols and every load command.

@@ -560,7 +560,8 @@ struct StatusView: View {
             let outdated = winecx == .outdated
             StatusRow(
                 title: "WineCX Engine",
-                value: "WineCX 11.15 with msync and D3DMetal, no CrossOver license needed.",
+                value: "\(FreeEngineWinecx.current.runner.releaseVersion) with msync and D3DMetal, "
+                    + "no CrossOver license needed.",
                 tone: outdated ? .warning : .neutral,
                 action: StatusAction(
                     label: outdated ? "Update & Set Up" : "Download & Set Up",
