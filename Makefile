@@ -59,7 +59,7 @@ TARGET      := $(OUT_DIR)/notproton.dylib
 OBJS := $(patsubst %.c,$(OUT_DIR)/%.o,$(SRCS))
 DEPS := $(OBJS:.o=.d)
 
-.PHONY: all clean rebuild dobby deploy dylib dylib-install sigcheck app-payload app app-zip \
+.PHONY: all clean rebuild dobby deploy dylib dylib-install sigcheck fonts fonts-install app-payload app app-zip \
         anchorcheck callscheck sigdb-fixtures webpatch-fixtures peicon-fixtures panel-behavior app-tests \
         tests-list overlay-shim overlay-shim-install overlay-shim-tests \
         overlay-shim-bench iconmaker icon \
@@ -287,17 +287,21 @@ spawn-live: $(TARGET)
 	  -o $$tmp/steam_osx $(SPAWN_LIVE)/driver.c || exit 1; \
 	cp $$tmp/steam_osx $$tmp/inert; cp $$tmp/child $$tmp/steam_osx_child; \
 	cp $$tmp/child $$tmp/sub/steam_osx; \
+	cp $$tmp/steam_osx "$$tmp/Steam Helper"; cp $$tmp/child "$$tmp/sub/Steam Helper"; \
 	fail=0; \
 	for spec in "inert:child:1" "steam_osx:child:0" \
-	            "steam_osx:steam_osx_child:0" "steam_osx:sub/steam_osx:1"; do \
-		drv=$${spec%%:*}; rest=$${spec#*:}; kid=$${rest%:*}; want=$${rest##*:}; \
-		got=$$(DYLD_INSERT_LIBRARIES=$$PWD/$(TARGET) $$tmp/$$drv $$tmp/$$kid 2>/dev/null \
-		       | grep -c "^DYLD_INSERT_LIBRARIES=") || true; \
+	            "steam_osx:steam_osx_child:0" "steam_osx:sub/steam_osx:1" \
+	            "steam_osx:sub/Steam Helper:1" "Steam Helper:child:0" \
+	            "Steam Helper:sub/Steam Helper:1" "Steam Helper:child:1:--type=renderer"; do \
+		drv=$${spec%%:*}; rest=$${spec#*:}; kid=$${rest%%:*}; rest=$${rest#*:}; \
+		want=$${rest%%:*}; arg=$${rest#*:}; [ "$$arg" = "$$rest" ] && arg=""; \
+		got=$$(DYLD_INSERT_LIBRARIES=$$PWD/$(TARGET) "$$tmp/$$drv" "$$tmp/$$kid" $$arg 2>/dev/null \
+		       | grep -c "/notproton.dylib$$") || true; \
 		if [ "$$got" != "$$want" ]; then \
-			echo "$$drv -> $$kid: insert present $$got, wanted $$want"; fail=1; fi; \
+			echo "$$drv $$arg -> $$kid: insert present $$got, wanted $$want"; fail=1; fi; \
 	done; \
 	if [ $$fail -ne 0 ]; then exit 1; fi; \
-	echo "==> spawn live: the hook lands, steam_osx keeps the insert, other children do not"
+	echo "==> spawn live: the hook lands, steam_osx and Steam Helper keep the insert, other children do not"
 
 APP_TESTS := app/Tests
 
@@ -475,7 +479,15 @@ sigdb-install:
 
 LAUNCHABLE_BUNDLES := $(HOME)/Desktop/NotProton.app /Applications/NotProton.app
 
-deploy: $(TARGET) dylib-install sigdb-install helpers-install
+FONT_FILES := --include='*/' --include='*.ttf' --include='*.ttc' --exclude='*'
+
+fonts-install:
+	@if [ ! -d build/fonts ]; then echo "build/fonts is missing, run: $(MAKE) fonts" >&2; exit 1; fi
+	@mkdir -p "$(SUPPORT_DIR)/fonts"
+	@rsync -a --delete $(FONT_FILES) build/fonts/ "$(SUPPORT_DIR)/fonts/"
+	@echo "==> Installed: $(SUPPORT_DIR)/fonts"
+
+deploy: $(TARGET) dylib-install sigdb-install fonts-install helpers-install
 	@if [ ! -d "$(STEAM_APP)" ]; then \
 		echo "==> deploy: $(STEAM_APP) not found"; exit 1; fi
 	$(call install_atomically,$(TARGET),$(DEPLOY_DST))
@@ -508,6 +520,9 @@ bridge:
 	steam-shim/build.sh
 	@echo "==> Built the bridge, now run: $(MAKE) app-payload"
 
+fonts:
+	fonts/build.sh
+
 app-payload: $(TARGET) $(OVERLAY_SHIM) $(ICONMAKER) $(APPINFO)
 	@mkdir -p "$(APP_PAYLOAD)/signatures/macos.arm64"
 	@mkdir -p "$(APP_PAYLOAD)/bridge"
@@ -525,6 +540,9 @@ app-payload: $(TARGET) $(OVERLAY_SHIM) $(ICONMAKER) $(APPINFO)
 		elif [ -f "$$dst" ]; then echo "==> keeping staged $${spec##*:}"; \
 		else echo "$$src is missing and nothing is staged at $$dst, run: $(MAKE) bridge" >&2; exit 1; fi; \
 	done
+	@if [ ! -d build/fonts ]; then echo "build/fonts is missing, run: $(MAKE) fonts" >&2; exit 1; fi
+	@mkdir -p "$(APP_PAYLOAD)/fonts"
+	@rsync -a --delete build/fonts/ "$(APP_PAYLOAD)/fonts/"
 	@stamp="$$(git log -1 --format=%ct 2>/dev/null)"; \
 	if [ -z "$$stamp" ]; then echo "build-time needs a git checkout" >&2; exit 1; fi; \
 	echo "$$stamp" > "$(APP_PAYLOAD)/build-time"
