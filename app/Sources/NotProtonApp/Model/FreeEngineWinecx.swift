@@ -65,8 +65,9 @@ enum FreeEngineWinecx {
 
     static let step = "Download free WineCX engine"
 
-    // What the WineCX row installs and what the notproton-winecx tool runs once it is
-    // installed. The 11.15 release stays a separate build with its own runner and tool.
+    // What the WineCX row installs. It gets its own tool, notproton-winecx-11.17, beside
+    // the 11.15 release, which keeps notproton-winecx: every existing prefix is claimed by
+    // winecx-11.15, so the default tool only moves once 11.17 is verified on real games.
     static let current = v1117
     static let previous = v1115
     static let releases = [current, previous]
@@ -155,7 +156,7 @@ enum FreeEngineWinecx {
                 .i386Windows: "8ad83740df2da5e79ed435e4bc57e82b4b6a4b984fbec73e1160ca81dfce1b44",
             ],
             tools: [
-                CompatTool(name: "notproton-winecx", flavor: .rosetta, display: "WineCX 11.17 (msync, D3DMetal)"),
+                CompatTool(name: "notproton-winecx-11.17", flavor: .rosetta, display: "WineCX 11.17 (msync, D3DMetal)"),
             ],
             isFree: true
         ),
@@ -198,8 +199,7 @@ enum FreeEngineWinecx {
 
     // runtime 4.5.125 is the last wine1115 build (winecx 5b45f45, built from winecx-gptk
     // 7a0349b, minos 26.0). The same bytes are mirrored on dappermint/Whisky, which is what
-    // Whisky itself downloads. Its tool is notproton-winecx-11.15, and it answers to
-    // notproton-winecx while 11.17 is not installed (CompatTool.standsInFor).
+    // Whisky itself downloads. It keeps the notproton-winecx tool.
     static let v1115 = WinecxRelease(
         build: "winecx-11.15",
         runtime: "4.5.125",
@@ -244,8 +244,7 @@ enum FreeEngineWinecx {
                 .i386Windows: "23ee72664f172d38d76ecb8969d5c5af7e6828864dfe298338ed0e773910bc5d",
             ],
             tools: [
-                CompatTool(name: "notproton-winecx-11.15", flavor: .rosetta, display: "WineCX 11.15 (msync, D3DMetal)",
-                           standsInFor: "notproton-winecx"),
+                CompatTool(name: "notproton-winecx", flavor: .rosetta, display: "WineCX 11.15 (msync, D3DMetal)"),
             ],
             isFree: true
         ),

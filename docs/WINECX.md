@@ -9,15 +9,15 @@ Two releases are pinned side by side (`FreeEngineWinecx.releases`):
 
 | Build | Runtime | winecx | Wine | Tool | Bundle |
 |---|---|---|---|---|---|
-| `winecx-11.17` (current) | 4.7.3 | `e0aa380` | 11.17 | `notproton-winecx` | `WineCX 11.17.app` |
-| `winecx-11.15` | 4.5.125 | `5b45f45` | 11.15 | `notproton-winecx-11.15` | `WineCX 11.15.app` |
+| `winecx-11.17` (current) | 4.7.3 | `e0aa380` | 11.17 | `notproton-winecx-11.17` | `WineCX 11.17.app` |
+| `winecx-11.15` | 4.5.125 | `5b45f45` | 11.15 | `notproton-winecx` | `WineCX 11.15.app` |
 
 The WineCX row installs the current one. Each release is its own runner build with its own
-pins, ntdll detours and Steam tool, so the 11.15 engine stays installed and selectable. While
-11.17 is not installed, the 11.15 build answers to `notproton-winecx` (`CompatTool.standsInFor`),
-so games mapped to that name keep working until the update. A prefix claimed by one build is
-refused by the other (`refuse_other_build` in `compat_run.sh`): rebuild it in NotProton, or pick
-"WineCX 11.15" in the game's Compatibility settings.
+pins, ntdll detours and Steam tool. `notproton-winecx` stays on 11.15: every existing prefix's
+build record (`notproton-build`) names `winecx-11.15`, and `refuse_other_build` in
+`compat_run.sh` refuses a prefix claimed by another build, so moving the default tool would
+stop every WineCX game until its prefix is rebuilt. 11.17 is picked per game as "WineCX 11.17"
+(`notproton-winecx-11.17`), on a rebuilt prefix.
 
 4.7.3 over 4.5.125: msync fixes (wake one waiter, skip wake syscalls nobody waits on, sleep
 instead of spinning while a wait registers, unregister on contention), kernelbase
@@ -36,8 +36,8 @@ Compared with the WineHQ 11.15 engine it adds:
   `e94c312` build as the WineHQ engine ([DXMT.md](DXMT.md)), not the archive's 0.80. The
   builtin Direct3D is Wine's own, or D3DMetal once a Game Porting Toolkit is linked.
 
-In NotProton the current build is `winecx-11.17`, tool `notproton-winecx`, shown as "WineCX
-11.17 (msync, D3DMetal)". Like the WineHQ engine it needs no CrossOver license. The licence check
+In NotProton the current build is `winecx-11.17`, tool `notproton-winecx-11.17`, shown as
+"WineCX 11.17 (msync, D3DMetal)". Like the WineHQ engine it needs no CrossOver license. The licence check
 treats it as free only because the loader hash matches the pinned one, so a CrossOver install
 can never pass as it.
 

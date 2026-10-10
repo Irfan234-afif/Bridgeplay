@@ -28,27 +28,23 @@ struct FreeEngineWinecxTests {
         #expect(release.bundleName == "\(build.releaseVersion).app")
     }
 
-    @Test("11.17 is the current release and owns notproton-winecx; 11.15 stays selectable beside it")
+    @Test("11.17 is the current release with its own tool; 11.15 keeps notproton-winecx")
     func currentAndPrevious() throws {
         #expect(FreeEngineWinecx.current.build == "winecx-11.17")
         #expect(FreeEngineWinecx.previous.build == "winecx-11.15")
         #expect(FreeEngineWinecx.runnerBuild == FreeEngineWinecx.current.runner)
-        #expect(FreeEngineWinecx.current.runner.tools.map(\.name) == ["notproton-winecx"])
-        #expect(FreeEngineWinecx.previous.runner.tools.map(\.name) == ["notproton-winecx-11.15"])
+        #expect(FreeEngineWinecx.current.runner.tools.map(\.name) == ["notproton-winecx-11.17"])
+        #expect(FreeEngineWinecx.previous.runner.tools.map(\.name) == ["notproton-winecx"])
         let current = FreeEngineWinecx.current.runner
         let previous = FreeEngineWinecx.previous.runner
 
-        // Both installed: each serves its own tool, the current one first.
-        let both = SupportedRunners.tools(for: [previous, current])
-        #expect(both.map(\.name) == ["notproton-winecx", "notproton-winecx-11.15"])
-        #expect(both.map(\.build) == ["winecx-11.17", "winecx-11.15"])
-        // Only 11.15 installed: it keeps answering to notproton-winecx, so games mapped to
-        // that name keep their tool until 11.17 is set up.
-        let old = SupportedRunners.tools(for: [previous])
-        #expect(old.map(\.name) == ["notproton-winecx"])
-        #expect(old.map(\.build) == ["winecx-11.15"])
-        #expect(old.first?.display == "WineCX 11.15 (msync, D3DMetal)")
-        #expect(SupportedRunners.tools(for: [current]).map(\.name) == ["notproton-winecx"])
+        // Installing 11.17 adds a tool and never moves notproton-winecx, which every
+        // existing prefix's build record ties to winecx-11.15.
+        let both = SupportedRunners.tools(for: [current, previous])
+        #expect(both.map(\.name) == ["notproton-winecx", "notproton-winecx-11.17"])
+        #expect(both.map(\.build) == ["winecx-11.15", "winecx-11.17"])
+        #expect(SupportedRunners.tools(for: [previous]).map(\.build) == ["winecx-11.15"])
+        #expect(SupportedRunners.tools(for: [current]).map(\.name) == ["notproton-winecx-11.17"])
     }
 
     @Test("Both free engines stay separate builds with their own loaders and tools")
