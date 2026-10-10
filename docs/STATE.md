@@ -6,11 +6,13 @@ Branch `integrate` = working fork state; nothing pushed except the `dxmt-e94c312
 - 14+ Windows-only games reach a full-screen window; Spider-Man 2 plays (77.9 fps, loads save). See compat/games.json.
 - Retina: D3DMetal back buffers sized in pixels (winemac patch, 233353d).
 - Xbox controllers: SDL-enabled winebus (9a0cbf5). Do NOT set winebus `Hidraw=1` for pads; it bypasses SDL.
+- Controllers need no per-game Input Monitoring grant: the run script starts the launcher bundle directly instead of via `open`, so TCC attributes HID access to Steam (verified: all `kTCCServiceListenEvent` requests from Horizon `responsible=com.valvesoftware.steam`, authValue=2). `NOTPROTON_LAUNCH_SERVICES=1` restores the old `open` launch.
+- Pads SDL doesn't know: `~/Library/Application Support/notproton/gamecontrollerdb.txt` is exported as `SDL_GAMECONTROLLERCONFIG`. GameSir G7 Pro dongle (3537:1022) mapping lives there; SDL IOKit axis order is X,Y,Z,Rz,Accel,Brake (browser Gamepad API numbers them differently). Never use the winebus registry `map` key: its loader (main.c:1101, writes `mappings[count]` after `count++`) crashes winebus and kills every pad.
 - Many games need `ROSETTA_ADVERTISE_AVX=1` (set in user gamefixes/default.conf and per-game Steam launch options).
 
 ## Blockers / open
 - NotProton can't deploy to Steam: App Management permission is lost on every ad-hoc rebuild (`run failed: cannot write /Applications/Steam.app/Contents/MacOS`). User must re-allow NotProton in Privacy & Security > App Management. Long-term: sign builds with a stable identity.
-- Ravenswatch: black band at top + bottom cropped; game sizes buffers from 1512x876 pt (982 − notch/menu bar). WIP on branch `wip/retina-notch` (unverified). Live runner has the verified winemac (c6110318…).
+- Ravenswatch: fixed by winemac 76d8f938… (CW HACK 22435 in winecx-d3dmetal-retina.patch: queue D3DMetal client view frames before WM_SIZE so ResizeBuffers sees the borderless size; 3024x1964 confirmed by user via Metal HUD 2026-10-10).
 - Borderlands 4: hangs before first frame (exception storm, likely Denuvo under Rosetta). Not solved.
 - The Last of Us Part I: not crashing; probably long first shader build. Skipped by user.
 - DOOM: The Dark Ages / Indiana Jones need hardware ray tracing (MoltenVK has none); Half-Life: Alyx is VR.

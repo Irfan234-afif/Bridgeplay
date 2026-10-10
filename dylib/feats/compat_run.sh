@@ -146,6 +146,24 @@ case "$app_id" in ''|0) app_id=$(basename "$STEAM_COMPAT_DATA_PATH" 2>/dev/null)
 case "$app_id" in ''|*[!0-9]*) app_id=0 ;; esac
 echo "app_id=$app_id (STEAM_COMPAT_APP_ID=$STEAM_COMPAT_APP_ID)" >> "$log" 2>&1 || true
 
+# SDL has no built-in mapping for some pads (GameSir G7 Pro dongle, 3537:1022), so
+# winebus hands games their raw button order. Mappings in gamecontrollerdb.txt reach
+# winebus through the environment; its registry "map" loader crashes in this Wine.
+pad_db="$HOME/Library/Application Support/notproton/gamecontrollerdb.txt"
+if [ -f "$pad_db" ]; then
+  pad_maps=$(sed -e '/^[[:space:]]*#/d' -e '/^[[:space:]]*$/d' "$pad_db")
+  if [ -n "$pad_maps" ]; then
+    if [ -n "$SDL_GAMECONTROLLERCONFIG" ]; then
+      SDL_GAMECONTROLLERCONFIG="$SDL_GAMECONTROLLERCONFIG
+$pad_maps"
+    else
+      SDL_GAMECONTROLLERCONFIG="$pad_maps"
+    fi
+    export SDL_GAMECONTROLLERCONFIG
+    echo "controllers: $(printf '%s\n' "$pad_maps" | wc -l | tr -d ' ') mapping(s) from $pad_db" >> "$log" 2>&1 || true
+  fi
+fi
+
 # Per-game fixes: the shipped gamefixes-default/<appid>.conf, then the user's
 # gamefixes/<appid>.conf, the later file winning per key. KEY=VALUE lines are checked
 # against an allow-list and never sourced, and the launch options win over both files.
@@ -1929,7 +1947,7 @@ else
   echo "=== client staged no overlay renderer, overlay disabled ===" >> "$log" 2>&1 || true
 fi
 set -- --args "$shim_exe" "$@"
-for name in $(env | sed -nE 's/^(CX_APPLEGPTK_LIBD3DSHARED_PATH|WINE_LARGE_ADDRESS_AWARE|WINE_CPU_TOPOLOGY|Steam[A-Za-z0-9]*|(CX_GRAPHICS|D3DM_|DXMT_|DXVK_|MVK_|VKD3D_|STAGING_|MTL_|ROSETTA_)[A-Z0-9_]*)=.*/\1/p'); do
+for name in $(env | sed -nE 's/^(CX_APPLEGPTK_LIBD3DSHARED_PATH|SDL_GAMECONTROLLERCONFIG|WINE_LARGE_ADDRESS_AWARE|WINE_CPU_TOPOLOGY|Steam[A-Za-z0-9]*|(CX_GRAPHICS|D3DM_|DXMT_|DXVK_|MVK_|VKD3D_|STAGING_|MTL_|ROSETTA_)[A-Z0-9_]*)=.*/\1/p'); do
   eval "value=\$$name"
   # shellcheck disable=SC2154 # eval assigns value on the line above
   set -- --env "$name=$value" "$@"
@@ -1953,7 +1971,38 @@ set -- \
 lsregister="/System/Library/Frameworks/CoreServices.framework/Versions/A"
 lsregister="$lsregister/Frameworks/LaunchServices.framework/Support/lsregister"
 [ -x "$lsregister" ] && "$lsregister" -f "$loader_app" >> "$log" 2>&1 || true
-open -n -W -a "$loader_app" "$@" >> "$log" 2>&1 &
+if [ "${NOTPROTON_LAUNCH_SERVICES:-0}" = "1" ]; then
+  open -n -W -a "$loader_app" "$@" >> "$log" 2>&1 &
+else
+  # A bundle started by `open` is its own TCC responsible process, so every game
+  # needed a separate Input Monitoring grant before controllers worked. Started
+  # from here it stays attributed to Steam, which already holds that grant, and
+  # macOS still takes the Dock name and icon from the enclosing bundle. env -i
+  # with the same --env list keeps the environment `open` would have given it.
+  count=$#
+  i=0
+  mode=vars
+  while [ "$i" -lt "$count" ]; do
+    arg=$1
+    shift
+    i=$((i + 1))
+    case "$mode:$arg" in
+      vars:--env)
+        set -- "$@" "$1"
+        shift
+        i=$((i + 1))
+        ;;
+      vars:--args)
+        mode=args
+        set -- "$@" "$loader_macos/launcher"
+        ;;
+      args:*) set -- "$@" "$arg" ;;
+    esac
+  done
+  echo "launching bundle directly so input permission stays with Steam" >> "$log" 2>&1 || true
+  env -i HOME="$HOME" USER="$USER" LOGNAME="$LOGNAME" SHELL="$SHELL" TMPDIR="$TMPDIR" \
+    __CF_USER_TEXT_ENCODING="$__CF_USER_TEXT_ENCODING" "$@" >> "$log" 2>&1 &
+fi
 open_pid=$!
 status=0
 seen=0

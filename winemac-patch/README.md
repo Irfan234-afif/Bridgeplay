@@ -28,6 +28,17 @@ pixels, which are backing pixels in Retina mode, so a 1512x876-point window got 
 hands D3DMetal a proxy view whose `-frame` is in Win32 pixels (`cgrect_win_from_mac`) and
 forwards everything else; DXMT never asks for `frame`.
 
+D3DMetal reads that frame again for `ResizeBuffers`, which games call from `WM_SIZE`. Its
+client surfaces (`data->d3dmetal_client_surfaces`, CW HACK 22435) are not on win32u's list,
+so `update_client_surfaces()` skipped them and their view only followed the window on the
+next present: D3DMetal read the old frame and kept the old size. Ravenswatch creates its
+swapchain while its window is maximized (client 3024x1752: the work area under the menu bar
+and above the Dock, minus the caption), then goes borderless 3024x1964 and resizes from
+`WM_SIZE`; the drawable stayed 3024x1752 and the image was stretched. The patch has
+`macdrv_WindowPosChanged()` queue those surfaces' view frames before `WM_SIZE` is sent, and
+the proxy reads `-frame` on the main thread behind them. With it the drawable follows to
+3024x1964.
+
 To rebuild `app/Sources/NotProtonApp/Resources/winemac-winecx-11.15.so` from winecx
 `5b45f45` (runtime 4.5.125), natively, with the CI's flags:
 

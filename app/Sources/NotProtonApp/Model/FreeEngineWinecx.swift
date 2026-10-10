@@ -96,7 +96,7 @@ enum FreeEngineWinecx {
             "d3d12.dll": "c6e285308bb3241efca3d94da4746b16a526a9fb5113f61922e7bd86694bebf9",
             "dxgi.dll": "f1f24da777c65a583b29f74475c6a9464da35068d75def6cee806268def9ecbb",
         ],
-        macDriver: "c611031855e596b2aeb2d2ea2c2ddef8cb843376d85ccf8bbe10c4fc727a527e",
+        macDriver: "76d8f93839386f37e8badf0c82bb31b5ead22ac580f17896f9d2a729af0fc147",
         // winebus.so: winecx 5b45f45 built with SONAME_LIBSDL2 (docs/WINECX.md). libSDL2:
         // SDL 2.32.8 (zlib license, NOTICE), the WineHQ engine runner's copy signed ad hoc,
         // since a release build strips unsigned Mach-O resources and would break the pin.

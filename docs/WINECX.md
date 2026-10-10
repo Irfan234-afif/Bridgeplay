@@ -79,7 +79,9 @@ between 0.80 and master.
 
 The engine's `winemac.so` is still replaced, for D3DMetal: winecx's own let D3DMetal size a
 swapchain from its view's frame in points, so with High Resolution (Retina) on, a game got a
-half-size drawable and showed only the top-left quarter. NotProton installs
+half-size drawable and showed only the top-left quarter, and a `ResizeBuffers` from
+`WM_SIZE` read the view's frame before it had followed the window, so the swapchain kept
+its old size (Ravenswatch: 3024x1752 stretched over a 3024x1964 screen). NotProton installs
 `winemac-winecx-11.15.so`, built from winecx `5b45f45` with
 `winemac-patch/winecx-d3dmetal-retina.patch` (`winemac-patch/README.md`), pinned as
 `FreeEngineWinecx.current.macDriver`.
