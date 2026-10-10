@@ -149,6 +149,15 @@ echo "app_id=$app_id (STEAM_COMPAT_APP_ID=$STEAM_COMPAT_APP_ID)" >> "$log" 2>&1 
 # SDL has no built-in mapping for some pads (GameSir G7 Pro dongle, 3537:1022), so
 # winebus hands games their raw button order. Mappings in gamecontrollerdb.txt reach
 # winebus through the environment; its registry "map" loader crashes in this Wine.
+# macOS Steam has no virtual gamepad Wine could read, so a pad Steam Input claims (and
+# lists in SDL_GAMECONTROLLER_IGNORE_DEVICES) would reach the game as nothing. Games read
+# pads directly unless the launch options set NOTPROTON_RAW_CONTROLLERS=0.
+if [ "${NOTPROTON_RAW_CONTROLLERS:-1}" = "1" ]; then
+  NOTPROTON_RAW_CONTROLLERS=1
+  SDL_GAMECONTROLLER_IGNORE_DEVICES=
+  export NOTPROTON_RAW_CONTROLLERS SDL_GAMECONTROLLER_IGNORE_DEVICES
+fi
+
 pad_db="$HOME/Library/Application Support/notproton/gamecontrollerdb.txt"
 if [ -f "$pad_db" ]; then
   pad_maps=$(sed -e '/^[[:space:]]*#/d' -e '/^[[:space:]]*$/d' "$pad_db")
