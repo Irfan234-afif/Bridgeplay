@@ -552,6 +552,9 @@ APP_BUNDLE  := $(OUT_DIR)/NotProton.app
 APP_BUNDLE_PAYLOAD := $(APP_BUNDLE)/Contents/Resources/NotProtonApp_NotProtonApp.bundle/Contents/Resources/payload
 APP_ZIP     := $(OUT_DIR)/NotProton.zip
 APP_VERSION := $(shell sed -n 's/^\#define NOTPROTON_VERSION "\(.*\)"/\1/p' dylib/version.h)
+# Sparkle ignores everything after a '-', so 1.1.4-winehq.1-ray.2 would compare equal to
+# ray.1. CFBundleVersion gets a dotted number instead: 1.1.4-winehq.1-ray.2 -> 1.1.4.2.
+APP_BUILD := $(shell echo '$(APP_VERSION)' | sed -E 's/^([0-9.]+)-.*-ray\.([0-9]+)$$/\1.\2/; s/-.*//')
 
 APP_SIGN_ID ?= -
 
@@ -583,7 +586,7 @@ app: app-payload $(ICON_CAR)
 	cp app/Info.plist "$(APP_BUNDLE)/Contents/Info.plist"
 	/usr/libexec/PlistBuddy -c \
 		"Set :CFBundleShortVersionString $(APP_VERSION)" -c \
-		"Set :CFBundleVersion $(APP_VERSION)" \
+		"Set :CFBundleVersion $(APP_BUILD)" \
 		"$(APP_BUNDLE)/Contents/Info.plist"
 	cp "$$(swift build --package-path app -c release --show-bin-path)/NotProtonApp" \
 		"$(APP_BUNDLE)/Contents/MacOS/NotProtonApp"
