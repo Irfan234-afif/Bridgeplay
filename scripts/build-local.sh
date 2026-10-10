@@ -172,6 +172,24 @@ fi
 phase bridge make -j"$JOBS" bridge
 [ -f "$wine_stamp" ] || echo "$wine_key" >"$wine_stamp"
 
+# --- fonts -------------------------------------------------------------------------
+
+# CI's font toolchain: Homebrew fontforge + gpatch, and afdko/fonttools in a venv.
+font_tools=$(sed -n 's/^ *FONT_TOOLS: "\(.*\)"$/\1/p' .github/workflows/app.yml)
+for tool in fontforge gpatch; do
+	command -v "$tool" >/dev/null 2>&1 || [ -x "$(brew --prefix 2>/dev/null)/opt/$tool/bin/$tool" ] \
+		|| { echo "==> $tool is missing, run: brew install fontforge gpatch" >&2; exit 1; }
+done
+if [ ! -x scratch/fontvenv/bin/makeotfexe ] || [ "$(cat scratch/fontvenv/.tools 2>/dev/null)" != "$font_tools" ]; then
+	python3 -m venv scratch/fontvenv
+	# shellcheck disable=SC2086 # FONT_TOOLS is a space-separated requirement list
+	scratch/fontvenv/bin/pip install -q $font_tools
+	echo "$font_tools" >scratch/fontvenv/.tools
+fi
+PATH="$repo/scratch/fontvenv/bin:$(brew --prefix)/opt/gpatch/libexec/gnubin:$PATH"
+export PATH
+phase fonts make fonts
+
 # --- app ---------------------------------------------------------------------------
 
 phase app-payload make app-payload
