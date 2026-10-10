@@ -1985,6 +1985,7 @@ cat > "$loader_contents/Info.plist" <<PLIST
   <key>CFBundlePackageType</key><string>APPL</string>
   <key>CFBundleInfoDictionaryVersion</key><string>6.0</string>
   <key>LSApplicationCategoryType</key><string>public.app-category.games</string>
+  <key>LSSupportsGameMode</key><true/>
   <key>NSHighResolutionCapable</key><true/>
   <key>NSPrincipalClass</key><string>NSApplication</string>
   <key>NSMicrophoneUsageDescription</key><string>This game would like to access your microphone.</string>
@@ -2006,7 +2007,13 @@ for f in "$wine_unix"/*; do
   ln -sfn "$f" "$loader_macos/$base"
 done
 ln "$WINELOADER" "$loader_macos/wine" 2>/dev/null || cp "$WINELOADER" "$loader_macos/wine"
+game_host=""
 if [ -x "$loader_macos/wine" ]; then
+  if "$np_support/prepare-game-loader" "$loader_macos/wine" "$loader_contents/Info.plist" >> "$log" 2>&1; then
+    game_host="$np_support/game-host.dylib"
+  else
+    echo "embedded loader metadata unsupported; keeping original launcher behavior" >> "$log" 2>&1 || true
+  fi
   WINELOADER="$loader_app/Contents/MacOS/wine"
   echo "loader staged in bundle for game mode" >> "$log" 2>&1 || true
 else
@@ -2030,6 +2037,10 @@ elif [ -f "\$shim" ] && [ "\${NOTPROTON_FRAMEGEN:-0}" != 0 ] && [ "\$NOTPROTON_F
   # Frame generation lives in the shim, so it loads without the Steam overlay too.
   export DYLD_INSERT_LIBRARIES="\$shim"
   export NOTPROTON_OVERLAY_SHIM="\$shim"
+fi
+export NOTPROTON_GAME_LOADER="$WINELOADER"
+if [ -n "$game_host" ]; then
+  export DYLD_INSERT_LIBRARIES="$game_host\${DYLD_INSERT_LIBRARIES:+:\$DYLD_INSERT_LIBRARIES}"
 fi
 [ -n "\$NOTPROTON_GAME_CWD" ] && cd "\$NOTPROTON_GAME_CWD"
 "$WINELOADER" "\$@"
