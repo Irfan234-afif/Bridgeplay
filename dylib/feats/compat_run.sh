@@ -158,6 +158,12 @@ if [ "${NOTPROTON_RAW_CONTROLLERS:-1}" = "1" ]; then
   export NOTPROTON_RAW_CONTROLLERS SDL_GAMECONTROLLER_IGNORE_DEVICES
 fi
 
+# SDL hands pads that macOS GameController.framework knows (GameSir G7 Pro over Bluetooth)
+# to its MFi driver, which finds nothing outside an app run loop such as winedevice.exe's,
+# so the pad never reached Wine. IOKit reads them instead.
+SDL_JOYSTICK_MFI=0
+export SDL_JOYSTICK_MFI
+
 pad_db="$HOME/Library/Application Support/notproton/gamecontrollerdb.txt"
 if [ -f "$pad_db" ]; then
   pad_maps=$(sed -e '/^[[:space:]]*#/d' -e '/^[[:space:]]*$/d' "$pad_db")
@@ -1980,7 +1986,7 @@ else
   echo "=== client staged no overlay renderer, overlay disabled ===" >> "$log" 2>&1 || true
 fi
 set -- --args "$shim_exe" "$@"
-for name in $(env | sed -nE 's/^(CX_APPLEGPTK_LIBD3DSHARED_PATH|SDL_GAMECONTROLLERCONFIG|WINE_LARGE_ADDRESS_AWARE|WINE_CPU_TOPOLOGY|Steam[A-Za-z0-9]*|(CX_GRAPHICS|D3DM_|DXMT_|DXVK_|MVK_|VKD3D_|STAGING_|MTL_|ROSETTA_)[A-Z0-9_]*)=.*/\1/p'); do
+for name in $(env | sed -nE 's/^(CX_APPLEGPTK_LIBD3DSHARED_PATH|SDL_GAMECONTROLLERCONFIG|SDL_JOYSTICK_MFI|WINE_LARGE_ADDRESS_AWARE|WINE_CPU_TOPOLOGY|Steam[A-Za-z0-9]*|(CX_GRAPHICS|D3DM_|DXMT_|DXVK_|MVK_|VKD3D_|STAGING_|MTL_|ROSETTA_)[A-Z0-9_]*)=.*/\1/p'); do
   eval "value=\$$name"
   # shellcheck disable=SC2154 # eval assigns value on the line above
   set -- --env "$name=$value" "$@"

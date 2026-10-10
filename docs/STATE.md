@@ -8,6 +8,7 @@ Branch `integrate` = working fork state; nothing pushed except the `dxmt-e94c312
 - Xbox controllers: SDL-enabled winebus (9a0cbf5). Do NOT set winebus `Hidraw=1` for pads; it bypasses SDL.
 - Controllers need no per-game Input Monitoring grant: the run script starts the launcher bundle directly instead of via `open`, so TCC attributes HID access to Steam (verified: all `kTCCServiceListenEvent` requests from Horizon `responsible=com.valvesoftware.steam`, authValue=2). `NOTPROTON_LAUNCH_SERVICES=1` restores the old `open` launch.
 - Pads SDL doesn't know: `~/Library/Application Support/notproton/gamecontrollerdb.txt` is exported as `SDL_GAMECONTROLLERCONFIG`. GameSir G7 Pro dongle (3537:1022) mapping lives there; SDL IOKit axis order is X,Y,Z,Rz,Accel,Brake (browser Gamepad API numbers them differently). Never use the winebus registry `map` key: its loader (main.c:1101, writes `mappings[count]` after `count++`) crashes winebus and kills every pad.
+- Bluetooth GameSir G7 Pro: its primary HID usage is Consumer, so stock SDL skips it; bundled libSDL2 carries winemac-patch/sdl2-iokit-gamepad-collection.patch, and the run script exports SDL_JOYSTICK_MFI=0 (SDL's MFi driver claims the pad but finds nothing in winedevice.exe). Verified 2026-10-11: winebus `sdl_add_device … is_gamepad 1`, user confirmed input in Megabonk.
 - Many games need `ROSETTA_ADVERTISE_AVX=1` (set in user gamefixes/default.conf and per-game Steam launch options).
 
 ## Blockers / open

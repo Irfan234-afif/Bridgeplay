@@ -98,13 +98,14 @@ enum FreeEngineWinecx {
         ],
         macDriver: "76d8f93839386f37e8badf0c82bb31b5ead22ac580f17896f9d2a729af0fc147",
         // winebus.so: winecx 5b45f45 built with SONAME_LIBSDL2 (docs/WINECX.md). libSDL2:
-        // SDL 2.32.8 (zlib license, NOTICE), the WineHQ engine runner's copy signed ad hoc,
-        // since a release build strips unsigned Mach-O resources and would break the pin.
+        // SDL 2.32.8 (zlib license, NOTICE) built x86_64 with winemac-patch/sdl2-iokit-gamepad-collection.patch
+        // (pads whose gamepad is a secondary HID collection, e.g. GameSir G7 Pro over Bluetooth),
+        // signed ad hoc, since a release build strips unsigned Mach-O resources and would break the pin.
         gamepad: [
             WinecxBundledFile(resource: "winebus-winecx-11.15", ext: "so", path: "lib/wine/x86_64-unix/winebus.so",
                               sha256: "1bc53184f5d026ab84a26cf6ef721348fc3b028c019ff969e69eb6cf9b9d1af9"),
             WinecxBundledFile(resource: "libSDL2-2.0.0", ext: "dylib", path: "lib/libSDL2-2.0.0.dylib",
-                              sha256: "605724f463875e945ca4a79a1db7bf35384d912fa5387f3042a27a42e878db19"),
+                              sha256: "28ca23a44bb24b4bb42fe84902788ca866ac824c7b83ea2ca28aebc6640f344d"),
         ]
     )
 
