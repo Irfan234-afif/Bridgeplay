@@ -12,7 +12,9 @@ const { panel, walk, details, runner, FORMS } = require('./harness');
 const emit = process.argv[2];
 if (!emit) { console.error('usage: effective.js <emit>'); process.exit(2); }
 
-const home = fs.mkdtempSync(path.join(os.tmpdir(), 'np-effective-'));
+// A quote and a space in the home have to reach the page escaped and the launch options quoted.
+const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'np-effective-'));
+const home = path.join(tmp, 'home "q" x');
 const np = path.join(home, 'Library', 'Application Support', 'notproton');
 const put = (rel, text) => {
   fs.mkdirSync(path.dirname(path.join(np, rel)), { recursive: true });
@@ -24,8 +26,14 @@ put('gamefixes/default.conf',
   '# Rosetta hides AVX/AVX2 unless asked; many games quit without it.\n' +
   'ROSETTA_ADVERTISE_AVX=1\n' +
   '# Exposes DLSS through MetalFX (D3DMetal); only takes effect when DLSS is switched on in the game.\n' +
-  'D3DM_ENABLE_METALFX=1\n');
+  'D3DM_ENABLE_METALFX=1\n' +
+  'FRAMEGEN=1\nFRAMEGEN_QUALITY=quality\nFRAMEGEN_UI=0\nFRAMEGEN_FALLBACK=0\nFRAMEGEN_ENGINE=metalfx\n');
 put('gamefixes-default/1888930.conf', 'ROSETTA_ADVERTISE_AVX=1\n');
+put('gamefixes/1778821.conf', 'FRAMEGEN=0\n');
+// np-native's own confs: raw variable names, export and quotes allowed.
+put('gamefixes/native-default.conf', '# native\nexport MTL_HUD_ENABLED=1\nNP_PAD_MODE = "hid"\n' +
+  'NOTPROTON_FRAMEGEN=3\nFRAMEGEN=2\nNOTPROTON_RETINA=1\n');
+put('gamefixes/native/1778820.conf', "NP_PAD_MODE='gc'\nNOTPROTON_FRAMEGEN_ENGINE=metalfx\n");
 // The first tool is the default one, and its name runs past the 16 characters a value may.
 put('tools',
   'notproton-winecx-11.17\twinecx-11.17\trosetta\tWineCX 11.17 (msync, D3DMetal)\n' +
@@ -50,19 +58,30 @@ try {
   vm.runInContext(tail, ctx);
   fx = ctx.MSCXFx;
 } finally {
-  fs.rmSync(home, { recursive: true, force: true });
+  fs.rmSync(tmp, { recursive: true, force: true });
 }
 t0.ok(fx !== undefined, 'the defaults survive the source map comment the chunk ends in');
 t0.ok(!!(fx && fx.e && fx.e['notproton-winecx-11.17'] && fx.e['notproton-winecx-11.17'].WINEMSYNC === '1'),
       'a tool name longer than a value still reaches the engine map');
 t0.ok(!!(fx && fx.e && fx.e[''] && fx.e[''].WINEMSYNC === '1'), 'the default tool stands in for an unpinned game');
+t0.ok(!!fx && fx.h === home, `the home reaches the page escaped (${fx && JSON.stringify(fx.h)})`);
+t0.ok(!!fx && JSON.stringify(fx.g).includes('"NOTPROTON_FRAMEGEN":"1"') &&
+      fx.g.NOTPROTON_FRAMEGEN_QUALITY === 'quality' && fx.g.NOTPROTON_FRAMEGEN_UI === '0' &&
+      fx.g.NOTPROTON_FRAMEGEN_FALLBACK === '0' && fx.g.NOTPROTON_FRAMEGEN_ENGINE === 'metalfx',
+      'the FRAMEGEN conf keys map to their variables');
+t0.ok(!!fx && fx.d.NOTPROTON_FRAMEGEN_UI === '1' && fx.d.NOTPROTON_FRAMEGEN_FALLBACK === '1',
+      'Protect UI and the fast-motion fallback default on');
+t0.ok(!!fx && JSON.stringify(fx.ng) === '{"MTL_HUD_ENABLED":"1","NP_PAD_MODE":"hid","NOTPROTON_FRAMEGEN":"3"}',
+      `native-default.conf is read the way np-native reads it (${fx && JSON.stringify(fx.ng)})`);
+t0.ok(!!fx && JSON.stringify(fx.na) === '{"1778820":{"NP_PAD_MODE":"gc","NOTPROTON_FRAMEGEN_ENGINE":"metalfx"}}',
+      `native/<appid>.conf lands per app (${fx && JSON.stringify(fx.na)})`);
 failed += t0.failed;
 
 const LABELS = ['Metal HUD', 'DLSS', 'Advertise AVX2 to Rosetta', 'MSync', 'High Resolution',
                 'Let games read controllers directly'];
 globalThis.MSCXFx = fx;
 for (const form of Object.keys(FORMS)) {
-  const { render: P } = panel(emit, form);
+  const { render: P, written } = panel(emit, form);
   const t = runner(form);
   const rows = over => walk(P({ details: details('', Object.assign({ unAppID: 1778820 }, over)) }))
     .filter(x => x.type === 'Toggle');
@@ -74,6 +93,28 @@ for (const form of Object.keys(FORMS)) {
        'the default tool named outright reads MSync as on');
   t.ok(!checked({ strCompatToolName: 'notproton-winehq' }).includes('MSync'),
        'a tool without msync reads MSync as off');
+  // Frame generation as the confs set it up.
+  const fg = (id, o, os) => walk(P({ details: details(o || '', Object.assign({ unAppID: id }, os || {})) }));
+  const lab = (ns, l) => ns.find(x => x.props.label === l);
+  let ns = fg(1778820);
+  t.ok(lab(ns, 'Mode').props.selectedOption === '2' && lab(ns, 'Quality').props.selectedOption === 'quality' &&
+       lab(ns, 'Engine').props.selectedOption === 'metalfx' &&
+       lab(ns, 'Protect UI (keeps static HUD and menus sharp)').props.checked === false &&
+       lab(ns, 'Fast-motion fallback (skips frames that would smear)').props.checked === false,
+       'the global FRAMEGEN keys show through, 1 as 2x');
+  t.ok(lab(fg(1778821), 'Mode').props.selectedOption === '0' && !lab(fg(1778821), 'Quality'),
+       'a per-app FRAMEGEN=0 turns it off and hides the rest');
+  // A native build reads np-native's confs and writes under the escaped home.
+  const mac = { vecPlatforms: ['osx'], strCompatToolName: '' };
+  ns = fg(1778820, '', mac);
+  t.ok(lab(ns, 'Metal HUD').props.checked === true && lab(ns, 'Mode').props.selectedOption === '3' &&
+       lab(ns, 'Controller layer').props.selectedOption === 'gc' && lab(ns, 'Engine').props.selectedOption === 'metalfx',
+       'a native game shows the native confs, per app over default');
+  t.ok(lab(fg(999, '', mac), 'Controller layer').props.selectedOption === 'hid', 'another native game gets the default');
+  written.length = 0;
+  lab(fg(999, '-novid', mac), 'Metal HUD').props.onChange(false);
+  const want = "'" + home.replace(/'/g, "'\\''") + "/.notproton/np-native' MTL_HUD_ENABLED=0 %command% -novid";
+  t.ok(written.length === 1 && written[0].opts === want, `the launcher path is the user's home (${written[0] && written[0].opts})`);
   failed += t.failed;
 }
 delete globalThis.MSCXFx;

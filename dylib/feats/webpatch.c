@@ -157,9 +157,9 @@ static int out_expand(np_out_t *o, const char *replace, const np_cap_t *caps) {
     "else{const w=wd();if(!c.length&&/^(if|then|else|elif|do|while|until|!|\\{)$/" \
     ".test(o.slice(w.start,w.end)))cs.push(c=[]);else c.push(w)}}" \
     "const m=w=>/%command%/i.test(o.slice(w.start,w.end)),G=cs.find(c=>c.some(m));" \
-    "if(!G)return{p:0,e:[]};" \
+    "if(!G)return{p:0,e:[],G:[],c:-1};" \
     "const n=G.findIndex(w=>m(w)||!/^[A-Za-z_]\\w*=/.test(o.slice(w.start,w.end)));" \
-    "return{p:G[0].start,e:G.slice(0,n<0?G.length:n)}})(),"
+    "return{p:G[0].start,e:G.slice(0,n<0?G.length:n),G:G,c:G.findIndex(m)}})(),"
 
 // CrossOver options panel. Not in great shape, but it'll do
 #define NP_CX_OPTIONS_CSS \
@@ -173,22 +173,59 @@ static int out_expand(np_out_t *o, const char *replace, const np_cap_t *caps) {
     ARG "=>{" \
     "const t=" ARG ".details,o=t.strLaunchOptions||\"\"," \
     NP_CX_LAUNCH_PARSE \
-    "g=k=>{const p=E.e.filter(w=>o.startsWith(k+\"=\",w.start)).pop();" \
-    "return p?(p.value===null?o.slice(p.start+k.length+1,p.end):p.value.slice(k.length+1)):\"\"}," \
+    "nat=t.unAppID<2147483648&&(t.vecPlatforms||[]).indexOf(\"osx\")>=0&&!t.strCompatToolName," \
+    "wv=w=>w.value===null?o.slice(w.start,w.end):w.value," \
+    "NE=E.c<0?[]:E.G.slice(0,E.c).filter(w=>/^[A-Za-z_]\\w*=/.test(wv(w)))," \
+    "A=k=>(nat?NE.filter(w=>wv(w).startsWith(k+\"=\")):E.e.filter(w=>o.startsWith(k+\"=\",w.start))).pop()," \
+    "g=k=>{const p=A(k);return p?wv(p).slice(k.length+1):\"\"}," \
     "qv=v=>/^[\\w.,:=\\/+@%-]*$/.test(v)?v:\"'\"+v.replace(/'/g,\"'\\\\''\")+\"'\"," \
-    "s=ps=>{const add=ps.filter(p=>p[1]).map(p=>p[0]+\"=\"+qv(p[1])).join(\" \");let r;" \
+    "sl=ps=>{const add=ps.filter(p=>p[1]).map(p=>p[0]+\"=\"+qv(p[1])).join(\" \");let r;" \
     "if(!/%command%/i.test(o)){if(!add)return;r=add+\" %command%\"+(o.trim()?\" \"+o:\"\")}" \
     "else{let at=E.p;r=o.slice(0,at)+(add?add+\" \":\"\");" \
     "E.e.forEach(w=>{if(ps.some(p=>o.startsWith(p[0]+\"=\",w.start))){" \
     "r+=o.slice(at,w.start);at=w.end;while(o[at]===\" \"||o[at]===\"\\t\")at++}});r+=o.slice(at)}" \
     "SteamClient.Apps.SetAppLaunchOptions(t.unAppID,r.trim()===\"%command%\"?\"\":r)}," \
+    /* Native games run through np-native, which also forces arm64: <launcher> VAR=VALUE ... \
+       %command% <game args>. Assignments are read from any word before %command%, so the \
+       older "/usr/bin/arch ... -e VAR=VALUE" form is understood, and rewritten without the \
+       arch prefix and its DYLD_INSERT_LIBRARIES. */ \
+    "sn=ps=>{const c=E.c<0?null:E.G[E.c]," \
+    "L=Fx.h?Fx.h+\"/.notproton/np-native\":(c&&E.G.slice(0,E.c).map(wv)" \
+    ".find(x=>/\\/\\.notproton\\/np-native$/.test(x)))||\"\";" \
+    "if(!L||!c&&!ps.some(p=>p[1]))return;" \
+    "const kn=w=>{const x=wv(w);return x.slice(0,x.indexOf(\"=\"))};" \
+    "let vs=NE.filter(w=>kn(w)!==\"DYLD_INSERT_LIBRARIES\").map(w=>[kn(w),o.slice(w.start,w.end)]);" \
+    "ps.forEach(p=>{const i=vs.findIndex(x=>x[0]===p[0]);vs=vs.filter(x=>x[0]!==p[0]);" \
+    "if(p[1])vs.splice(i<0?vs.length:i,0,[p[0],p[0]+\"=\"+qv(p[1])])});" \
+    "const h=[qv(L)].concat(vs.map(x=>x[1])).join(\" \");" \
+    "SteamClient.Apps.SetAppLaunchOptions(t.unAppID," \
+    "c?o.slice(0,E.p)+h+\" \"+o.slice(c.start):h+\" %command%\"+(o.trim()?\" \"+o.trim():\"\"))}," \
+    "s=ps=>nat?sn(ps):sl(ps)," \
     "Fx=globalThis.MSCXFx||{}," \
-    "dv=k=>{const a=(Fx.a||{})[t.unAppID]||{},en=Fx.e||{},x=en[t.strCompatToolName]||en[\"\"]||{};" \
+    "dv=k=>{if(nat){const a=(Fx.na||{})[t.unAppID]||{},n=Fx.ng||{};" \
+    "return k in a?a[k]:k in n?n[k]:(Fx.d||{})[k]||\"\"}" \
+    "const a=(Fx.a||{})[t.unAppID]||{},en=Fx.e||{},x=en[t.strCompatToolName]||en[\"\"]||{};" \
     "return k in a?a[k]:k in(Fx.g||{})?Fx.g[k]:k in x?x[k]:(Fx.d||{})[k]||\"\"}," \
-    "ev=k=>E.e.some(w=>o.startsWith(k+\"=\",w.start))?g(k):dv(k)," \
+    "ev=k=>A(k)?g(k):dv(k)," \
     "T=(ks,l,on,off)=>(0," RT ".jsx)(" BARREL ".Yh,{className:\"MSCXRow\",label:l," \
     "checked:ev(ks[0])===on," \
     "onChange:v=>s(ks.map(k=>[k,v?(dv(k)===on?\"\":on):(dv(k)===on?(off||\"0\"):\"\")]))},ks[0])," \
+    /* A labelled dropdown row. n turns a raw value, set or not, into an option's data, so \
+       picking what the confs already give drops the argument instead of writing it. */ \
+    "D=(k,l,O,n)=>(0," RT ".jsx)(" BARREL ".m,{label:l,strClassName:\"MSCXRow\",rgOptions:O," \
+    "selectedOption:n(ev(k)),onChange:v=>s([[k,v.data===n(dv(k))?\"\":v.data]])},k)," \
+    "lc=z=>x=>(x||z).toLowerCase()," \
+    "fz=x=>{x=(x||\"\").toLowerCase();return x===\"1\"?\"2\":/^(0|off|false|no)?$/.test(x)?\"0\":x}," \
+    "fo=fz(ev(\"NOTPROTON_FRAMEGEN\"))!==\"0\"," \
+    "FG=()=>(0," RT ".jsxs)(" BARREL ".XY,{label:\"Frame Generation (Experimental. Adds input lag)\",children:[" \
+    "D(\"NOTPROTON_FRAMEGEN\",\"Mode\",[{data:\"0\",label:\"Off\"},{data:\"2\",label:\"2x\"}," \
+    "{data:\"3\",label:\"3x\"},{data:\"adaptive\",label:\"Adaptive (fills to display refresh)\"}],fz)," \
+    "fo&&D(\"NOTPROTON_FRAMEGEN_QUALITY\",\"Quality\",[{data:\"performance\",label:\"Performance\"}," \
+    "{data:\"balanced\",label:\"Balanced\"},{data:\"quality\",label:\"Quality\"}],lc(\"balanced\"))," \
+    "fo&&T([\"NOTPROTON_FRAMEGEN_UI\"],\"Protect UI (keeps static HUD and menus sharp)\",\"1\",\"0\")," \
+    "fo&&T([\"NOTPROTON_FRAMEGEN_FALLBACK\"],\"Fast-motion fallback (skips frames that would smear)\",\"1\",\"0\")," \
+    "fo&&D(\"NOTPROTON_FRAMEGEN_ENGINE\",\"Engine\",[{data:\"own\",label:\"Built-in optical flow\"}," \
+    "{data:\"metalfx\",label:\"MetalFX\"}],lc(\"own\"))]},\"fgn\")," \
     "b=g(\"CX_GRAPHICS_BACKEND\")," \
     "dm=\"\"===b||\"d3dmetal\"===b," \
     "dx=\"\"===b||\"dxmt\"===b," \
@@ -209,8 +246,13 @@ static int out_expand(np_out_t *o, const char *replace, const np_cap_t *caps) {
     "{data:\"dxmt\",label:\"DXMT\"}," \
     "{data:\"dxvk\",label:\"DXVK\"}," \
     "{data:\"wined3d\",label:\"WineD3D\"}];" \
-    "if(t.unAppID<2147483648&&(t.vecPlatforms||[]).indexOf(\"osx\")>=0" \
-    "&&!t.strCompatToolName)return null;" \
+    "if(nat)return(0," RT ".jsx)(\"div\",{className:\"MSCXPanel\",children:(0," RT ".jsxs)(" RT ".Fragment,{children:[" \
+    "(0," RT ".jsx)(\"style\",{children:" NP_CX_OPTIONS_CSS "})," \
+    "T([\"MTL_HUD_ENABLED\"],\"Metal HUD\",\"1\"),FG()," \
+    "(0," RT ".jsx)(" BARREL ".XY,{label:\"Controllers\",children:" \
+    "D(\"NP_PAD_MODE\",\"Controller layer\",[{data:\"\",label:\"Automatic\"},{data:\"hid\",label:\"Raw HID (Unity, SDL, Unreal)\"}," \
+    "{data:\"gc\",label:\"GameController\"},{data:\"off\",label:\"Off\"}],lc(\"\"))},\"ctl\")" \
+    "]})});" \
     "return(0," RT ".jsx)(\"div\",{className:\"MSCXPanel\",children:(0," RT ".jsxs)(" RT ".Fragment,{children:[" \
     "(0," RT ".jsx)(\"style\",{children:" NP_CX_OPTIONS_CSS "})," \
     "(0," RT ".jsxs)(" BARREL ".XY,{label:\"Graphics\",children:[" \
@@ -232,8 +274,7 @@ static int out_expand(np_out_t *o, const char *replace, const np_cap_t *caps) {
     "children:(0," RT ".jsx)(" BARREL ".m,{rgOptions:U," \
     "selectedOption:sw?(U.find(u=>u.data&&+u.data===fn)||{data:String(fn)}).data:\"\"," \
     "onChange:v=>s([[\"DXMT_METALFX_SPATIAL_SWAPCHAIN\",v.data?\"1\":\"\"],[\"DXMT_CONFIG\",fx(v.data)]])})},\"usf\")," \
-    "(0," RT ".jsx)(" BARREL ".XY,{label:\"Frame Generation (Experimental. Adds input lag)\",children:" \
-    "T([\"NOTPROTON_FRAMEGEN\"],\"MetalFX frame interpolation (2x)\",\"1\",\"0\")},\"fgn\")," \
+    "FG()," \
     "(0," RT ".jsx)(" BARREL ".XY,{label:\"Controllers (May break Steam Input. Not recommended)\",children:" \
     "T([\"NOTPROTON_RAW_CONTROLLERS\"],\"Let games read controllers directly\",\"1\",\"\")},\"ctl\")" \
     "]})})}"
@@ -423,7 +464,9 @@ int np_webpatch_should_patch(const char *path) {
 // launch options > gamefixes/<appid>.conf > gamefixes-default/<appid>.conf >
 // gamefixes/default.conf > the engine, so the values below the launch options are handed to
 // the page as globalThis.MSCXFx when Steam loads it (a later conf edit shows after a restart).
-#define NP_FX_MAX 4096
+// Native games go through np-native instead, which reads gamefixes/native/<appid>.conf over
+// gamefixes/native-default.conf with variable names as they are; those land in ng and na.
+#define NP_FX_MAX 16384
 
 static const char *fx_panel_key(const char *key) {
     static const char *const same[] = {
@@ -431,8 +474,24 @@ static const char *fx_panel_key(const char *key) {
     };
     if (strcmp(key, "RETINA") == 0) return "NOTPROTON_RETINA";
     if (strcmp(key, "MSYNC") == 0) return "WINEMSYNC";
+    if (strcmp(key, "FRAMEGEN") == 0) return "NOTPROTON_FRAMEGEN";
+    if (strcmp(key, "FRAMEGEN_QUALITY") == 0) return "NOTPROTON_FRAMEGEN_QUALITY";
+    if (strcmp(key, "FRAMEGEN_UI") == 0) return "NOTPROTON_FRAMEGEN_UI";
+    if (strcmp(key, "FRAMEGEN_FALLBACK") == 0) return "NOTPROTON_FRAMEGEN_FALLBACK";
+    if (strcmp(key, "FRAMEGEN_ENGINE") == 0) return "NOTPROTON_FRAMEGEN_ENGINE";
     for (size_t i = 0; i < sizeof(same) / sizeof(same[0]); i++)
         if (strcmp(key, same[i]) == 0) return same[i];
+    return NULL;
+}
+
+// np-native confs name the variables themselves.
+static const char *fx_native_key(const char *key) {
+    static const char *const keys[] = {
+        "MTL_HUD_ENABLED", "NP_PAD_MODE", "NOTPROTON_FRAMEGEN", "NOTPROTON_FRAMEGEN_QUALITY",
+        "NOTPROTON_FRAMEGEN_UI", "NOTPROTON_FRAMEGEN_FALLBACK", "NOTPROTON_FRAMEGEN_ENGINE",
+    };
+    for (size_t i = 0; i < sizeof(keys) / sizeof(keys[0]); i++)
+        if (strcmp(key, keys[i]) == 0) return keys[i];
     return NULL;
 }
 
@@ -452,7 +511,7 @@ static int fx_word(const char *v, size_t max) {
 static int fx_safe(const char *v) { return fx_word(v, 16); }
 
 typedef struct { char key[32]; char val[20]; } fx_pair_t;
-typedef struct { fx_pair_t p[8]; size_t n; } fx_set_t;
+typedef struct { fx_pair_t p[16]; size_t n; } fx_set_t;
 
 static void fx_set(fx_set_t *set, const char *key, const char *val) {
     for (size_t i = 0; i < set->n; i++)
@@ -464,21 +523,42 @@ static void fx_set(fx_set_t *set, const char *key, const char *val) {
     }
 }
 
+static char *fx_trim(char *b) {
+    while (*b == ' ' || *b == '\t') b++;
+    char *e = b + strlen(b);
+    while (e > b && (e[-1] == '\n' || e[-1] == '\r' || e[-1] == ' ' || e[-1] == '\t')) *--e = '\0';
+    return b;
+}
+
 // Same line rules as the run script's gamefix_read: KEY=VALUE, # comments, blank lines.
-static void fx_read(const char *path, fx_set_t *set) {
+// A native conf follows np-native's load_conf: "export " allowed, whitespace around the =
+// and one pair of matching quotes around the value dropped.
+static void fx_read(const char *path, fx_set_t *set, int native) {
     FILE *f = fopen(path, "r");
     if (!f) return;
     char line[256];
     while (fgets(line, sizeof(line), f)) {
-        char *b = line, *e;
-        while (*b == ' ' || *b == '\t') b++;
-        e = b + strlen(b);
-        while (e > b && (e[-1] == '\n' || e[-1] == '\r' || e[-1] == ' ' || e[-1] == '\t')) *--e = '\0';
+        char *b = fx_trim(line);
+        if (native && strncmp(b, "export ", 7) == 0) b = fx_trim(b + 7);
         char *eq = strchr(b, '=');
         if (*b == '#' || !eq) continue;
         *eq = '\0';
-        const char *key = fx_panel_key(b);
-        if (key && fx_safe(eq + 1)) fx_set(set, key, eq + 1);
+        char *val = eq + 1;
+        const char *key;
+        if (native) {
+            char *k = b + strlen(b);
+            while (k > b && (k[-1] == ' ' || k[-1] == '\t')) *--k = '\0';
+            val = fx_trim(val);
+            size_t vl = strlen(val);
+            if (vl >= 2 && (val[0] == '"' || val[0] == '\'') && val[vl - 1] == val[0]) {
+                val[vl - 1] = '\0';
+                val++;
+            }
+            key = fx_native_key(b);
+        } else {
+            key = fx_panel_key(b);
+        }
+        if (key && fx_safe(val)) fx_set(set, key, val);
     }
     fclose(f);
 }
@@ -498,12 +578,75 @@ static int fx_json_set(char *buf, size_t cap, size_t *len, const fx_set_t *set) 
     return 1;
 }
 
+// A JSON string, for values that can hold any character (the home directory).
+static int fx_json_str(char *buf, size_t cap, size_t *len, const char *v) {
+    if (*len + 1 >= cap) return 0;
+    buf[(*len)++] = '"';
+    for (; *v; v++) {
+        unsigned char c = (unsigned char)*v;
+        char esc[8];
+        int n;
+        if (c == '"' || c == '\\') n = snprintf(esc, sizeof(esc), "\\%c", c);
+        else if (c < 0x20 || c == 0x7f) n = snprintf(esc, sizeof(esc), "\\u%04x", c);
+        else { esc[0] = (char)c; esc[1] = '\0'; n = 1; }
+        if (n < 0 || *len + (size_t)n + 1 >= cap) return 0;
+        memcpy(buf + *len, esc, (size_t)n);
+        *len += (size_t)n;
+    }
+    buf[(*len)++] = '"';
+    buf[*len] = '\0';
+    return 1;
+}
+
 static int fx_appid(const char *name, char *out, size_t cap) {
     size_t n = 0;
     while (name[n] >= '0' && name[n] <= '9') n++;
     if (n == 0 || n >= cap || strcmp(name + n, ".conf") != 0) return 0;
     memcpy(out, name, n);
     out[n] = '\0';
+    return 1;
+}
+
+// {"<appid>":{...},...} from the <appid>.conf files in dirs, later dirs winning per key.
+static int fx_json_apps(char *buf, size_t cap, size_t *len, const char *root,
+                        const char *const *dirs, int ndirs, int native) {
+    char path[768];
+    int n = snprintf(buf + *len, cap - *len, "{");
+    if (n < 0 || (size_t)n >= cap - *len) return 0;
+    *len += (size_t)n;
+    char seen[64][16];
+    size_t nseen = 0;
+    for (int d = 0; d < ndirs; d++) {
+        snprintf(path, sizeof(path), "%s/%s", root, dirs[d]);
+        DIR *dir = opendir(path);
+        if (!dir) continue;
+        struct dirent *ent;
+        while ((ent = readdir(dir)) && nseen < 64) {
+            char id[16];
+            if (!fx_appid(ent->d_name, id, sizeof(id))) continue;
+            int dup = 0;
+            for (size_t i = 0; i < nseen; i++) dup |= strcmp(seen[i], id) == 0;
+            if (!dup) memcpy(seen[nseen++], id, sizeof(id));
+        }
+        closedir(dir);
+    }
+    int first = 1;
+    for (size_t i = 0; i < nseen; i++) {
+        fx_set_t app = {0};
+        for (int d = 0; d < ndirs; d++) {
+            snprintf(path, sizeof(path), "%s/%s/%s.conf", root, dirs[d], seen[i]);
+            fx_read(path, &app, native);
+        }
+        if (!app.n) continue;
+        n = snprintf(buf + *len, cap - *len, "%s\"%s\":", first ? "" : ",", seen[i]);
+        if (n < 0 || (size_t)n >= cap - *len) return 0;
+        *len += (size_t)n;
+        first = 0;
+        if (!fx_json_set(buf, cap, len, &app)) return 0;
+    }
+    n = snprintf(buf + *len, cap - *len, "}");
+    if (n < 0 || (size_t)n >= cap - *len) return 0;
+    *len += (size_t)n;
     return 1;
 }
 
@@ -522,46 +665,19 @@ static int fx_build(char *buf, size_t cap) {
 
     fx_set_t global = {0};
     snprintf(path, sizeof(path), "%s/gamefixes/default.conf", root);
-    fx_read(path, &global);
+    fx_read(path, &global, 0);
     if (!fx_json_set(buf, cap, &len, &global)) return 0;
 
     // Per-app: the shipped file first, the user's second, as the run script reads them.
-    n = snprintf(buf + len, cap - len, ",\"a\":{");
+    n = snprintf(buf + len, cap - len, ",\"a\":");
     if (n < 0 || (size_t)n >= cap - len) return 0;
     len += (size_t)n;
     const char *dirs[2] = { "gamefixes-default", "gamefixes" };
-    char seen[64][16];
-    size_t nseen = 0;
-    for (int d = 0; d < 2; d++) {
-        snprintf(path, sizeof(path), "%s/%s", root, dirs[d]);
-        DIR *dir = opendir(path);
-        if (!dir) continue;
-        struct dirent *ent;
-        while ((ent = readdir(dir)) && nseen < 64) {
-            char id[16];
-            if (!fx_appid(ent->d_name, id, sizeof(id))) continue;
-            int dup = 0;
-            for (size_t i = 0; i < nseen; i++) dup |= strcmp(seen[i], id) == 0;
-            if (!dup) memcpy(seen[nseen++], id, sizeof(id));
-        }
-        closedir(dir);
-    }
-    for (size_t i = 0; i < nseen; i++) {
-        fx_set_t app = {0};
-        for (int d = 0; d < 2; d++) {
-            snprintf(path, sizeof(path), "%s/%s/%s.conf", root, dirs[d], seen[i]);
-            fx_read(path, &app);
-        }
-        if (!app.n) continue;
-        n = snprintf(buf + len, cap - len, "%s\"%s\":", len && buf[len - 1] == '{' ? "" : ",", seen[i]);
-        if (n < 0 || (size_t)n >= cap - len) return 0;
-        len += (size_t)n;
-        if (!fx_json_set(buf, cap, &len, &app)) return 0;
-    }
+    if (!fx_json_apps(buf, cap, &len, root, dirs, 2, 0)) return 0;
 
     // Engines: a tool whose description names msync runs with it on (tools: name, build,
     // arch, description, tab separated). "" stands for the default tool.
-    n = snprintf(buf + len, cap - len, "},\"e\":{");
+    n = snprintf(buf + len, cap - len, ",\"e\":{");
     if (n < 0 || (size_t)n >= cap - len) return 0;
     len += (size_t)n;
     snprintf(path, sizeof(path), "%s/tools", root);
@@ -590,8 +706,31 @@ static int fx_build(char *buf, size_t cap) {
         fclose(tools);
     }
 
-    // The run script reads controllers directly unless the launch options say otherwise.
-    n = snprintf(buf + len, cap - len, "},\"d\":{\"NOTPROTON_RAW_CONTROLLERS\":\"1\"}};");
+    // The run script reads controllers directly unless the launch options say otherwise, and
+    // overlay-shim keeps the UI sharp and falls back on fast motion unless told not to.
+    n = snprintf(buf + len, cap - len, "},\"d\":{\"NOTPROTON_RAW_CONTROLLERS\":\"1\","
+                 "\"NOTPROTON_FRAMEGEN_UI\":\"1\",\"NOTPROTON_FRAMEGEN_FALLBACK\":\"1\"}");
+    if (n < 0 || (size_t)n >= cap - len) return 0;
+    len += (size_t)n;
+
+    // Native games: np-native's own confs, and the home its launcher path is written under.
+    n = snprintf(buf + len, cap - len, ",\"ng\":");
+    if (n < 0 || (size_t)n >= cap - len) return 0;
+    len += (size_t)n;
+    fx_set_t native = {0};
+    snprintf(path, sizeof(path), "%s/gamefixes/native-default.conf", root);
+    fx_read(path, &native, 1);
+    if (!fx_json_set(buf, cap, &len, &native)) return 0;
+    n = snprintf(buf + len, cap - len, ",\"na\":");
+    if (n < 0 || (size_t)n >= cap - len) return 0;
+    len += (size_t)n;
+    const char *ndirs[1] = { "gamefixes/native" };
+    if (!fx_json_apps(buf, cap, &len, root, ndirs, 1, 1)) return 0;
+    n = snprintf(buf + len, cap - len, ",\"h\":");
+    if (n < 0 || (size_t)n >= cap - len) return 0;
+    len += (size_t)n;
+    if (!fx_json_str(buf, cap, &len, home)) return 0;
+    n = snprintf(buf + len, cap - len, "};");
     if (n < 0 || (size_t)n >= cap - len) return 0;
     return 1;
 }

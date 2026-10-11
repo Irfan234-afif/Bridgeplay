@@ -14,15 +14,13 @@ for (const form of Object.keys(FORMS)) {
   const sections = ns => ns.filter(x => x.type === 'Section').map(x => x.props.label.split(' ')[0]);
   const last = () => (written.length ? written[written.length - 1].opts : '');
 
-  t.ok(P({ details: details('', { vecPlatforms: ['osx'], strCompatToolName: '' }) }) === null,
-       'a mac build with nothing pinned renders no panel');
   t.ok(P({ details: details('', { unAppID: 3420702832, vecPlatforms: ['osx'],
                                   strCompatToolName: '' }) }) !== null,
        'a shortcut renders the panel before a tool name reaches the page');
 
   let r = nodes('');
-  t.ok(toggles(r).length === 7 && sections(r).length === 4, 'automatic shows seven toggles in four sections');
-  t.ok(r.filter(x => x.type === 'Dropdown').length === 2, 'two dropdowns');
+  t.ok(toggles(r).length === 6 && sections(r).length === 4, 'automatic shows six toggles in four sections');
+  t.ok(r.filter(x => x.type === 'Dropdown').length === 3, 'three dropdowns');
   t.ok(!('label' in r.find(x => x.type === 'Dropdown').props), 'the backend dropdown carries no label column');
 
   r = nodes('CX_GRAPHICS_BACKEND=dxmt');
@@ -79,7 +77,7 @@ for (const form of Object.keys(FORMS)) {
   const root = P({ details: details('') });
   t.ok(root.props.className === 'MSCXPanel', 'the panel root carries its own class');
   const classes = nodes('').filter(x => x.type === 'Toggle').map(x => x.props.className);
-  t.ok(classes.length === 7 && classes.every(c => c === 'MSCXRow'), 'every checkbox carries the row class');
+  t.ok(classes.length === 6 && classes.every(c => c === 'MSCXRow'), 'every checkbox carries the row class');
   const raw = o => nodes(o).find(x => x.props.label === 'Let games read controllers directly');
   t.ok(sections(nodes('')).includes('Controllers') && raw('').props.checked === false,
        'controller hiding is on unless the game says otherwise');
@@ -119,23 +117,212 @@ for (const form of Object.keys(FORMS)) {
   t.ok(last().trim() === 'NOTPROTON_RAW_CONTROLLERS=0 %command%', `opting out of raw controllers writes 0 (${last()})`);
   delete globalThis.MSCXFx;
 
-  // Frame generation: shown for every backend, one row.
-  const fg = (o) => nodes(o).find(x => x.props.label === 'MetalFX frame interpolation (2x)');
+  // Frame generation: a mode for every backend, and the rest of its rows only once it is on.
+  const FGL = 'Frame Generation (Experimental. Adds input lag)';
+  const fgRows = o => {
+    const sec = nodes(o).find(x => x.type === 'Section' && x.props.label === FGL);
+    return sec ? walk(sec.props.children) : [];
+  };
+  const FGT = { ui: 'Protect UI (keeps static HUD and menus sharp)',
+                fb: 'Fast-motion fallback (skips frames that would smear)' };
+  const fgrow = (o, l) => fgRows(o).find(x => x.props.label === l);
   for (const b of ['', 'd3dmetal', 'dxmt', 'dxvk', 'wined3d']) {
-    t.ok(fg(b ? 'CX_GRAPHICS_BACKEND=' + b : '') !== undefined, `${b || 'automatic'} shows the frame generation row`);
+    t.ok(fgrow(b ? 'CX_GRAPHICS_BACKEND=' + b : '', 'Mode') !== undefined,
+         `${b || 'automatic'} shows the frame generation mode`);
   }
-  t.ok(nodes('').some(x => x.type === 'Section' && x.props.label === 'Frame Generation (Experimental. Adds input lag)'),
+  t.ok(nodes('').some(x => x.type === 'Section' && x.props.label === FGL),
        'the frame generation section warns about latency');
-  t.ok(fg('').props.checked === false, 'frame generation is off by default');
+  const mode = fgrow('', 'Mode');
+  t.ok(mode.type === 'Dropdown' && mode.props.className === undefined && mode.props.strClassName === 'MSCXRow',
+       'the mode is a dropdown row');
+  t.ok(mode.props.rgOptions.map(x => x.label).join(',') === 'Off,2x,3x,Adaptive (fills to display refresh)' &&
+       mode.props.rgOptions.map(x => x.data).join(',') === '0,2,3,adaptive',
+       `the modes name themselves (${mode.props.rgOptions.map(x => x.label).join(',')})`);
+  t.ok(mode.props.selectedOption === '0', 'frame generation is off by default');
+  t.ok(fgRows('').length === 1, 'off hides every other frame generation row');
+  t.ok(fgrow('NOTPROTON_FRAMEGEN=0', 'Quality') === undefined, 'an explicit 0 hides them too');
+  t.ok(fgrow('NOTPROTON_FRAMEGEN=off', 'Mode').props.selectedOption === '0', 'off reads as Off');
+  const ordered = fgRows('NOTPROTON_FRAMEGEN=2').map(x => x.props.label);
+  t.ok(ordered.join('|') === ['Mode', 'Quality', FGT.ui, FGT.fb, 'Engine'].join('|'),
+       `on shows five rows in order (${ordered.join('|')})`);
+  t.ok(fgRows('NOTPROTON_FRAMEGEN=2').every(x => (x.props.className || x.props.strClassName) === 'MSCXRow'),
+       'every frame generation row carries the row class');
+  for (const [v, want] of [['1', '2'], ['2', '2'], ['3', '3'], ['adaptive', 'adaptive'], ['Adaptive', 'adaptive']]) {
+    t.ok(fgrow('NOTPROTON_FRAMEGEN=' + v, 'Mode').props.selectedOption === want, `${v} reads as ${want}`);
+  }
+  for (const [v, want] of [['2', 'NOTPROTON_FRAMEGEN=2 %command%'], ['3', 'NOTPROTON_FRAMEGEN=3 %command%'],
+                           ['adaptive', 'NOTPROTON_FRAMEGEN=adaptive %command%']]) {
+    written.length = 0;
+    fgrow('', 'Mode').props.onChange({ data: v });
+    t.ok(last().trim() === want, `picking ${v} writes it (${last()})`);
+  }
   written.length = 0;
-  fg('').props.onChange(true);
-  t.ok(last().trim() === 'NOTPROTON_FRAMEGEN=1 %command%', `the frame generation row writes its flag (${last()})`);
-  t.ok(fg('NOTPROTON_FRAMEGEN=1').props.checked === true, 'the frame generation row reads its flag');
-  written.length = 0;
-  fg('NOTPROTON_FRAMEGEN=1 WINEMSYNC=1').props.onChange(false);
+  fgrow('NOTPROTON_FRAMEGEN=1 WINEMSYNC=1', 'Mode').props.onChange({ data: '0' });
   t.ok(last().trim() === 'WINEMSYNC=1 %command%', `turning frame generation off removes its flag (${last()})`);
-  globalThis.MSCXFx = { g: { NOTPROTON_FRAMEGEN: '1' }, a: {}, e: {}, d: {} };
-  t.ok(fg('').props.checked === true, 'a global conf value reads frame generation as on');
+  written.length = 0;
+  fgrow('NOTPROTON_FRAMEGEN=1', 'Mode').props.onChange({ data: '3' });
+  t.ok(last().trim() === 'NOTPROTON_FRAMEGEN=3 %command%', `a legacy 1 is replaced, not kept (${last()})`);
+  written.length = 0;
+  fgrow('NOTPROTON_FRAMEGEN=2 NOTPROTON_FRAMEGEN_QUALITY=quality', 'Mode').props.onChange({ data: '0' });
+  t.ok(last().trim() === 'NOTPROTON_FRAMEGEN_QUALITY=quality %command%',
+       `turning it off keeps the sub-settings for the next time (${last()})`);
+
+  const on = 'NOTPROTON_FRAMEGEN=2';
+  const quality = fgrow(on, 'Quality');
+  t.ok(quality.type === 'Dropdown' && quality.props.selectedOption === 'balanced', 'quality is balanced by default');
+  t.ok(quality.props.rgOptions.map(x => x.label + ':' + x.data).join(',') ===
+       'Performance:performance,Balanced:balanced,Quality:quality', 'the qualities name themselves');
+  t.ok(fgrow(on + ' NOTPROTON_FRAMEGEN_QUALITY=performance', 'Quality').props.selectedOption === 'performance',
+       'quality reads its flag');
+  written.length = 0;
+  fgrow(on, 'Quality').props.onChange({ data: 'quality' });
+  t.ok(last().trim() === 'NOTPROTON_FRAMEGEN_QUALITY=quality NOTPROTON_FRAMEGEN=2 %command%',
+       `quality writes its flag (${last()})`);
+  written.length = 0;
+  fgrow(on + ' NOTPROTON_FRAMEGEN_QUALITY=quality', 'Quality').props.onChange({ data: 'balanced' });
+  t.ok(last().trim() === on + ' %command%', `balanced drops the flag (${last()})`);
+
+  const engine = fgrow(on, 'Engine');
+  t.ok(engine.type === 'Dropdown' && engine.props.selectedOption === 'own', 'the engine is the built-in one by default');
+  t.ok(engine.props.rgOptions.map(x => x.label + ':' + x.data).join(',') ===
+       'Built-in optical flow:own,MetalFX:metalfx', 'the engines name themselves');
+  t.ok(fgrow(on + ' NOTPROTON_FRAMEGEN_ENGINE=metalfx', 'Engine').props.selectedOption === 'metalfx',
+       'the engine reads its flag');
+  written.length = 0;
+  fgrow(on, 'Engine').props.onChange({ data: 'metalfx' });
+  t.ok(last().includes('NOTPROTON_FRAMEGEN_ENGINE=metalfx '), `the engine writes its flag (${last()})`);
+  written.length = 0;
+  fgrow(on + ' NOTPROTON_FRAMEGEN_ENGINE=metalfx', 'Engine').props.onChange({ data: 'own' });
+  t.ok(last().trim() === on + ' %command%', `own drops the flag (${last()})`);
+
+  // Both toggles are on unless told otherwise, which only the run script defaults say.
+  globalThis.MSCXFx = { g: {}, a: {}, e: {},
+                        d: { NOTPROTON_FRAMEGEN_UI: '1', NOTPROTON_FRAMEGEN_FALLBACK: '1' } };
+  for (const [k, l] of [['NOTPROTON_FRAMEGEN_UI', FGT.ui], ['NOTPROTON_FRAMEGEN_FALLBACK', FGT.fb]]) {
+    t.ok(fgrow(on, l).type === 'Toggle' && fgrow(on, l).props.checked === true, `${k} is on by default`);
+    t.ok(fgrow(on + ` ${k}=0`, l).props.checked === false, `${k} reads 0 as off`);
+    written.length = 0;
+    fgrow(on, l).props.onChange(false);
+    t.ok(last().trim() === `${k}=0 ${on} %command%`, `turning ${k} off writes 0 (${last()})`);
+    written.length = 0;
+    fgrow(on + ` ${k}=0`, l).props.onChange(true);
+    t.ok(last().trim() === `${on} %command%`, `turning ${k} back on drops it (${last()})`);
+  }
+  // A conf that turns frame generation on: Off has to say so, picking the conf's mode says nothing.
+  globalThis.MSCXFx = { g: { NOTPROTON_FRAMEGEN: '1', NOTPROTON_FRAMEGEN_QUALITY: 'performance',
+                             NOTPROTON_FRAMEGEN_ENGINE: 'metalfx', NOTPROTON_FRAMEGEN_UI: '0' },
+                        a: {}, e: {}, d: { NOTPROTON_FRAMEGEN_UI: '1', NOTPROTON_FRAMEGEN_FALLBACK: '1' } };
+  t.ok(fgrow('', 'Mode').props.selectedOption === '2', 'a global conf 1 reads frame generation as 2x');
+  t.ok(fgRows('').length === 5, 'a conf that turns it on shows every row');
+  t.ok(fgrow('', 'Quality').props.selectedOption === 'performance', 'quality reads the conf');
+  t.ok(fgrow('', 'Engine').props.selectedOption === 'metalfx', 'the engine reads the conf');
+  t.ok(fgrow('', FGT.ui).props.checked === false, 'the conf beats the run script default');
+  written.length = 0;
+  fgrow('', 'Mode').props.onChange({ data: '0' });
+  t.ok(last().trim() === 'NOTPROTON_FRAMEGEN=0 %command%', `off over a conf default writes 0 (${last()})`);
+  written.length = 0;
+  fgrow('NOTPROTON_FRAMEGEN=0', 'Mode').props.onChange({ data: '2' });
+  t.ok(last() === '', `the conf's own mode drops the override (${JSON.stringify(last())})`);
+  written.length = 0;
+  fgrow('', 'Quality').props.onChange({ data: 'balanced' });
+  t.ok(last().trim() === 'NOTPROTON_FRAMEGEN_QUALITY=balanced %command%',
+       `balanced over a conf default writes it (${last()})`);
+  delete globalThis.MSCXFx;
+
+  // Native macOS builds with nothing pinned run through np-native: HUD, frame generation, pads.
+  const HOME = '/Users/some one';
+  const NAT = "'/Users/some one/.notproton/np-native'";
+  const mac = (o, over) => details(o, Object.assign({ vecPlatforms: ['osx'], strCompatToolName: '' }, over || {}));
+  const nnodes = o => walk(P({ details: mac(o) }));
+  const nrow = (o, l) => nnodes(o).find(x => x.props.label === l);
+  globalThis.MSCXFx = { g: { MTL_HUD_ENABLED: '1', NOTPROTON_FRAMEGEN: '2' }, a: { 287700: { WINEMSYNC: '1' } },
+                        e: {}, d: { NOTPROTON_FRAMEGEN_UI: '1', NOTPROTON_FRAMEGEN_FALLBACK: '1' },
+                        ng: {}, na: {}, h: HOME };
+  let n = nnodes('');
+  t.ok(P({ details: mac('') }) !== null && P({ details: mac('') }).props.className === 'MSCXPanel',
+       'a mac build with nothing pinned renders the native panel');
+  t.ok(toggles(n).join('|') === 'Metal HUD' && sections(n).join(',') === 'Frame,Controllers',
+       `the native panel has the HUD, frame generation and controllers only (${toggles(n)} / ${sections(n)})`);
+  t.ok(n.filter(x => x.type === 'Dropdown').map(x => x.props.label).join(',') === 'Mode,Controller layer',
+       'native dropdowns: the mode and the controller layer');
+  t.ok(nrow('', 'Metal HUD').props.checked === false && nrow('', 'Mode').props.selectedOption === '0',
+       'the Wine confs do not reach a native game');
+  t.ok(nnodes('NOTPROTON_FRAMEGEN=3 %command%').filter(x => x.props.label === 'Quality').length === 1,
+       'the native panel carries the same frame generation rows');
+  const pad = nrow('', 'Controller layer');
+  t.ok(pad.props.rgOptions.map(x => x.label + ':' + x.data).join(',') ===
+       'Automatic:,Raw HID (Unity, SDL, Unreal):hid,GameController:gc,Off:off', 'the controller layers name themselves');
+  t.ok(pad.props.selectedOption === '', 'Automatic is selected when NP_PAD_MODE is unset everywhere');
+  t.ok(nrow(NAT + ' MTL_HUD_ENABLED=1 %command%', 'Controller layer').props.selectedOption === '',
+       'Automatic stays selected when other variables are set');
+  t.ok(pad.props.strClassName === 'MSCXRow', 'the controller layer is a row');
+  t.ok(nnodes('').some(x => x.type === 'Section' && x.props.label === 'Controllers'), 'the native controller section');
+  t.ok(P({ details: mac('', { unAppID: 3420702832 }) }).props.children.props.children.length > 4,
+       'a mac shortcut still gets the full panel');
+  t.ok(P({ details: mac('', { strCompatToolName: 'notproton' }) }).props.children.props.children.length > 4,
+       'a mac build with a tool pinned still gets the full panel');
+
+  const ARCH = '/usr/bin/arch -arm64 -x86_64 -e "DYLD_INSERT_LIBRARIES=/Users/x/Library/Application Support/a.dylib"' +
+               ' -e NP_PAD_MODE=hid -e MTL_HUD_ENABLED=1 %command% -novid';
+  const NEW = '/Users/someone/.notproton/np-native NP_PAD_MODE=hid MTL_HUD_ENABLED=1 %command% -novid';
+  for (const [name, o] of [['arch', ARCH], ['np-native', NEW]]) {
+    t.ok(nrow(o, 'Metal HUD').props.checked === true, `${name}: the HUD reads from -e/VAR pairs`);
+    t.ok(nrow(o, 'Controller layer').props.selectedOption === 'hid', `${name}: the controller layer reads hid`);
+    written.length = 0;
+    nrow(o, 'Controller layer').props.onChange({ data: 'gc' });
+    t.ok(last() === NAT + ' NP_PAD_MODE=gc MTL_HUD_ENABLED=1 %command% -novid',
+         `${name}: rewritten under the launcher, -novid kept (${last()})`);
+    written.length = 0;
+    nrow(o, 'Mode').props.onChange({ data: 'adaptive' });
+    t.ok(last() === NAT + ' NP_PAD_MODE=hid MTL_HUD_ENABLED=1 NOTPROTON_FRAMEGEN=adaptive %command% -novid',
+         `${name}: a new variable goes before %command% (${last()})`);
+    written.length = 0;
+    nrow(o, 'Metal HUD').props.onChange(false);
+    t.ok(last() === NAT + ' NP_PAD_MODE=hid %command% -novid', `${name}: turning the HUD off drops it (${last()})`);
+  }
+  for (const [name, o] of [['arch', ARCH], ['np-native', NEW]]) {
+    written.length = 0;
+    nrow(o, 'Controller layer').props.onChange({ data: '' });
+    t.ok(last() === NAT + ' MTL_HUD_ENABLED=1 %command% -novid',
+         `${name}: Automatic from hid drops NP_PAD_MODE, keeps np-native and -novid (${last()})`);
+  }
+  written.length = 0;
+  nrow(NAT + ' NP_PAD_MODE=gc %command% -novid +map x', 'Controller layer').props.onChange({ data: '' });
+  t.ok(last() === NAT + ' %command% -novid +map x', `Automatic as the last variable keeps the launcher (${last()})`);
+  written.length = 0;
+  nrow('/x/.notproton/np-native MTL_HUD_ENABLED=1 %command% -novid', 'Metal HUD').props.onChange(false);
+  t.ok(last() === NAT + ' %command% -novid', `no variable left keeps the launcher and the arguments (${last()})`);
+  written.length = 0;
+  nrow('', 'Controller layer').props.onChange({ data: 'off' });
+  t.ok(last() === NAT + ' NP_PAD_MODE=off %command%', `empty options get the launcher (${last()})`);
+  written.length = 0;
+  nrow('-novid', 'Mode').props.onChange({ data: '3' });
+  t.ok(last() === NAT + ' NOTPROTON_FRAMEGEN=3 %command% -novid', `bare game arguments follow %command% (${last()})`);
+
+  // Native defaults come from np-native's confs, the per-app one first.
+  globalThis.MSCXFx = { g: {}, a: {}, e: {}, d: { NOTPROTON_FRAMEGEN_UI: '1', NOTPROTON_FRAMEGEN_FALLBACK: '1' },
+                        ng: { MTL_HUD_ENABLED: '1', NP_PAD_MODE: 'hid', NOTPROTON_FRAMEGEN: 'adaptive' },
+                        na: { 287700: { NP_PAD_MODE: 'gc' } }, h: '/Users/me' };
+  t.ok(nrow('', 'Metal HUD').props.checked === true, 'native-default.conf reads the HUD as on');
+  t.ok(nrow('', 'Mode').props.selectedOption === 'adaptive', 'native-default.conf sets the mode');
+  t.ok(nrow('', 'Controller layer').props.selectedOption === 'gc', 'the per-app native conf beats the default');
+  t.ok(nrow('', FGT.ui).props.checked === true, 'the shim defaults hold for native games');
+  written.length = 0;
+  nrow('', 'Metal HUD').props.onChange(false);
+  t.ok(last() === '/Users/me/.notproton/np-native MTL_HUD_ENABLED=0 %command%',
+       `turning a native default off writes 0 under the home from the page (${last()})`);
+  written.length = 0;
+  nrow('NP_PAD_MODE=hid %command%', 'Controller layer').props.onChange({ data: 'gc' });
+  t.ok(last() === '/Users/me/.notproton/np-native %command%', `the conf's own layer drops the override (${last()})`);
+  // Without a home from the page the launcher already there is reused, and nothing is guessed.
+  globalThis.MSCXFx = { g: {}, a: {}, e: {}, d: {} };
+  written.length = 0;
+  nrow(NEW, 'Mode').props.onChange({ data: '2' });
+  t.ok(last() === '/Users/someone/.notproton/np-native NP_PAD_MODE=hid MTL_HUD_ENABLED=1 NOTPROTON_FRAMEGEN=2 %command% -novid',
+       `no home: the existing launcher path is kept (${last()})`);
+  written.length = 0;
+  nrow(ARCH, 'Mode').props.onChange({ data: '2' });
+  t.ok(written.length === 0, 'no home and no launcher: nothing is written');
   delete globalThis.MSCXFx;
 
   const css = nodes('').filter(x => x.type === 'style');

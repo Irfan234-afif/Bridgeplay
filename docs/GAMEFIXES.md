@@ -26,7 +26,11 @@ logged, when:
 | `DLLOVERRIDES` | Wine syntax, e.g. `dinput8=n,b;xinput1_3=n` | Added to `WINEDLLOVERRIDES` after the backend's entries and before the launch options' |
 | `MSYNC` | `0`, `1` | `1` turns msync on when the engine supports it; `0` turns it off |
 | `RETINA` | `0`, `1` | Same as `NOTPROTON_RETINA` (High Resolution) |
-| `FRAMEGEN` | `0`, `1` | Same as `NOTPROTON_FRAMEGEN=1`: experimental MetalFX frame interpolation (2x) in overlay-shim, adds up to half a frame of latency |
+| `FRAMEGEN` | `0`, `1`, `2`, `3`, `adaptive` | Same as `NOTPROTON_FRAMEGEN`: experimental frame generation in overlay-shim, adds up to half a frame of latency. `2` and `3` multiply the frame rate, `adaptive` fills up to the display refresh, `1` is the same as `2`, `0` is off (the default) |
+| `FRAMEGEN_QUALITY` | `performance`, `balanced`, `quality` | Same as `NOTPROTON_FRAMEGEN_QUALITY`. `balanced` when unset |
+| `FRAMEGEN_UI` | `0`, `1` | Same as `NOTPROTON_FRAMEGEN_UI`, Protect UI: keeps static HUD and menus sharp. On when unset |
+| `FRAMEGEN_FALLBACK` | `0`, `1` | Same as `NOTPROTON_FRAMEGEN_FALLBACK`, Fast-motion fallback: skips generated frames that would smear. On when unset |
+| `FRAMEGEN_ENGINE` | `own`, `metalfx` | Same as `NOTPROTON_FRAMEGEN_ENGINE`: the built-in optical flow (`own`, the default) or MetalFX frame interpolation |
 | `NVAPI` | `0`, `1` | `1` turns on Apple's `nvapi64` on an engine with a linked Game Porting Toolkit, for `d3dmetal` only. Off by default, since an nvapi that answers sends some games down NVIDIA-only paths |
 | `DXMT_*`, `DXVK_*`, `MVK_*`, `VKD3D_*`, `D3DM_*`, `STAGING_*` | any | Exported as is |
 | `MTL_HUD_ENABLED`, `WINEDEBUG`, `WINE_LARGE_ADDRESS_AWARE`, `WINE_CPU_TOPOLOGY` | any | Exported as is |
@@ -130,3 +134,18 @@ DXMT_METALFX_SPATIAL_SWAPCHAIN=1
 MSYNC=0
 RETINA=1
 ```
+
+## Native macOS games
+
+A Mac build with no compatibility tool pinned runs through `~/.notproton/np-native`, not the
+`run` script, so the files above do not apply to it. np-native reads its own two files,
+with variable names as they are (`NOTPROTON_FRAMEGEN=2`, `NP_PAD_MODE=hid`, `MTL_HUD_ENABLED=1`):
+
+1. `~/Library/Application Support/notproton/gamefixes/native-default.conf`, for every native game
+2. `~/Library/Application Support/notproton/gamefixes/native/<appid>.conf`, which wins per key
+
+The Steam panel for such a game shows the Metal HUD, Frame Generation and the controller
+layer (`NP_PAD_MODE`: `hid`, `gc` or `off`). It writes the launch options as
+`<home>/.notproton/np-native VAR=VALUE ... %command% <game args>`, and rewrites the older
+`/usr/bin/arch -arm64 -x86_64 -e VAR=VALUE ... %command%` form into that one, dropping its
+`DYLD_INSERT_LIBRARIES`.

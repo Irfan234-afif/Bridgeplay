@@ -18,6 +18,8 @@ bridge_line=$(grep 'export WINEDLLOVERRIDES=' "$SRC" | grep 'lsteamclient=b' | s
 [ -n "$bridge_line" ] || { echo "FAIL: the bridge WINEDLLOVERRIDES line not found"; exit 1; }
 forward=$(sed -n '/^for name in $(env /,/^done$/p' "$SRC")
 [ -n "$forward" ] || { echo "FAIL: the launcher environment loop not found"; exit 1; }
+launcher_body=$(sed -n '/^cat > "\$loader_macos\/launcher" <<LAUNCHER$/,/^LAUNCHER$/p' "$SRC")
+[ -n "$launcher_body" ] || { echo "FAIL: the launcher heredoc not found"; exit 1; }
 append_args=$(sed -n '/^if \[ -n "\$gamefix_args" \]; then$/,/^fi$/p' "$SRC")
 [ -n "$append_args" ] || { echo "FAIL: the ARGS append not found"; exit 1; }
 
@@ -106,7 +108,8 @@ launch() {
 			graphics_log "backend=$backend ($backend_from)"
 			compose_dll_overrides
 			eval "$bridge_line"
-			for v in backend WINEDLLOVERRIDES WINEMSYNC msync_from NOTPROTON_RETINA NOTPROTON_FRAMEGEN CX_GRAPHICS_BACKEND \
+			for v in backend WINEDLLOVERRIDES WINEMSYNC msync_from NOTPROTON_RETINA NOTPROTON_FRAMEGEN \
+				NOTPROTON_FRAMEGEN_QUALITY NOTPROTON_FRAMEGEN_UI NOTPROTON_FRAMEGEN_FALLBACK NOTPROTON_FRAMEGEN_ENGINE CX_GRAPHICS_BACKEND \
 				DXVK_HUD VKD3D_CONFIG WINEDEBUG MTL_HUD_ENABLED gamefix_args; do
 				eval "printf \"%s=%s\\n\" \$v \"\${$v-<unset>}\""
 			done
@@ -166,7 +169,8 @@ default_conf '# shipped fix' '' '  DXVK_HUD=fps  ' "VKD3D_CONFIG=dxr$(printf '\r
 	'WINEDEBUG=-all' 'PATH=/evil' 'DYLD_INSERT_LIBRARIES=/evil.dylib' 'lower=1' 'no equals sign' \
 	"DXMT_A=\$(touch $case_dir/pwned)" 'DXMT_B=`touch pwned`' 'DXMT_C="quoted"' "DXMT_D='single'" \
 	'BACKEND=vulkan' 'MSYNC=2' 'RETINA=yes' 'DLLOVERRIDES=dxgi=native' 'DLLOVERRIDES=;=n' \
-	'DXMT_=1' 'MTL_HUD_ENABLED=1' 'FRAMEGEN=2'
+	'DXMT_=1' 'MTL_HUD_ENABLED=1' 'FRAMEGEN=4' 'FRAMEGEN_QUALITY=ultra' 'FRAMEGEN_UI=2' \
+	'FRAMEGEN_FALLBACK=yes' 'FRAMEGEN_ENGINE=fsr' 'FRAMEGEN_OTHER=1'
 launch waitforexitandrun "$case_dir/game/game.exe"
 is "a padded value is trimmed" "fps" "$(got DXVK_HUD)"
 is "a CRLF line ends cleanly" "dxr" "$(got VKD3D_CONFIG)"
@@ -188,6 +192,13 @@ has "RETINA must be 0 or 1" "rejected RETINA: not 0 or 1" "$case_dir/log"
 has "a bad override order is rejected" "line 17 rejected DLLOVERRIDES: not Wine override syntax" "$case_dir/log"
 has "an override without a name is rejected" "line 18 rejected DLLOVERRIDES: not Wine override syntax" "$case_dir/log"
 has "a bare prefix is not a variable" "rejected DXMT_: not on the allow-list" "$case_dir/log"
+has "FRAMEGEN must be a mode" "rejected FRAMEGEN: not 0, 1, 2, 3 or adaptive" "$case_dir/log"
+has "FRAMEGEN_QUALITY must be a quality" "rejected FRAMEGEN_QUALITY: not performance, balanced or quality" "$case_dir/log"
+has "FRAMEGEN_UI must be 0 or 1" "rejected FRAMEGEN_UI: not 0 or 1" "$case_dir/log"
+has "FRAMEGEN_FALLBACK must be 0 or 1" "rejected FRAMEGEN_FALLBACK: not 0 or 1" "$case_dir/log"
+has "FRAMEGEN_ENGINE must be an engine" "rejected FRAMEGEN_ENGINE: not own or metalfx" "$case_dir/log"
+has "an unknown FRAMEGEN_ key is not on the allow-list" "rejected FRAMEGEN_OTHER: not on the allow-list" "$case_dir/log"
+is "a rejected FRAMEGEN leaves frame generation unset" "<unset>" "$(got NOTPROTON_FRAMEGEN)"
 has "applied values are logged" "applied DXVK_HUD=fps from the default conf" "$case_dir/log"
 
 echo "== precedence: launch options > user conf > default conf > auto > default"
@@ -502,14 +513,62 @@ launch waitforexitandrun "$case_dir/game/game.exe"
 is "FRAMEGEN maps to NOTPROTON_FRAMEGEN" "1" "$(got NOTPROTON_FRAMEGEN)"
 launch waitforexitandrun "$case_dir/game/game.exe" NOTPROTON_FRAMEGEN=0
 is "the frame generation launch option wins" "0" "$(got NOTPROTON_FRAMEGEN)"
+for mode in 0 2 3 adaptive; do
+	new_case
+	full_engine
+	user_conf "FRAMEGEN=$mode"
+	launch waitforexitandrun "$case_dir/game/game.exe"
+	is "FRAMEGEN=$mode is accepted" "$mode" "$(got NOTPROTON_FRAMEGEN)"
+done
+new_case
+full_engine
+default_conf 'FRAMEGEN_QUALITY=performance' 'FRAMEGEN_UI=1' 'FRAMEGEN_FALLBACK=1' 'FRAMEGEN_ENGINE=own'
+user_conf 'FRAMEGEN=2' 'FRAMEGEN_QUALITY=quality' 'FRAMEGEN_UI=0' 'FRAMEGEN_FALLBACK=0' 'FRAMEGEN_ENGINE=metalfx'
+launch waitforexitandrun "$case_dir/game/game.exe"
+is "FRAMEGEN_QUALITY maps to NOTPROTON_FRAMEGEN_QUALITY, user over default" "quality" "$(got NOTPROTON_FRAMEGEN_QUALITY)"
+is "FRAMEGEN_UI maps to NOTPROTON_FRAMEGEN_UI" "0" "$(got NOTPROTON_FRAMEGEN_UI)"
+is "FRAMEGEN_FALLBACK maps to NOTPROTON_FRAMEGEN_FALLBACK" "0" "$(got NOTPROTON_FRAMEGEN_FALLBACK)"
+is "FRAMEGEN_ENGINE maps to NOTPROTON_FRAMEGEN_ENGINE" "metalfx" "$(got NOTPROTON_FRAMEGEN_ENGINE)"
+launch waitforexitandrun "$case_dir/game/game.exe" NOTPROTON_FRAMEGEN_QUALITY=balanced NOTPROTON_FRAMEGEN_UI=1 \
+	NOTPROTON_FRAMEGEN_FALLBACK=1 NOTPROTON_FRAMEGEN_ENGINE=own
+is "the quality launch option wins" "balanced" "$(got NOTPROTON_FRAMEGEN_QUALITY)"
+is "the Protect UI launch option wins" "1" "$(got NOTPROTON_FRAMEGEN_UI)"
+is "the fallback launch option wins" "1" "$(got NOTPROTON_FRAMEGEN_FALLBACK)"
+is "the engine launch option wins" "own" "$(got NOTPROTON_FRAMEGEN_ENGINE)"
+new_case
+full_engine
+launch waitforexitandrun "$case_dir/game/game.exe"
+is "no conf leaves the quality to the shim" "<unset>" "$(got NOTPROTON_FRAMEGEN_QUALITY)"
+
+# The stub reports NOTPROTON_OVERLAY_SHIM, set beside DYLD_INSERT_LIBRARIES, since SIP strips DYLD_* from /bin/sh.
+echo "== the launcher loads the shim for frame generation unless it is off"
+mkdir -p "$work/launcher/Contents/MacOS" "$work/launcher/home/Library/Application Support/notproton"
+: > "$work/launcher/home/Library/Application Support/notproton/overlay-shim.dylib"
+printf '#!/bin/sh\nprintf "%%s" "${NOTPROTON_OVERLAY_SHIM:-none}"\n' > "$work/launcher/wine"
+chmod +x "$work/launcher/wine"
+env -i PATH="$PATH" HOME="$work/launcher/home" WINELOADER="$work/launcher/wine" loader_root="$work/launcher" \
+	loader_macos="$work/launcher/Contents/MacOS" body="$launcher_body" sh -ec 'eval "$body"'
+chmod +x "$work/launcher/Contents/MacOS/launcher"
+for spec in '-:none' '0:none' 'off:none' '1:shim' '2:shim' '3:shim' 'adaptive:shim'; do
+	fg=${spec%%:*} want=${spec#*:}
+	if [ "$fg" = - ]; then
+		env -i PATH="$PATH" "$work/launcher/Contents/MacOS/launcher" >/dev/null 2>&1 || true
+	else
+		env -i PATH="$PATH" NOTPROTON_FRAMEGEN="$fg" "$work/launcher/Contents/MacOS/launcher" >/dev/null 2>&1 || true
+	fi
+	got_dyld=$(cat "$work/launcher/notproton-wine.log")
+	case "$got_dyld" in *overlay-shim.dylib) got_dyld=shim ;; esac
+	is "NOTPROTON_FRAMEGEN=${fg#-} without the Steam overlay: $want" "$want" "$got_dyld"
+done
 
 echo "== the launcher receives the allow-listed variables"
 set --
 out=$(env -i PATH="$PATH" forward="$forward" VKD3D_CONFIG=dxr MVK_CONFIG_LOG_LEVEL=1 \
 	STAGING_SHARED_MEMORY=1 WINE_CPU_TOPOLOGY=4:0,1,2,3 WINE_LARGE_ADDRESS_AWARE=1 \
-	DXVK_HUD=fps NOTPROTON_FRAMEGEN=1 NOTPROTON_UNRELATED=1 sh -c 'set --; eval "$forward"; printf "%s\n" "$@"' | grep -v '^--env$' | sort | tr '\n' ' ')
+	DXVK_HUD=fps NOTPROTON_FRAMEGEN=1 NOTPROTON_FRAMEGEN_QUALITY=quality NOTPROTON_FRAMEGEN_UI=0 \
+	NOTPROTON_FRAMEGEN_FALLBACK=0 NOTPROTON_FRAMEGEN_ENGINE=metalfx NOTPROTON_FRAMEGENX=1 NOTPROTON_UNRELATED=1 sh -c 'set --; eval "$forward"; printf "%s\n" "$@"' | grep -v '^--env$' | sort | tr '\n' ' ')
 is "VKD3D_, MVK_, STAGING_ and WINE_ topology variables are forwarded" \
-	"DXVK_HUD=fps MVK_CONFIG_LOG_LEVEL=1 NOTPROTON_FRAMEGEN=1 STAGING_SHARED_MEMORY=1 VKD3D_CONFIG=dxr WINE_CPU_TOPOLOGY=4:0,1,2,3 WINE_LARGE_ADDRESS_AWARE=1 " "$out"
+	"DXVK_HUD=fps MVK_CONFIG_LOG_LEVEL=1 NOTPROTON_FRAMEGEN=1 NOTPROTON_FRAMEGEN_ENGINE=metalfx NOTPROTON_FRAMEGEN_FALLBACK=0 NOTPROTON_FRAMEGEN_QUALITY=quality NOTPROTON_FRAMEGEN_UI=0 STAGING_SHARED_MEMORY=1 VKD3D_CONFIG=dxr WINE_CPU_TOPOLOGY=4:0,1,2,3 WINE_LARGE_ADDRESS_AWARE=1 " "$out"
 
 echo "== the wineserver directory self-heal"
 heal=$(sed -n '/^heal_wine_tmp() {$/,/^}$/p' "$SRC")
