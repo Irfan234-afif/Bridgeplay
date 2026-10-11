@@ -256,7 +256,7 @@ gamefix_reason() {
   case "$1" in
     BACKEND)
       case "$2" in dxmt|dxvk|wined3d|d3dmetal) ;; *) echo "not dxmt, dxvk, wined3d or d3dmetal" ;; esac ;;
-    MSYNC|RETINA|NVAPI|FRAMEGEN_UI|FRAMEGEN_FALLBACK)
+    MSYNC|RETINA|NVAPI|FRAMEGEN_UI|FRAMEGEN_FALLBACK|STEAMDECK)
       case "$2" in 0|1) ;; *) echo "not 0 or 1" ;; esac ;;
     FRAMEGEN)
       # 1 is the 2x of the first release.
@@ -347,6 +347,8 @@ load_gamefixes() {
           gamefix_log "ARGS not applied, $verb is not the game launch"
         fi ;;
       RETINA) gamefix_apply_env NOTPROTON_RETINA "$value" "$from" ;;
+      # Steam reads SteamDeck in mixed case, which a conf key cannot spell.
+      STEAMDECK) gamefix_apply_env SteamDeck "$value" "$from" ;;
       FRAMEGEN|FRAMEGEN_QUALITY|FRAMEGEN_UI|FRAMEGEN_FALLBACK|FRAMEGEN_ENGINE)
         gamefix_apply_env "NOTPROTON_$key" "$value" "$from" ;;
       *) gamefix_apply_env "$key" "$value" "$from" ;;
