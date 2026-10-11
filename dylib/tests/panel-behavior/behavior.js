@@ -92,6 +92,33 @@ for (const form of Object.keys(FORMS)) {
   written.length = 0;
   raw('NOTPROTON_RAW_CONTROLLERS=1 WINEMSYNC=1').props.onChange(false);
   t.ok(last().trim() === 'WINEMSYNC=1 %command%', `turning the controller row off removes its flag (${last()})`);
+  // Settings that come from the gamefix confs or the engine show as they will apply.
+  globalThis.MSCXFx = {
+    g: { MTL_HUD_ENABLED: '1', NOTPROTON_RETINA: '1' },
+    a: { 287700: { NOTPROTON_RETINA: '0' } },
+    e: { notproton: { WINEMSYNC: '1' }, '': { WINEMSYNC: '0' } },
+    d: { NOTPROTON_RAW_CONTROLLERS: '1' },
+  };
+  const row = (o, l) => nodes(o).find(x => x.props.label === l);
+  t.ok(row('', 'Metal HUD').props.checked === true, 'a global conf value reads as on');
+  t.ok(row('', 'High Resolution').props.checked === false, 'the per-app conf beats the global conf');
+  t.ok(row('', 'MSync').props.checked === true, 'the engine default reads as on');
+  t.ok(row('', 'Let games read controllers directly').props.checked === true, 'the run script default reads as on');
+  t.ok(row('MTL_HUD_ENABLED=0', 'Metal HUD').props.checked === false, 'the launch options beat the confs');
+  written.length = 0;
+  row('', 'Metal HUD').props.onChange(false);
+  t.ok(last().trim() === 'MTL_HUD_ENABLED=0 %command%', `turning a default off writes 0 (${last()})`);
+  written.length = 0;
+  row('MTL_HUD_ENABLED=0', 'Metal HUD').props.onChange(true);
+  t.ok(last() === '', `turning it back on drops the override (${JSON.stringify(last())})`);
+  written.length = 0;
+  row('', 'High Resolution').props.onChange(true);
+  t.ok(last().trim() === 'NOTPROTON_RETINA=1 %command%', `turning on what a conf turns off writes 1 (${last()})`);
+  written.length = 0;
+  row('', 'Let games read controllers directly').props.onChange(false);
+  t.ok(last().trim() === 'NOTPROTON_RAW_CONTROLLERS=0 %command%', `opting out of raw controllers writes 0 (${last()})`);
+  delete globalThis.MSCXFx;
+
   const css = nodes('').filter(x => x.type === 'style');
   t.ok(css.length === 1 && css[0].props.children.includes('.MSCXPanel .MSCXRow{'),
        'the panel carries one stylesheet defining the row rule');

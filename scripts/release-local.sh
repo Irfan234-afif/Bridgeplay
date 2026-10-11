@@ -55,3 +55,6 @@ printf '%s\n' "$notes" >"$out/NotProton.txt"
 gh release create "v$version" "$out/NotProton.zip" "$out/appcast.xml" -R "$slug" \
 	--target "$(git rev-parse HEAD)" --title "$version" --notes "$notes" --latest
 echo "==> released v$version: https://github.com/$slug/releases/tag/v$version"
+# The release is the zip; the built app copies would only show up in Spotlight next to
+# /Applications/NotProton.app.
+rm -rf build/NotProton.app out/NotProton.app

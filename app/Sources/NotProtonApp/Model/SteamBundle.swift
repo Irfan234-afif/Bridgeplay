@@ -86,14 +86,16 @@ enum SteamBundle {
         guard isRunning else { return false }
         onStopping()
 
-        _ = try? Shell.run("/usr/bin/pkill", ["-x", "steam_osx"])
+        _ = try? Shell.run("/usr/bin/open", ["-g", "steam://exit"])
         for _ in 0..<60 where isRunning {
             Thread.sleep(forTimeInterval: 0.5)
         }
 
         if isRunning {
             _ = try? Shell.run("/usr/bin/pkill", ["-9", "-x", "steam_osx"])
-            Thread.sleep(forTimeInterval: 1)
+            for _ in 0..<10 where isRunning {
+                Thread.sleep(forTimeInterval: 0.5)
+            }
         }
 
         guard !isRunning else {

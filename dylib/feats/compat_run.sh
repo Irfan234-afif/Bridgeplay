@@ -158,6 +158,12 @@ if [ "${NOTPROTON_RAW_CONTROLLERS:-1}" = "1" ]; then
   export NOTPROTON_RAW_CONTROLLERS SDL_GAMECONTROLLER_IGNORE_DEVICES
 fi
 
+# SDL hands pads that macOS GameController.framework knows (GameSir G7 Pro over Bluetooth)
+# to its MFi driver, which finds nothing outside an app run loop such as winedevice.exe's,
+# so the pad never reached Wine. IOKit reads them instead.
+SDL_JOYSTICK_MFI=0
+export SDL_JOYSTICK_MFI
+
 pad_db="$HOME/Library/Application Support/notproton/gamecontrollerdb.txt"
 if [ -f "$pad_db" ]; then
   pad_maps=$(sed -e '/^[[:space:]]*#/d' -e '/^[[:space:]]*$/d' "$pad_db")
@@ -1604,6 +1610,20 @@ install_legacycompat() {
   done
 }
 
+# Steam on Linux symlinks this for every compat tool launch. Is needed for some legacy games.
+link_legacy_steam_dll() {
+  src="$STEAM_COMPAT_CLIENT_INSTALL_PATH/legacycompat/Steam.dll"
+  [ -n "$STEAM_COMPAT_INSTALL_PATH" ] && [ -f "$src" ] || return 0
+  dst="$(dirname "$STEAM_COMPAT_INSTALL_PATH")/Steam.dll"
+  [ -L "$dst" ] || [ ! -e "$dst" ] || return 0
+  [ "$(readlink "$dst" 2>/dev/null)" = "$src" ] && return 0
+  if ln -sfn "$src" "$dst" 2>> "$log"; then
+    echo "=== linked legacy Steam.dll at $dst ===" >> "$log" 2>&1 || true
+  else
+    echo "=== could not link legacy Steam.dll at $dst ===" >> "$log" 2>&1 || true
+  fi
+}
+
 bridge_files="steamclient64.dll steamclient.dll tier0_s64.dll vstdlib_s64.dll"
 bridge_files="$bridge_files lsteamclient.dll lsteamclient.so steam.exe"
 # A clone cannot cross drives, so a prefix on another drive clones from a copy of the
@@ -1695,6 +1715,7 @@ if [ -d "$bridge_src" ] && [ -n "$WINEPREFIX" ]; then
     export STEAM_COMPAT_CLIENT_INSTALL_PATH="$native_client"
   fi
   install_legacycompat
+  link_legacy_steam_dll
   echo "=== bridge staged into $prefix_steam ===" >> "$log" 2>&1 || true
   echo "WINEDLLPATH=$WINEDLLPATH" >> "$log" 2>&1 || true
   echo "WINEDLLOVERRIDES=$WINEDLLOVERRIDES" >> "$log" 2>&1 || true
@@ -1763,12 +1784,16 @@ fi
 [ -z "$game_name" ] && game_name="Steam Game"
 # shellcheck disable=SC1003 # the pair deletes a literal backslash, not a quote
 bundle_name=$(printf '%s' "$game_name" | tr -d '/:"`$\\')
+bundle_name=${bundle_name#"${bundle_name%%[!.]*}"}
+[ -n "$bundle_name" ] || bundle_name="Steam Game"
 game_name_xml=$(printf '%s' "$game_name" | sed -e 's/&/\&amp;/g' -e 's/</\&lt;/g' -e 's/>/\&gt;/g')
 loader_root="$HOME/Library/Application Support/notproton/launchers/$app_id"
 mkdir -p "$loader_root"
 loader_app="$loader_root/$bundle_name.app"
-rm -rf "$loader_root"/*.app
-loader_contents="$loader_app/Contents"
+find "$loader_root" -maxdepth 1 -name '.build.*' -mmin +60 -exec rm -rf {} + 2>/dev/null || true
+loader_work=$(mktemp -d "$loader_root/.build.XXXXXX")
+loader_stage="$loader_work/new/$bundle_name.app"
+loader_contents="$loader_stage/Contents"
 loader_macos="$loader_contents/MacOS"
 loader_res="$loader_contents/Resources"
 mkdir -p "$loader_macos" "$loader_res"
@@ -1871,6 +1896,9 @@ cat > "$loader_contents/Info.plist" <<PLIST
   <key>LSApplicationCategoryType</key><string>public.app-category.games</string>
   <key>NSHighResolutionCapable</key><true/>
   <key>NSPrincipalClass</key><string>NSApplication</string>
+  <key>NSMicrophoneUsageDescription</key><string>This game would like to access your microphone.</string>
+  <key>NSCameraUsageDescription</key><string>This game would like to access your camera.</string>
+  <key>NSLocalNetworkUsageDescription</key><string>This game would like to access devices on your local network.</string>
 $uielement_arg
 $icon_arg
 </dict>
@@ -1888,7 +1916,7 @@ for f in "$wine_unix"/*; do
 done
 ln "$WINELOADER" "$loader_macos/wine" 2>/dev/null || cp "$WINELOADER" "$loader_macos/wine"
 if [ -x "$loader_macos/wine" ]; then
-  WINELOADER="$loader_macos/wine"
+  WINELOADER="$loader_app/Contents/MacOS/wine"
   echo "loader staged in bundle for game mode" >> "$log" 2>&1 || true
 else
   echo "loader staging failed, game mode unavailable" >> "$log" 2>&1 || true
@@ -1913,6 +1941,69 @@ fi
 exit \$?
 LAUNCHER
 chmod +x "$loader_macos/launcher"
+
+bundle_listing() {
+  (cd "$1" && find . | LC_ALL=C sort | while IFS= read -r p; do
+    if [ -L "$p" ]; then
+      printf 'l %s %s\n' "$p" "$(readlink "$p")"
+    elif [ -d "$p" ]; then
+      printf 'd %s\n' "$p"
+    else
+      printf 'f %s %s %s\n' "$p" "$(stat -f %Lp "$p")" "$(cksum < "$p")"
+    fi
+  done)
+}
+install_bundle() (
+  exec 7>> "$loader_root/.lock"
+  /usr/bin/lockf -s -t 30 7 || exit 1
+  same=""
+  for b in "$loader_root"/*.app; do
+    if [ "$b" = "$loader_app" ] && [ -d "$b" ] && [ ! -L "$b" ] &&
+       [ "$(bundle_listing "$b")" = "$(bundle_listing "$loader_stage")" ]; then
+      same=1
+    fi
+  done
+  if [ -n "$same" ]; then
+    for b in "$loader_root"/*.app "$loader_root"/.[!.]*.app; do
+      if [ "$b" != "$loader_app" ]; then rm -rf "$b" || true; fi
+    done
+    echo "launcher bundle unchanged" >> "$log" 2>&1 || true
+  else
+    stage_identity=$(stat -f '%d:%i' "$loader_stage") || exit 1
+    loader_backup=$(mktemp -d "$loader_root/.backup.XXXXXX") || exit 1
+    finish_bundle() {
+      result=$?
+      trap - EXIT
+      trap '' HUP INT TERM
+      installed_identity=$(stat -f '%d:%i' "$loader_app" 2>/dev/null) || installed_identity=""
+      if [ "$installed_identity" != "$stage_identity" ]; then
+        for saved in "$loader_backup"/* "$loader_backup"/.[!.]*; do
+          [ -e "$saved" ] || [ -L "$saved" ] || continue
+          mv "$saved" "$loader_root/${saved##*/}" || result=1
+        done
+        rmdir "$loader_backup" 2>/dev/null || result=1
+      else
+        rm -rf "$loader_backup" || true
+      fi
+      rm -rf "$loader_work" || true
+      exit "$result"
+    }
+    trap 'finish_bundle' EXIT
+    trap 'exit 129' HUP
+    trap 'exit 130' INT
+    trap 'exit 143' TERM
+    for b in "$loader_root"/*.app "$loader_root"/.[!.]*.app "$loader_app"; do
+      if [ -e "$b" ] || [ -L "$b" ]; then
+        mv "$b" "$loader_backup/${b##*/}" || exit 1
+      fi
+    done
+    mv "$loader_stage" "$loader_app" || exit 1
+    echo "launcher bundle updated" >> "$log" 2>&1 || true
+    finish_bundle
+  fi
+  rm -rf "$loader_work" || true
+)
+install_bundle
 
 wine_helpers='winedevice\.exe|services\.exe|plugplay\.exe|svchost\.exe'
 wine_helpers="$wine_helpers|rpcss\.exe|explorer\.exe|steam\.exe"
@@ -1980,7 +2071,7 @@ else
   echo "=== client staged no overlay renderer, overlay disabled ===" >> "$log" 2>&1 || true
 fi
 set -- --args "$shim_exe" "$@"
-for name in $(env | sed -nE 's/^(CX_APPLEGPTK_LIBD3DSHARED_PATH|SDL_GAMECONTROLLERCONFIG|WINE_LARGE_ADDRESS_AWARE|WINE_CPU_TOPOLOGY|Steam[A-Za-z0-9]*|(CX_GRAPHICS|D3DM_|DXMT_|DXVK_|MVK_|VKD3D_|STAGING_|MTL_|ROSETTA_)[A-Z0-9_]*)=.*/\1/p'); do
+for name in $(env | sed -nE 's/^(CX_APPLEGPTK_LIBD3DSHARED_PATH|SDL_GAMECONTROLLERCONFIG|SDL_JOYSTICK_MFI|WINE_LARGE_ADDRESS_AWARE|WINE_CPU_TOPOLOGY|Steam[A-Za-z0-9]*|(CX_GRAPHICS|D3DM_|DXMT_|DXVK_|MVK_|VKD3D_|STAGING_|MTL_|ROSETTA_)[A-Z0-9_]*)=.*/\1/p'); do
   eval "value=\$$name"
   # shellcheck disable=SC2154 # eval assigns value on the line above
   set -- --env "$name=$value" "$@"
@@ -2027,7 +2118,7 @@ else
         ;;
       vars:--args)
         mode=args
-        set -- "$@" "$loader_macos/launcher"
+        set -- "$@" "$loader_app/Contents/MacOS/launcher"
         ;;
       args:*) set -- "$@" "$arg" ;;
     esac

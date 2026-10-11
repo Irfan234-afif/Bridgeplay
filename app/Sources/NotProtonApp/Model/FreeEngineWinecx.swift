@@ -102,11 +102,12 @@ enum FreeEngineWinecx {
                           sha256: "f79d417f675d00008375eb4ea2318af6fcd0b27971d604d3cf345a0dcfa998a0"),
     ]
 
-    // SDL 2.32.8 (zlib license, NOTICE), the WineHQ engine runner's copy signed ad hoc,
-    // since a release build strips unsigned Mach-O resources and would break the pin.
+    // SDL 2.32.8 (zlib license, NOTICE) built x86_64 with winemac-patch/sdl2-iokit-gamepad-collection.patch
+    // (pads whose gamepad is a secondary HID collection, e.g. GameSir G7 Pro over Bluetooth),
+    // signed ad hoc, since a release build strips unsigned Mach-O resources and would break the pin.
     private static let sdl = WinecxBundledFile(
         resource: "libSDL2-2.0.0", ext: "dylib", path: "lib/libSDL2-2.0.0.dylib",
-        sha256: "605724f463875e945ca4a79a1db7bf35384d912fa5387f3042a27a42e878db19")
+        sha256: "28ca23a44bb24b4bb42fe84902788ca866ac824c7b83ea2ca28aebc6640f344d")
 
     // runtime 4.7.3: winecx e0aa380 (Wine 11.17), built by winecx-gptk 0bf3eab, minos 26.0.
     // Over 4.5.125 it carries the later msync fixes, kernelbase's FlsGetValue2 for Unity

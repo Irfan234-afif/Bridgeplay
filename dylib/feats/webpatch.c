@@ -2,6 +2,8 @@
 #include "webpatch.h"
 #include "../util/log.h"
 
+#include <dirent.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -180,9 +182,13 @@ static int out_expand(np_out_t *o, const char *replace, const np_cap_t *caps) {
     "E.e.forEach(w=>{if(ps.some(p=>o.startsWith(p[0]+\"=\",w.start))){" \
     "r+=o.slice(at,w.start);at=w.end;while(o[at]===\" \"||o[at]===\"\\t\")at++}});r+=o.slice(at)}" \
     "SteamClient.Apps.SetAppLaunchOptions(t.unAppID,r.trim()===\"%command%\"?\"\":r)}," \
+    "Fx=globalThis.MSCXFx||{}," \
+    "dv=k=>{const a=(Fx.a||{})[t.unAppID]||{},en=Fx.e||{},x=en[t.strCompatToolName]||en[\"\"]||{};" \
+    "return k in a?a[k]:k in(Fx.g||{})?Fx.g[k]:k in x?x[k]:(Fx.d||{})[k]||\"\"}," \
+    "ev=k=>E.e.some(w=>o.startsWith(k+\"=\",w.start))?g(k):dv(k)," \
     "T=(ks,l,on,off)=>(0," RT ".jsx)(" BARREL ".Yh,{className:\"MSCXRow\",label:l," \
-    "checked:g(ks[0])===on," \
-    "onChange:v=>s(ks.map(k=>[k,v?on:(off||\"\")]))},ks[0])," \
+    "checked:ev(ks[0])===on," \
+    "onChange:v=>s(ks.map(k=>[k,v?(dv(k)===on?\"\":on):(dv(k)===on?(off||\"0\"):\"\")]))},ks[0])," \
     "b=g(\"CX_GRAPHICS_BACKEND\")," \
     "dm=\"\"===b||\"d3dmetal\"===b," \
     "dx=\"\"===b||\"dxmt\"===b," \
@@ -411,6 +417,176 @@ int np_webpatch_should_patch(const char *path) {
         && strncmp(rest, "libraries/", sizeof("libraries/") - 1) != 0;
 }
 
+// The panel shows what a launch will actually use. The run script resolves each setting as
+// launch options > gamefixes/<appid>.conf > gamefixes-default/<appid>.conf >
+// gamefixes/default.conf > the engine, so the values below the launch options are handed to
+// the page as globalThis.MSCXFx when Steam loads it (a later conf edit shows after a restart).
+#define NP_FX_MAX 4096
+
+static const char *fx_panel_key(const char *key) {
+    static const char *const same[] = {
+        "MTL_HUD_ENABLED", "ROSETTA_ADVERTISE_AVX", "D3DM_ENABLE_METALFX", "DXMT_ENABLE_NVEXT",
+    };
+    if (strcmp(key, "RETINA") == 0) return "NOTPROTON_RETINA";
+    if (strcmp(key, "MSYNC") == 0) return "WINEMSYNC";
+    for (size_t i = 0; i < sizeof(same) / sizeof(same[0]); i++)
+        if (strcmp(key, same[i]) == 0) return same[i];
+    return NULL;
+}
+
+static int fx_safe(const char *v) {
+    size_t n = strlen(v);
+    if (n > 16) return 0;
+    for (; *v; v++)
+        if (!((*v >= 'A' && *v <= 'Z') || (*v >= 'a' && *v <= 'z') ||
+              (*v >= '0' && *v <= '9') || *v == '.' || *v == '_' || *v == '-'))
+            return 0;
+    return 1;
+}
+
+typedef struct { char key[32]; char val[20]; } fx_pair_t;
+typedef struct { fx_pair_t p[8]; size_t n; } fx_set_t;
+
+static void fx_set(fx_set_t *set, const char *key, const char *val) {
+    for (size_t i = 0; i < set->n; i++)
+        if (strcmp(set->p[i].key, key) == 0) { snprintf(set->p[i].val, sizeof(set->p[i].val), "%s", val); return; }
+    if (set->n < sizeof(set->p) / sizeof(set->p[0])) {
+        snprintf(set->p[set->n].key, sizeof(set->p[set->n].key), "%s", key);
+        snprintf(set->p[set->n].val, sizeof(set->p[set->n].val), "%s", val);
+        set->n++;
+    }
+}
+
+// Same line rules as the run script's gamefix_read: KEY=VALUE, # comments, blank lines.
+static void fx_read(const char *path, fx_set_t *set) {
+    FILE *f = fopen(path, "r");
+    if (!f) return;
+    char line[256];
+    while (fgets(line, sizeof(line), f)) {
+        char *b = line, *e;
+        while (*b == ' ' || *b == '\t') b++;
+        e = b + strlen(b);
+        while (e > b && (e[-1] == '\n' || e[-1] == '\r' || e[-1] == ' ' || e[-1] == '\t')) *--e = '\0';
+        char *eq = strchr(b, '=');
+        if (*b == '#' || !eq) continue;
+        *eq = '\0';
+        const char *key = fx_panel_key(b);
+        if (key && fx_safe(eq + 1)) fx_set(set, key, eq + 1);
+    }
+    fclose(f);
+}
+
+static int fx_json_set(char *buf, size_t cap, size_t *len, const fx_set_t *set) {
+    int n = snprintf(buf + *len, cap - *len, "{");
+    if (n < 0 || (size_t)n >= cap - *len) return 0;
+    *len += (size_t)n;
+    for (size_t i = 0; i < set->n; i++) {
+        n = snprintf(buf + *len, cap - *len, "%s\"%s\":\"%s\"", i ? "," : "", set->p[i].key, set->p[i].val);
+        if (n < 0 || (size_t)n >= cap - *len) return 0;
+        *len += (size_t)n;
+    }
+    n = snprintf(buf + *len, cap - *len, "}");
+    if (n < 0 || (size_t)n >= cap - *len) return 0;
+    *len += (size_t)n;
+    return 1;
+}
+
+static int fx_appid(const char *name, char *out, size_t cap) {
+    size_t n = 0;
+    while (name[n] >= '0' && name[n] <= '9') n++;
+    if (n == 0 || n >= cap || strcmp(name + n, ".conf") != 0) return 0;
+    memcpy(out, name, n);
+    out[n] = '\0';
+    return 1;
+}
+
+static int fx_build(char *buf, size_t cap) {
+    const char *home = getenv("HOME");
+    if (!home || !*home) return 0;
+    char root[512], path[768];
+    snprintf(root, sizeof(root), "%s/Library/Application Support/notproton", home);
+
+    size_t len = 0;
+    int n = snprintf(buf, cap, ";globalThis.MSCXFx={\"g\":");
+    if (n < 0 || (size_t)n >= cap) return 0;
+    len = (size_t)n;
+
+    fx_set_t global = {0};
+    snprintf(path, sizeof(path), "%s/gamefixes/default.conf", root);
+    fx_read(path, &global);
+    if (!fx_json_set(buf, cap, &len, &global)) return 0;
+
+    // Per-app: the shipped file first, the user's second, as the run script reads them.
+    n = snprintf(buf + len, cap - len, ",\"a\":{");
+    if (n < 0 || (size_t)n >= cap - len) return 0;
+    len += (size_t)n;
+    const char *dirs[2] = { "gamefixes-default", "gamefixes" };
+    char seen[64][16];
+    size_t nseen = 0;
+    for (int d = 0; d < 2; d++) {
+        snprintf(path, sizeof(path), "%s/%s", root, dirs[d]);
+        DIR *dir = opendir(path);
+        if (!dir) continue;
+        struct dirent *ent;
+        while ((ent = readdir(dir)) && nseen < 64) {
+            char id[16];
+            if (!fx_appid(ent->d_name, id, sizeof(id))) continue;
+            int dup = 0;
+            for (size_t i = 0; i < nseen; i++) dup |= strcmp(seen[i], id) == 0;
+            if (!dup) memcpy(seen[nseen++], id, sizeof(id));
+        }
+        closedir(dir);
+    }
+    for (size_t i = 0; i < nseen; i++) {
+        fx_set_t app = {0};
+        for (int d = 0; d < 2; d++) {
+            snprintf(path, sizeof(path), "%s/%s/%s.conf", root, dirs[d], seen[i]);
+            fx_read(path, &app);
+        }
+        if (!app.n) continue;
+        n = snprintf(buf + len, cap - len, "%s\"%s\":", len && buf[len - 1] == '{' ? "" : ",", seen[i]);
+        if (n < 0 || (size_t)n >= cap - len) return 0;
+        len += (size_t)n;
+        if (!fx_json_set(buf, cap, &len, &app)) return 0;
+    }
+
+    // Engines: a tool whose description names msync runs with it on (tools: name, build,
+    // arch, description, tab separated). "" stands for the default tool.
+    n = snprintf(buf + len, cap - len, "},\"e\":{");
+    if (n < 0 || (size_t)n >= cap - len) return 0;
+    len += (size_t)n;
+    snprintf(path, sizeof(path), "%s/tools", root);
+    FILE *tools = fopen(path, "r");
+    int first = 1;
+    if (tools) {
+        char line[512];
+        while (fgets(line, sizeof(line), tools)) {
+            char *tab = strchr(line, '\t');
+            if (!tab) continue;
+            *tab = '\0';
+            if (!fx_safe(line)) continue;
+            const char *ms = strstr(tab + 1, "msync") ? "1" : "0";
+            int fallback = g_fallback_tool[0] && strcmp(line, g_fallback_tool) == 0;
+            n = snprintf(buf + len, cap - len, "%s\"%s\":{\"WINEMSYNC\":\"%s\"}",
+                         first ? "" : ",", line, ms);
+            if (n < 0 || (size_t)n >= cap - len) { fclose(tools); return 0; }
+            len += (size_t)n;
+            first = 0;
+            if (fallback) {
+                n = snprintf(buf + len, cap - len, ",\"\":{\"WINEMSYNC\":\"%s\"}", ms);
+                if (n < 0 || (size_t)n >= cap - len) { fclose(tools); return 0; }
+                len += (size_t)n;
+            }
+        }
+        fclose(tools);
+    }
+
+    // The run script reads controllers directly unless the launch options say otherwise.
+    n = snprintf(buf + len, cap - len, "},\"d\":{\"NOTPROTON_RAW_CONTROLLERS\":\"1\"}};");
+    if (n < 0 || (size_t)n >= cap - len) return 0;
+    return 1;
+}
+
 char *np_webpatch_transform(const uint8_t *src, size_t src_len, size_t *out_len,
                             const char **out_shape) {
     const char *s = (const char *)src;
@@ -481,6 +657,13 @@ char *np_webpatch_transform(const uint8_t *src, size_t src_len, size_t *out_len,
                      : out_put(&out, s + i, 1);
         if (!ok) { free(out.buf); return NULL; }
         i += hit ? used : 1;
+    }
+
+    if (shape) {
+        char *fx = malloc(NP_FX_MAX);
+        int ok = !fx || !fx_build(fx, NP_FX_MAX) || out_put(&out, fx, strlen(fx));
+        free(fx);
+        if (!ok) { free(out.buf); return NULL; }
     }
 
     if (!out_reserve(&out, 0)) { free(out.buf); return NULL; }
