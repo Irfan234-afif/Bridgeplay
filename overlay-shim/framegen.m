@@ -170,7 +170,7 @@ static int fg_rate_frames;
 static double fg_slow_since, fg_fast_since; // when the rate crossed the threshold, 0 = not crossed
 static double fg_retry_not_before; // after a forced pass-through, no engagement until then
 static _Atomic int fg_total_state_changes; // active <-> pass-through transitions
-static int fg_hud_suppressed; // the covering layer carries the HUD, the game's layer has it hidden
+static int fg_hud_suppressed; // the game's layer has its HUD hidden under the covering layer
 
 // Mode changes between active and pass-through are what the user sees as the
 // picture jumping between layers; count them for the stats and the tests.
@@ -1265,19 +1265,20 @@ static int fg_hud_wanted(CAMetalLayer *game)
 	       (CFEqual(mode, CFSTR("default")) || CFEqual(mode, CFSTR("main")));
 }
 
-// covering = 1: only the covering layer shows the HUD (as the main layer, so it
-// counts real + generated frames); 0: only the game's layer does again.
-static void fg_hud_suppress(CAMetalLayer *game, CAMetalLayer *layer, int covering)
+// covering = 1: hide the game layer's HUD so only the covering layer's (real +
+// generated frames) shows; 0: show it again. The covering layer's own properties
+// stay untouched: marking it "main" left its drawables never presented (black
+// screen, HUD FPS inf, no presented handler ever ran). "default", not "main",
+// on restore for the same reason.
+static void fg_hud_suppress(CAMetalLayer *game, int covering)
 {
 	if (covering && !fg_hud_suppressed) {
 		if (!fg_hud_wanted(game))
 			return;
-		fg_hud_set_mode(layer, CFSTR("main"));
 		fg_hud_set_mode(game, CFSTR("off"));
 		fg_hud_suppressed = 1;
 	} else if (!covering && fg_hud_suppressed) {
-		fg_hud_set_mode(game, CFSTR("main"));
-		fg_hud_set_mode(layer, CFSTR("off"));
+		fg_hud_set_mode(game, CFSTR("default"));
 		fg_hud_suppressed = 0;
 	}
 }
@@ -1291,7 +1292,7 @@ static void fg_layer_set_hidden(int hidden)
 	fg_on_main(^{
 		fg_ca_begin();
 		layer.hidden = hidden ? YES : NO;
-		fg_hud_suppress(game, layer, !hidden);
+		fg_hud_suppress(game, !hidden);
 		fg_ca_end();
 	});
 }
@@ -1389,7 +1390,7 @@ static void fg_layer_destroy(void)
 		return;
 	fg_on_main(^{
 		fg_ca_begin();
-		fg_hud_suppress(game, layer, 0);
+		fg_hud_suppress(game, 0);
 		[layer removeFromSuperlayer];
 		fg_ca_end();
 	});
