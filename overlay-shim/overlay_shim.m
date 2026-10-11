@@ -19,6 +19,7 @@
 #import <sys/mman.h>
 #import <stdarg.h>
 #import <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #import <unistd.h>
 
@@ -213,11 +214,27 @@ static int interpose(Class target, const char *selector_name, IMP replacement, I
 }
 
 // The overlay swizzles by renaming the original to steamoverlay_<selector>, so the
-// renamed method is what says its hook survived.
+// renamed method is what says its hook survived. Scans the method lists rather
+// than asking class_getInstanceMethod: a lookup that misses runs the class's
+// +resolveInstanceMethod:, and on CALayer that leaves AppKit's CALayer categories
+// (NS_setView: and friends) unattached if AppKit loads afterwards, which crashes
+// the first layer-backed NSView. Seen with the harness; a game that loads AppKit
+// after the shim installs would hit the same.
 static int class_has_method(Class target, const char *selector_name)
 {
-	return target != Nil &&
-	       class_getInstanceMethod(target, sel_registerName(selector_name)) != NULL;
+	SEL selector = sel_registerName(selector_name);
+
+	for (Class c = target; c != Nil; c = class_getSuperclass(c)) {
+		unsigned count = 0;
+		Method *methods = class_copyMethodList(c, &count);
+		int found = 0;
+		for (unsigned i = 0; i < count && !found; i++)
+			found = method_getName(methods[i]) == selector;
+		free(methods);
+		if (found)
+			return 1;
+	}
+	return 0;
 }
 
 static Class device_class;
