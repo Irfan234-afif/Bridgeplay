@@ -232,6 +232,8 @@ static int out_expand(np_out_t *o, const char *replace, const np_cap_t *caps) {
     "children:(0," RT ".jsx)(" BARREL ".m,{rgOptions:U," \
     "selectedOption:sw?(U.find(u=>u.data&&+u.data===fn)||{data:String(fn)}).data:\"\"," \
     "onChange:v=>s([[\"DXMT_METALFX_SPATIAL_SWAPCHAIN\",v.data?\"1\":\"\"],[\"DXMT_CONFIG\",fx(v.data)]])})},\"usf\")," \
+    "(0," RT ".jsx)(" BARREL ".XY,{label:\"Frame Generation (Experimental. Adds input lag)\",children:" \
+    "T([\"NOTPROTON_FRAMEGEN\"],\"MetalFX frame interpolation (2x)\",\"1\",\"0\")},\"fgn\")," \
     "(0," RT ".jsx)(" BARREL ".XY,{label:\"Controllers (May break Steam Input. Not recommended)\",children:" \
     "T([\"NOTPROTON_RAW_CONTROLLERS\"],\"Let games read controllers directly\",\"1\",\"\")},\"ctl\")" \
     "]})})}"
@@ -434,15 +436,20 @@ static const char *fx_panel_key(const char *key) {
     return NULL;
 }
 
-static int fx_safe(const char *v) {
+// Characters that go into a JSON string unescaped, up to max of them.
+static int fx_word(const char *v, size_t max) {
     size_t n = strlen(v);
-    if (n > 16) return 0;
+    if (n > max) return 0;
     for (; *v; v++)
         if (!((*v >= 'A' && *v <= 'Z') || (*v >= 'a' && *v <= 'z') ||
               (*v >= '0' && *v <= '9') || *v == '.' || *v == '_' || *v == '-'))
             return 0;
     return 1;
 }
+
+// Values fit fx_pair_t.val. Tool names are longer ("notproton-winecx-11.17") and are
+// bounded by the fallback name they are compared against instead.
+static int fx_safe(const char *v) { return fx_word(v, 16); }
 
 typedef struct { char key[32]; char val[20]; } fx_pair_t;
 typedef struct { fx_pair_t p[8]; size_t n; } fx_set_t;
@@ -506,8 +513,10 @@ static int fx_build(char *buf, size_t cap) {
     char root[512], path[768];
     snprintf(root, sizeof(root), "%s/Library/Application Support/notproton", home);
 
+    // Steam's chunks end in "//# sourceMappingURL=..." with no newline after it, so the
+    // assignment starts a line of its own or the browser reads it as part of that comment.
     size_t len = 0;
-    int n = snprintf(buf, cap, ";globalThis.MSCXFx={\"g\":");
+    int n = snprintf(buf, cap, "\n;globalThis.MSCXFx={\"g\":");
     if (n < 0 || (size_t)n >= cap) return 0;
     len = (size_t)n;
 
@@ -564,7 +573,7 @@ static int fx_build(char *buf, size_t cap) {
             char *tab = strchr(line, '\t');
             if (!tab) continue;
             *tab = '\0';
-            if (!fx_safe(line)) continue;
+            if (!*line || !fx_word(line, sizeof(g_fallback_tool) - 1)) continue;
             const char *ms = strstr(tab + 1, "msync") ? "1" : "0";
             int fallback = g_fallback_tool[0] && strcmp(line, g_fallback_tool) == 0;
             n = snprintf(buf + len, cap - len, "%s\"%s\":{\"WINEMSYNC\":\"%s\"}",
@@ -661,7 +670,11 @@ char *np_webpatch_transform(const uint8_t *src, size_t src_len, size_t *out_len,
 
     if (shape) {
         char *fx = malloc(NP_FX_MAX);
-        int ok = !fx || !fx_build(fx, NP_FX_MAX) || out_put(&out, fx, strlen(fx));
+        int built = fx && fx_build(fx, NP_FX_MAX);
+        if (!built)
+            NP_WARN("webpatch: [%s] conf defaults not handed to the panel, its toggles "
+                    "show launch options only", shape->name);
+        int ok = !built || out_put(&out, fx, strlen(fx));
         free(fx);
         if (!ok) { free(out.buf); return NULL; }
     }

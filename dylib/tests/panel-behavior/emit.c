@@ -22,6 +22,25 @@ int main(int argc, char **argv) {
         fputs(NP_LAUNCH_MIGRATION, stdout);
         return 0;
     }
-    fputs("usage: emit component|statement|migration\n", stderr);
+    // The chunk as Steam is served it, defaults included, read from $HOME like the hook.
+    if (argc == 4 && strcmp(argv[1], "transform") == 0) {
+        FILE *f = fopen(argv[2], "rb");
+        if (!f) return 1;
+        fseek(f, 0, SEEK_END);
+        long n = ftell(f);
+        rewind(f);
+        uint8_t *src = malloc(n > 0 ? (size_t)n : 1);
+        if (!src || fread(src, 1, (size_t)n, f) != (size_t)n) { fclose(f); return 1; }
+        fclose(f);
+        np_webpatch_set_fallback_tool(argv[3]);
+        size_t out_len = 0;
+        char *out = np_webpatch_transform(src, (size_t)n, &out_len, NULL);
+        free(src);
+        if (!out) return 1;
+        fwrite(out, 1, out_len, stdout);
+        free(out);
+        return 0;
+    }
+    fputs("usage: emit component|statement|migration|transform <chunk> <fallback tool>\n", stderr);
     return 2;
 }
