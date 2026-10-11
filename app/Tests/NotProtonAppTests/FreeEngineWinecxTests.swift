@@ -39,10 +39,11 @@ struct FreeEngineWinecxTests {
         let previous = FreeEngineWinecx.previous.runner
 
         // Installing 11.17 adds a tool and never moves notproton-winecx, which every
-        // existing prefix's build record ties to winecx-11.15.
+        // existing prefix's build record ties to winecx-11.15. 11.17 lists first, so it is
+        // what games without a mapping get.
         let both = SupportedRunners.tools(for: [current, previous])
-        #expect(both.map(\.name) == ["notproton-winecx", "notproton-winecx-11.17"])
-        #expect(both.map(\.build) == ["winecx-11.15", "winecx-11.17"])
+        #expect(both.map(\.name) == ["notproton-winecx-11.17", "notproton-winecx"])
+        #expect(both.map(\.build) == ["winecx-11.17", "winecx-11.15"])
         #expect(SupportedRunners.tools(for: [previous]).map(\.build) == ["winecx-11.15"])
         #expect(SupportedRunners.tools(for: [current]).map(\.name) == ["notproton-winecx-11.17"])
     }
