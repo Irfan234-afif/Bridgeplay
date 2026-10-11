@@ -55,6 +55,10 @@ struct WinecxRelease: Sendable {
     // dlopens by leaf name, which dyld finds through winebus.so's @loader_path/../../
     // rpath, i.e. in lib/.
     let gamepad: [WinecxBundledFile]
+    // ws2_32 rebuilt so getaddrinfo on this machine's own host name drops the loopback and
+    // link-local addresses macOS lists first, as Windows never returns them
+    // (ws2_32-patch/). Empty where the runtime's own ws2_32 is kept.
+    let network: [WinecxBundledFile]
     // The runner build this release unpacks to, keyed by its pinned loader, and the ntdll
     // detours for it (NtdllPatcher.byBuild).
     let runner: RunnerBuild
@@ -143,6 +147,12 @@ enum FreeEngineWinecx {
                               sha256: "da108d1c3788fa32807ef08c4d26d8a89812c230317ffa7ba5111e126bda607c"),
             sdl,
         ],
+        // ws2_32.dll: winecx e0aa380's PE half with ws2_32-patch/winecx-own-hostname.patch.
+        network: [
+            WinecxBundledFile(resource: "ws2_32-winecx-11.17", ext: "dll",
+                              path: "lib/wine/x86_64-windows/ws2_32.dll",
+                              sha256: "cb0a5670ce6dbf949ed25cca54e9f1c4930cd4c2ade895836d518d3d9073079c"),
+        ],
         runner: RunnerBuild(
             bundleVersion: "winecx-11.17",
             releaseVersion: "WineCX 11.17",
@@ -229,6 +239,7 @@ enum FreeEngineWinecx {
                               sha256: "1bc53184f5d026ab84a26cf6ef721348fc3b028c019ff969e69eb6cf9b9d1af9"),
             sdl,
         ],
+        network: [],
         // The hash-pinned loader is what makes it free, so a CrossOver install can never be
         // taken for it.
         runner: RunnerBuild(
@@ -321,7 +332,7 @@ enum FreeEngineWinecx {
     // checks them, since they are either Wine's own or links into a Game Porting Toolkit.
     static func expectedFiles(_ release: WinecxRelease = current) -> [String: String] {
         var table: [String: String] = [FreeEngine.macDriverPath: release.macDriver]
-        for file in release.gamepad { table[file.path] = file.sha256 }
+        for file in release.gamepad + release.network { table[file.path] = file.sha256 }
         for file in release.backends { table["\(backendsPath)/\(file.destination)"] = file.sha256 }
         for path in release.renderer.files.keys {
             table[release.renderer.installPath(of: path)] = release.renderer.installedHash(of: path)
@@ -410,7 +421,7 @@ enum FreeEngineWinecx {
         try fm.createDirectory(at: root.deletingLastPathComponent(), withIntermediateDirectories: true)
         try fm.moveItem(at: wine, to: root)
         try FreeEngine.installMacDriver(root: root, build: release.build, sha256: release.macDriver, step: step)
-        try installBundled(release.gamepad, root: root)
+        try installBundled(release.gamepad + release.network, root: root)
 
         let libraries = wine.deletingLastPathComponent()
         for file in release.backends {

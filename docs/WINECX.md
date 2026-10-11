@@ -97,6 +97,7 @@ lib/notproton-backends/dxvk/{x86_64,i386}-windows/{d3d11,d3d10core}.dll        f
 lib/wine/x86_64-unix/winemac.so                   Retina fix, replacing the archive's (below)
 lib/wine/x86_64-unix/winebus.so                   built with SDL2, replacing the archive's (Controllers)
 lib/wine/x86_64-windows/winebus.sys               11.17 only: map-key fix, replacing the archive's (Controllers)
+lib/wine/x86_64-windows/ws2_32.dll                11.17 only: own host name without loopback, replacing the archive's (Own host name)
 lib/libSDL2-2.0.0.dylib                           SDL 2.32.8, x86_64, for winebus.so (Controllers)
 ```
 
@@ -174,6 +175,29 @@ then corrupted the heap and took winebus, and every pad, down. Wine master still
 `x86_64-w64-mingw32-strip --strip-debug` as the CI does). Built without the patch, the result
 is byte-identical to the runtime's `winebus.sys` except the PE timestamp, checksum and build
 id. 11.15 keeps the runtime's own `winebus.sys`, so the `map` key is still unsafe there.
+
+## Own host name
+
+macOS resolves the machine's own name (`gethostname()`, `<name>.local`) to lo0's addresses
+first: `getaddrinfo` in a Windows program returned `::1`, `fe80::1`, `127.0.0.1`, `127.0.2.2`,
+`127.0.2.3`, then the LAN address. Windows never returns loopback for its own name. TEKKEN 8's
+online SDK takes the first result as its local IP and ranked matchmaking hangs; a hand-made
+`/etc/hosts` line for the LAN address fixed it, but that pins a DHCP address.
+
+11.17 ships `ws2_32-winecx-11.17.dll` as `lib/wine/x86_64-windows/ws2_32.dll`: winecx
+`e0aa380`'s PE half with `ws2_32-patch/winecx-own-hostname.patch`. For the own host name
+(case-insensitive, with or without `.local`, or its first label, and `""`) `getaddrinfo`, and
+through it `GetAddrInfoW` and `GetAddrInfoExW`, drops loopback and IPv6 link-local results
+while a routable one remains, keeping the order (`ws2_32-patch/README.md`). `localhost` and
+`NULL` still return loopback, as on Windows. The unix half is unchanged. The pin is the
+release's `network`.
+
+Built by the tree's own rule in a tree configured as in `winemac-patch/README.md` (mingw-w64
+gcc 16.2, `make dlls/ws2_32/x86_64-windows/ws2_32.dll`), then
+`x86_64-w64-mingw32-strip --strip-debug` as the CI does. Built without the patch, every section
+is byte-identical to the runtime's `ws2_32.dll`; only the PE timestamp, checksum and build id
+differ, and the runtime's `.eh_frame` section name is cut to `.eh_fram` (10 bytes of string
+table). 11.15 keeps the runtime's own `ws2_32.dll`, so it still answers loopback first.
 
 ## D3DMetal: the builtin model
 
@@ -325,6 +349,7 @@ python3 apply.py <ntdll.dll> <out> <detour bin>   # patched hashes
 | `winemac-winecx-11.17.so` | `aa192f846ad15d56de200fc92752eaf2d455700846ae2cf1ccc7b27b535f1c00` |
 | `winebus-winecx-11.17.so` | `6223c035c824c90708abbc3e733f8d1d6ed6b8b4e9a3e1a5c813493ceba50473` |
 | `winebus-winecx-11.17.sys` | `da108d1c3788fa32807ef08c4d26d8a89812c230317ffa7ba5111e126bda607c` |
+| `ws2_32-winecx-11.17.dll` | `cb0a5670ce6dbf949ed25cca54e9f1c4930cd4c2ade895836d518d3d9073079c` |
 
 4.5.125 (`winecx-11.15`):
 

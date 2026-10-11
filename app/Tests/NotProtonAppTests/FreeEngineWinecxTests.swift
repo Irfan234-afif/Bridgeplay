@@ -180,6 +180,35 @@ struct FreeEngineWinecxTests {
         #expect(throws: StepFailure.self) { try FreeEngineWinecx.installBundled(wrong, root: root) }
     }
 
+    // docs/WINECX.md, Own host name: 11.17 ships ws2_32.dll with getaddrinfo on the local
+    // host name returning no loopback first (ws2_32-patch/); 11.15 keeps the runtime's.
+    @Test("The own-host-name ws2_32 ships with the app and is laid into the 11.17 engine",
+          arguments: FreeEngineWinecx.releases.map(\.build))
+    func ownHostNameNetwork(id: String) throws {
+        let release = try #require(FreeEngineWinecx.release(build: id))
+        let files = release.network
+        let expected: Set<String> = release.build == "winecx-11.17" ? ["lib/wine/x86_64-windows/ws2_32.dll"] : []
+        #expect(Set(files.map(\.path)) == expected)
+        let table = FreeEngineWinecx.expectedFiles(release)
+        for file in files {
+            let bundled = try #require(Bundle.module.url(forResource: file.resource, withExtension: file.ext))
+            #expect(Digest.sha256IfPresent(bundled) == file.sha256, "\(file.resource)")
+            #expect(table[file.path] == file.sha256, "\(file.path)")
+        }
+        guard !files.isEmpty else { return }
+
+        let root = try makeDirectory("network")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let dll = root.appending(path: "lib/wine/x86_64-windows/ws2_32.dll")
+        try FileManager.default.createDirectory(at: dll.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try Data("winecx's own ws2_32.dll".utf8).write(to: dll)
+        #expect(FreeEngineWinecx.layoutProblems(root: root, release: release).contains(files[0].path))
+
+        try FreeEngineWinecx.installBundled(files, root: root)
+        #expect(Digest.sha256IfPresent(dll) == files[0].sha256)
+        #expect(!FreeEngineWinecx.layoutProblems(root: root, release: release).contains(files[0].path))
+    }
+
     @Test("Each free engine is current, outdated or missing on its own pins")
     func perEngineState() throws {
         let winehqBuild = try #require(SupportedRunners.build(id: FreeEngine.current.build))
