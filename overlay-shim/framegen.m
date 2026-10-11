@@ -170,8 +170,7 @@ static int fg_rate_frames;
 static double fg_slow_since, fg_fast_since; // when the rate crossed the threshold, 0 = not crossed
 static double fg_retry_not_before; // after a forced pass-through, no engagement until then
 static _Atomic int fg_total_state_changes; // active <-> pass-through transitions
-static id fg_hud_saved; // the game layer's developerHUDProperties before we hid its HUD
-static int fg_hud_suppressed;
+static int fg_hud_suppressed; // the covering layer carries the HUD, the game's layer has it hidden
 
 // Mode changes between active and pass-through are what the user sees as the
 // picture jumping between layers; count them for the stats and the tests.
@@ -1229,28 +1228,56 @@ static void fg_ca_end(void)
 	[CATransaction flush];
 }
 
-// With MTL_HUD_ENABLED the game's layer shows its own HUD too, frozen at the
-// rate of its own presents, and it would sit under ours. A developerHUDProperties
-// dictionary without the "mode" key hides that layer's HUD; nil lets the
-// environment decide again. Caller is on the main thread.
-static void fg_hud_suppress(CAMetalLayer *game, int suppress)
+// With MTL_HUD_ENABLED every CAMetalLayer gets its own HUD, so the game's layer
+// (frozen at its own present rate) shows a second one under ours. libMTLHud
+// (HUDMTLLayerTracking -observeValueForKeyPath:, macOS 27) reads only the "mode"
+// key of a layer's developerHUDProperties: "default" shows that layer's HUD,
+// "main" shows it and makes the layer the main one (full layout), any other
+// string hides it. A dictionary without "mode" hands the layer back to MTL_HUD_*
+// (so it does not hide anything), and nil is ignored. Caller is on the main thread.
+static void fg_hud_set_mode(CAMetalLayer *layer, CFStringRef mode)
 {
-	SEL get = sel_registerName("developerHUDProperties");
 	SEL set = sel_registerName("setDeveloperHUDProperties:");
-	if (game == nil || ![game respondsToSelector:get] || ![game respondsToSelector:set])
+	if (layer == nil || ![layer respondsToSelector:set])
 		return;
-	if (suppress && !fg_hud_suppressed) {
-		id current = ((id (*)(id, SEL))objc_msgSend)(game, get);
-		fg_release(&fg_hud_saved);
-		fg_hud_saved = [current retain];
-		CFDictionaryRef empty = CFDictionaryCreate(NULL, NULL, NULL, 0, &kCFTypeDictionaryKeyCallBacks,
-		                                           &kCFTypeDictionaryValueCallBacks);
-		((void (*)(id, SEL, id))objc_msgSend)(game, set, (id)empty);
-		CFRelease(empty);
+	const void *key = CFSTR("mode"), *value = mode;
+	CFDictionaryRef props = CFDictionaryCreate(NULL, &key, &value, 1, &kCFTypeDictionaryKeyCallBacks,
+	                                           &kCFTypeDictionaryValueCallBacks);
+	((void (*)(id, SEL, id))objc_msgSend)(layer, set, (id)props);
+	CFRelease(props);
+}
+
+// Whether the HUD is on for the game: from the environment, or a mode the game's
+// layer already carries (set by the HUD itself or the app)
+static int fg_hud_wanted(CAMetalLayer *game)
+{
+	const char *env = getenv("MTL_HUD_ENABLED");
+	if (env != NULL && *env != '\0' && strcmp(env, "0") != 0)
+		return 1;
+	SEL get = sel_registerName("developerHUDProperties");
+	if (game == nil || ![game respondsToSelector:get])
+		return 0;
+	CFTypeRef props = (CFTypeRef)((id (*)(id, SEL))objc_msgSend)(game, get);
+	if (props == NULL || CFGetTypeID(props) != CFDictionaryGetTypeID())
+		return 0;
+	CFTypeRef mode = CFDictionaryGetValue((CFDictionaryRef)props, CFSTR("mode"));
+	return mode != NULL && CFGetTypeID(mode) == CFStringGetTypeID() &&
+	       (CFEqual(mode, CFSTR("default")) || CFEqual(mode, CFSTR("main")));
+}
+
+// covering = 1: only the covering layer shows the HUD (as the main layer, so it
+// counts real + generated frames); 0: only the game's layer does again.
+static void fg_hud_suppress(CAMetalLayer *game, CAMetalLayer *layer, int covering)
+{
+	if (covering && !fg_hud_suppressed) {
+		if (!fg_hud_wanted(game))
+			return;
+		fg_hud_set_mode(layer, CFSTR("main"));
+		fg_hud_set_mode(game, CFSTR("off"));
 		fg_hud_suppressed = 1;
-	} else if (!suppress && fg_hud_suppressed) {
-		((void (*)(id, SEL, id))objc_msgSend)(game, set, fg_hud_saved);
-		fg_release(&fg_hud_saved);
+	} else if (!covering && fg_hud_suppressed) {
+		fg_hud_set_mode(game, CFSTR("main"));
+		fg_hud_set_mode(layer, CFSTR("off"));
 		fg_hud_suppressed = 0;
 	}
 }
@@ -1264,7 +1291,7 @@ static void fg_layer_set_hidden(int hidden)
 	fg_on_main(^{
 		fg_ca_begin();
 		layer.hidden = hidden ? YES : NO;
-		fg_hud_suppress(game, !hidden);
+		fg_hud_suppress(game, layer, !hidden);
 		fg_ca_end();
 	});
 }
@@ -1362,7 +1389,7 @@ static void fg_layer_destroy(void)
 		return;
 	fg_on_main(^{
 		fg_ca_begin();
-		fg_hud_suppress(game, 0);
+		fg_hud_suppress(game, layer, 0);
 		[layer removeFromSuperlayer];
 		fg_ca_end();
 	});
