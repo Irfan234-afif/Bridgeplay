@@ -65,7 +65,7 @@ DEPS := $(OBJS:.o=.d)
         overlay-shim-bench iconmaker icon \
         appinfo helpers-install ntdll-resolve bridge runcheck compatcheck \
         compatsvc-check scriptcheck envcheck buildcheck settingscheck routecheck bridgecheck gamedrivecheck \
-        gamefixescheck launchercheck launch-shell FORCE
+        gamefixescheck launchercheck padcheck launch-shell FORCE
 
 APP_PAYLOAD := app/Sources/NotProtonApp/Resources/payload
 
@@ -124,6 +124,10 @@ gamedrivecheck:
 gamefixescheck:
 	@if [ ! -f dylib/tests/gamefixescheck.sh ]; then $(call SKIP,gamefixescheck,dylib/tests/gamefixescheck.sh); exit 0; fi; \
 	sh dylib/tests/gamefixescheck.sh dylib/feats/compat_run.sh
+
+padcheck:
+	@if [ ! -f dylib/tests/padcheck.sh ]; then $(call SKIP,padcheck,dylib/tests/padcheck.sh); exit 0; fi; \
+	sh dylib/tests/padcheck.sh dylib/feats/compat_run.sh
 
 launchercheck:
 	@if [ ! -f dylib/tests/launchercheck.sh ]; then $(call SKIP,launchercheck,dylib/tests/launchercheck.sh); exit 0; fi; \

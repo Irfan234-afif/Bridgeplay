@@ -164,20 +164,58 @@ fi
 SDL_JOYSTICK_MFI=0
 export SDL_JOYSTICK_MFI
 
-pad_db="$HOME/Library/Application Support/notproton/gamecontrollerdb.txt"
-if [ -f "$pad_db" ]; then
-  pad_maps=$(sed -e '/^[[:space:]]*#/d' -e '/^[[:space:]]*$/d' "$pad_db")
-  if [ -n "$pad_maps" ]; then
-    if [ -n "$SDL_GAMECONTROLLERCONFIG" ]; then
-      SDL_GAMECONTROLLERCONFIG="$SDL_GAMECONTROLLERCONFIG
-$pad_maps"
+# The full database, gamecontrollerdb.merged.txt from scripts/update-gamecontrollerdb.sh
+# (~90 KB), reaches SDL as a file: SDL_Init reads SDL_GAMECONTROLLERCONFIG_FILE (SDL 2.0.22+),
+# then the variable's lines, which outrank the file's. Only the hand-written lines ride in
+# the variable, which every Wine process inherits. A runner SDL without the hint gets the
+# database in the variable instead. The variable keeps the last line per GUID, newest
+# first, up to pad_cap bytes.
+np_pad_mappings() {
+  pad_db="$np_support/gamecontrollerdb.txt"
+  pad_full="$np_support/gamecontrollerdb.merged.txt"
+  pad_sdl="$CX_ROOT/lib/libSDL2-2.0.0.dylib"
+  pad_cap=32768
+  pad_env_src=""
+  if [ -f "$pad_full" ] && [ -z "$SDL_GAMECONTROLLERCONFIG_FILE" ]; then
+    if [ -f "$pad_sdl" ] && LC_ALL=C grep -q -a SDL_GAMECONTROLLERCONFIG_FILE "$pad_sdl" 2>/dev/null; then
+      SDL_GAMECONTROLLERCONFIG_FILE="$pad_full"
+      export SDL_GAMECONTROLLERCONFIG_FILE
+      echo "controllers: mapping file $pad_full" >> "$log" 2>&1 || true
     else
-      SDL_GAMECONTROLLERCONFIG="$pad_maps"
+      pad_env_src="$pad_full"
+      echo "controllers: $pad_sdl lacks SDL_GAMECONTROLLERCONFIG_FILE, $pad_full goes in the environment (capped)" >> "$log" 2>&1 || true
     fi
-    export SDL_GAMECONTROLLERCONFIG
-    echo "controllers: $(printf '%s\n' "$pad_maps" | wc -l | tr -d ' ') mapping(s) from $pad_db" >> "$log" 2>&1 || true
   fi
-fi
+  [ -f "$pad_db" ] || pad_db=""
+  [ -n "$pad_env_src$pad_db" ] || return 0
+  # Last line per GUID, newest first until pad_cap bytes, printed in file order
+  pad_maps=$(cat ${pad_env_src:+"$pad_env_src"} ${pad_db:+"$pad_db"} | tr -d '\r' \
+    | sed -e '/^[[:space:]]*#/d' -e '/^[[:space:]]*$/d' \
+    | awk -v cap="$pad_cap" '
+      { line[NR] = $0 }
+      END {
+        for (i = NR; i >= 1; i--) {
+          g = tolower(substr(line[i], 1, 32))
+          if (g in seen) continue
+          seen[g] = 1
+          if (size + length(line[i]) + 1 > cap) { dropped++; continue }
+          size += length(line[i]) + 1
+          keep[i] = 1
+        }
+        for (i = 1; i <= NR; i++) if (i in keep) print line[i]
+        if (dropped) printf "controllers: %d mapping(s) over the %d-byte cap dropped\n", dropped, cap > "/dev/stderr"
+      }' 2>> "$log")
+  [ -n "$pad_maps" ] || return 0
+  if [ -n "$SDL_GAMECONTROLLERCONFIG" ]; then
+    SDL_GAMECONTROLLERCONFIG="$SDL_GAMECONTROLLERCONFIG
+$pad_maps"
+  else
+    SDL_GAMECONTROLLERCONFIG="$pad_maps"
+  fi
+  export SDL_GAMECONTROLLERCONFIG
+  echo "controllers: $(printf '%s\n' "$pad_maps" | wc -l | tr -d ' ') mapping(s) in SDL_GAMECONTROLLERCONFIG from ${pad_env_src:+$pad_env_src }${pad_db}" >> "$log" 2>&1 || true
+}
+np_pad_mappings
 
 # Per-game fixes: the shipped gamefixes-default/<appid>.conf, then the user's
 # gamefixes/<appid>.conf, the later file winning per key. KEY=VALUE lines are checked
@@ -2071,7 +2109,7 @@ else
   echo "=== client staged no overlay renderer, overlay disabled ===" >> "$log" 2>&1 || true
 fi
 set -- --args "$shim_exe" "$@"
-for name in $(env | sed -nE 's/^(CX_APPLEGPTK_LIBD3DSHARED_PATH|SDL_GAMECONTROLLERCONFIG|SDL_JOYSTICK_MFI|WINE_LARGE_ADDRESS_AWARE|WINE_CPU_TOPOLOGY|Steam[A-Za-z0-9]*|(CX_GRAPHICS|D3DM_|DXMT_|DXVK_|MVK_|VKD3D_|STAGING_|MTL_|ROSETTA_)[A-Z0-9_]*)=.*/\1/p'); do
+for name in $(env | sed -nE 's/^(CX_APPLEGPTK_LIBD3DSHARED_PATH|SDL_GAMECONTROLLERCONFIG(_FILE)?|SDL_JOYSTICK_MFI|WINE_LARGE_ADDRESS_AWARE|WINE_CPU_TOPOLOGY|Steam[A-Za-z0-9]*|(CX_GRAPHICS|D3DM_|DXMT_|DXVK_|MVK_|VKD3D_|STAGING_|MTL_|ROSETTA_)[A-Z0-9_]*)=.*/\1/p'); do
   eval "value=\$$name"
   # shellcheck disable=SC2154 # eval assigns value on the line above
   set -- --env "$name=$value" "$@"
