@@ -161,19 +161,23 @@ enum SteamInstaller {
             backedUp = try backUpPlist(plist, into: backups)
 
             let priorPlist = try? Data(contentsOf: plist)
-            let priorHash = cdhash(of: app)
+            let priorRequirement = designatedRequirement(of: app)
             do {
                 try setInsert(at: plist, to: dylib)
 
                 report(.signing)
-                try adHocSign(dylib)
-                try adHocSign(app.appending(path: "Contents/MacOS/steam_osx"))
-                try adHocSign(app)
+                let identity = signingIdentity()
+                try sign(dylib, identity: identity)
+                try sign(app.appending(path: "Contents/MacOS/steam_osx"), identity: identity)
+                try sign(app, identity: identity)
             } catch {
                 revertPlist(priorPlist, at: plist, app: app)
                 throw error
             }
-            if cdhash(of: app) != priorHash {
+            // macOS keys Steam's input access to the designated requirement. Ad hoc that is the
+            // cdhash, which every new dylib changes; signed with the local identity it is the
+            // certificate, so the approval survives updates and is only cleared on a change.
+            if designatedRequirement(of: app) != priorRequirement {
                 resetInputAccess()
             }
         }
@@ -366,11 +370,36 @@ enum SteamInstaller {
     }
 
     static func adHocSign(_ url: URL, step: String = step) throws {
+        try sign(url, identity: "-", step: step)
+    }
+
+    // A self-signed code signing identity in the login keychain. When it exists Steam is signed
+    // with it instead of ad hoc, which keeps its designated requirement, and with it the user's
+    // Input Monitoring approval, the same across NotProton updates.
+    static let localSigningIdentity = "NotProton Local Signing"
+
+    static func signingIdentity() -> String {
+        guard let result = try? Shell.run("/usr/bin/security", ["find-identity", "-p", "codesigning"]),
+              result.succeeded else { return "-" }
+        for line in result.stdout.split(separator: "\n") where line.contains("\"\(localSigningIdentity)\"") {
+            let fields = line.split(separator: " ")
+            if let hash = fields.first(where: { $0.count == 40 && $0.allSatisfy(\.isHexDigit) }) {
+                return String(hash)
+            }
+        }
+        return "-"
+    }
+
+    static func sign(_ url: URL, identity: String, step: String = step) throws {
         let path = url.path(percentEncoded: false)
-        var result = try Shell.run("/usr/bin/codesign", ["-f", "-s", "-", path])
+        var result = try Shell.run("/usr/bin/codesign", ["-f", "-s", identity, path])
         // Fixes codesign refusing a Steam.app that carries Finder info or a resource fork.
         if !result.succeeded, result.stderr.contains("detritus not allowed") {
             clearFinderData(in: enclosingBundle(of: url))
+            result = try Shell.run("/usr/bin/codesign", ["-f", "-s", identity, path])
+        }
+        // A keychain that refuses the identity must not leave Steam unsigned.
+        if !result.succeeded, identity != "-" {
             result = try Shell.run("/usr/bin/codesign", ["-f", "-s", "-", path])
         }
         guard result.succeeded else {
@@ -380,6 +409,14 @@ enum SteamInstaller {
                     + result.stderr.trimmingCharacters(in: .whitespacesAndNewlines)
             )
         }
+    }
+
+    static func designatedRequirement(of url: URL) -> String? {
+        guard let result = try? Shell.run("/usr/bin/codesign", ["-d", "-r-", url.path(percentEncoded: false)])
+        else { return nil }
+        return (result.stdout + result.stderr).split(separator: "\n")
+            .first { $0.hasPrefix("designated => ") }
+            .map(String.init)
     }
 
     static func enclosingBundle(of url: URL) -> URL {
@@ -403,13 +440,6 @@ enum SteamInstaller {
                 removexattr(path, name, XATTR_NOFOLLOW)
             }
         }
-    }
-
-    static func cdhash(of app: URL) -> String? {
-        guard let result = try? Shell.run("/usr/bin/codesign", ["-dvvv", app.path(percentEncoded: false)]) else { return nil }
-        return (result.stdout + result.stderr).split(separator: "\n")
-            .first { $0.hasPrefix("CDHash=") }
-            .map { String($0.dropFirst("CDHash=".count)) }
     }
 
     // macOS does not automatically clear a pre-existing input access approval, so it needs to be cleared
