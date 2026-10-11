@@ -1269,6 +1269,10 @@ static void fg_layer_set_hidden(int hidden)
 	});
 }
 
+// Colour state last handed to the covering layer (fg_layer_create, fg_layer_sync_geometry).
+static CGColorSpaceRef fg_synced_space;
+static int fg_synced_edr = -1;
+
 static void fg_layer_sync_geometry(CAMetalLayer *game)
 {
 	CGRect bounds = game.bounds;
@@ -1282,6 +1286,34 @@ static void fg_layer_sync_geometry(CAMetalLayer *game)
 			fg_ca_end();
 		});
 	}
+	// Games switch to HDR (PQ, EDR) after the layer exists; copied PQ pixels shown through
+	// an sRGB, non-EDR layer look washed out, so the colour state follows the game's.
+	// Compared against what was last requested: the layer's own properties are set on the
+	// main thread and may not read back yet.
+	CGColorSpaceRef space = game.colorspace;
+	int edr = [game respondsToSelector:@selector(wantsExtendedDynamicRangeContent)] ?
+	                  (int)game.wantsExtendedDynamicRangeContent : -1;
+	int space_same = (space == NULL && fg_synced_space == NULL) ||
+	                 (space != NULL && fg_synced_space != NULL && CFEqual(space, fg_synced_space));
+	if (!space_same || edr != fg_synced_edr) {
+		if (fg_synced_space != NULL)
+			CGColorSpaceRelease(fg_synced_space);
+		fg_synced_space = space != NULL ? CGColorSpaceRetain(space) : NULL;
+		fg_synced_edr = edr;
+		CGColorSpaceRef held = space != NULL ? CGColorSpaceRetain(space) : NULL;
+		id metadata = [game respondsToSelector:@selector(EDRMetadata)] ? game.EDRMetadata : nil;
+		fg_on_main(^{
+			fg_ca_begin();
+			layer.colorspace = held;
+			if (edr >= 0 && [layer respondsToSelector:@selector(setWantsExtendedDynamicRangeContent:)])
+				layer.wantsExtendedDynamicRangeContent = edr != 0;
+			if ([layer respondsToSelector:@selector(setEDRMetadata:)])
+				layer.EDRMetadata = metadata;
+			fg_ca_end();
+			if (held != NULL)
+				CGColorSpaceRelease(held);
+		});
+	}
 }
 
 static int fg_layer_create(CAMetalLayer *game, NSUInteger width, NSUInteger height, NSUInteger format)
@@ -1289,6 +1321,11 @@ static int fg_layer_create(CAMetalLayer *game, NSUInteger width, NSUInteger heig
 	CAMetalLayer *layer = [[CAMetalLayer alloc] init];
 	if (layer == nil)
 		return 0;
+	if (fg_synced_space != NULL)
+		CGColorSpaceRelease(fg_synced_space);
+	fg_synced_space = game.colorspace != NULL ? CGColorSpaceRetain(game.colorspace) : NULL;
+	fg_synced_edr = [game respondsToSelector:@selector(wantsExtendedDynamicRangeContent)] ?
+	                        (int)game.wantsExtendedDynamicRangeContent : -1;
 
 	fg_on_main(^{
 	fg_ca_begin();
