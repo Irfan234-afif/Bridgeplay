@@ -4,8 +4,8 @@
 #   scripts/sync-upstream.sh            merge, then print what came in
 #   scripts/sync-upstream.sh --check    only report whether anything new is upstream
 #
-# Sources, in order: leonseemann/NotProton-WineHQ (remote fork-src) and
-# NotProtonNot/NotProton (remote upstream). Each is merged with a merge commit, never
+# Source: NotProtonNot/NotProton (remote upstream). The fork this one started from,
+# leonseemann/NotProton-WineHQ, was deleted in October 2026. Upstream is merged with a merge commit, never
 # rebased or taken with -X theirs, so local commits stay as they are. The only conflict
 # resolved automatically is dylib/version.h: the result is upstream's base version with
 # this fork's "-winehq.N-ray.M" suffix, M bumped so Sparkle sees a newer build. Any
@@ -27,7 +27,6 @@ ensure_remote() {
 	url=$(git remote get-url "$1" 2>/dev/null || true)
 	[ -n "$url" ] || git remote add "$1" "$2"
 }
-ensure_remote fork-src https://github.com/leonseemann/NotProton-WineHQ
 ensure_remote upstream https://github.com/NotProtonNot/NotProton
 
 if [ -n "$(git status --porcelain --untracked-files=no)" ]; then
@@ -35,7 +34,6 @@ if [ -n "$(git status --porcelain --untracked-files=no)" ]; then
 	exit 1
 fi
 
-git fetch -q fork-src
 git fetch -q upstream
 
 version_of() {
@@ -43,13 +41,13 @@ version_of() {
 }
 
 pending=""
-for ref in fork-src/main upstream/main; do
+for ref in upstream/main; do
 	count=$(git rev-list --count "HEAD..$ref")
 	[ "$count" -eq 0 ] || pending="$pending $ref:$count"
 done
 
 if [ -z "$pending" ]; then
-	echo "==> up to date with fork-src/main and upstream/main"
+	echo "==> up to date with upstream/main"
 	exit 0
 fi
 echo "==> new upstream commits:$pending"
