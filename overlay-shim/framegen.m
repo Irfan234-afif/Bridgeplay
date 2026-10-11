@@ -64,6 +64,7 @@
 #import <QuartzCore/CATransaction.h>
 #import <dispatch/dispatch.h>
 #import <mach/mach_time.h>
+#import <math.h>
 #import <pthread.h>
 #import <stdatomic.h>
 #import <stdlib.h>
@@ -127,13 +128,16 @@ enum fg_skip {
 	fg_skip_warmup,
 	fg_skip_settling,
 	fg_skip_fast_motion,
+	fg_skip_display_dropped,
+	fg_skip_double_present,
 	fg_skip_count,
 };
 
 static const char *const fg_skip_names[fg_skip_count] = {
 	"other-layer", "mismatch", "fps>=refresh", "worker-lag", "no-drawable", "error", "unordered",
-	"metalfx-warmup", "settling", "fast-motion",
+	"metalfx-warmup", "settling", "fast-motion", "display-dropped", "double-present",
 };
+
 
 // Shared between the game thread and the worker; fg_lock guards everything
 // below except the atomics.
@@ -159,7 +163,26 @@ static double fg_last_present_time;
 static double fg_interval; // EMA of real present spacing, seconds
 static double fg_lead; // EMA of generation latency, seconds
 static double fg_refresh_interval;
-static int fg_slow_frames;
+// Engage/disengage runs on a smoothed rate: frames counted over half-second
+// windows, and the state held until the condition has lasted a second.
+static double fg_rate_start, fg_rate_interval; // window start; mean interval of the last full window
+static int fg_rate_frames;
+static double fg_slow_since, fg_fast_since; // when the rate crossed the threshold, 0 = not crossed
+static double fg_retry_not_before; // after a forced pass-through, no engagement until then
+static _Atomic int fg_total_state_changes; // active <-> pass-through transitions
+static id fg_hud_saved; // the game layer's developerHUDProperties before we hid its HUD
+static int fg_hud_suppressed;
+
+// Mode changes between active and pass-through are what the user sees as the
+// picture jumping between layers; count them for the stats and the tests.
+static void fg_mode_store(int mode)
+{
+	int was = atomic_exchange(&fg_mode, mode);
+	if ((was == fg_mode_active) != (mode == fg_mode_active) &&
+	    (was == fg_mode_active || was == fg_mode_passthrough) &&
+	    (mode == fg_mode_active || mode == fg_mode_passthrough))
+		atomic_fetch_add(&fg_total_state_changes, 1);
+}
 
 // Stats, once per second when OVERLAY_SHIM_LOG is set
 static double fg_stat_start;
@@ -167,6 +190,20 @@ static int fg_stat_real, fg_stat_generated, fg_stat_skips[fg_skip_count];
 static double fg_stat_gpu_ms, fg_stat_gpu_max_ms;
 static int fg_stat_gpu_n;
 static _Atomic int fg_total_generated, fg_total_real_copies;
+
+// Display diagnostics: what the compositor did with the overlay layer's drawables
+// (presentedTime 0 in the presented handler means dropped), and the mean luma of
+// the last real copy and generated frame, measured once a second on the GPU.
+static _Atomic int fg_total_presented, fg_total_dropped;
+static int fg_stat_presented, fg_stat_dropped;
+static double fg_diag_luma[2]; // 0 real copy, 1 generated
+static double fg_diag_time; // last luma measurement
+static id<MTLTexture> fg_diag_texture; // 1/64 luma of a frame
+static id<MTLBuffer> fg_diag_buffer[2];
+// Safety net: active with presents issued but none reaching the glass
+static double fg_display_check_time;
+static int fg_display_check_presented, fg_display_check_issued;
+static _Atomic int fg_game_presented; // the game's own presents that reached the display
 
 // Which engine the worker ended up with
 static int fg_engine_kind; // 0 none, 1 own, 2 metalfx
@@ -1143,25 +1180,107 @@ static double fg_display_interval(NSUInteger width, NSUInteger height)
 	return rate > 0 ? 1.0 / rate : 1.0 / 60.0;
 }
 
-static void fg_layer_set_hidden(int hidden)
+// Layer-tree changes belong to the main thread, which owns the window's layer
+// tree and commits it; a change committed from the worker races with it. The
+// block runs on the main queue when that is being drained (Wine's main thread
+// runs the Cocoa run loop), inline when we are the main thread, and inline as
+// the fallback when the main queue has not picked it up within 50 ms.
+static void fg_on_main(void (^block)(void))
 {
-	if (fg_layer == nil)
-		return;
+	if (pthread_main_np())
+		return block();
+
+	struct task {
+		_Atomic int claimed; // whoever flips 0 -> 1 runs the block
+		_Atomic int finished; // the second party to finish frees the task
+		dispatch_semaphore_t done;
+	} *task = calloc(1, sizeof(*task));
+	task->done = dispatch_semaphore_create(0);
+	dispatch_async(dispatch_get_main_queue(), ^{
+		int expected = 0;
+		if (atomic_compare_exchange_strong(&task->claimed, &expected, 1))
+			block();
+		dispatch_semaphore_signal(task->done);
+		if (atomic_fetch_add(&task->finished, 1) == 1) {
+			dispatch_release(task->done);
+			free(task);
+		}
+	});
+	if (dispatch_semaphore_wait(task->done, dispatch_time(DISPATCH_TIME_NOW, 50 * NSEC_PER_MSEC)) != 0) {
+		int expected = 0;
+		if (atomic_compare_exchange_strong(&task->claimed, &expected, 1))
+			block(); // main thread not draining its queue; the block above then only signals
+	}
+	if (atomic_fetch_add(&task->finished, 1) == 1) {
+		dispatch_release(task->done);
+		free(task);
+	}
+}
+
+static void fg_ca_begin(void)
+{
 	[CATransaction begin];
 	[CATransaction setDisableActions:YES];
-	fg_layer.hidden = hidden ? YES : NO;
+}
+
+static void fg_ca_end(void)
+{
 	[CATransaction commit];
+	[CATransaction flush];
+}
+
+// With MTL_HUD_ENABLED the game's layer shows its own HUD too, frozen at the
+// rate of its own presents, and it would sit under ours. A developerHUDProperties
+// dictionary without the "mode" key hides that layer's HUD; nil lets the
+// environment decide again. Caller is on the main thread.
+static void fg_hud_suppress(CAMetalLayer *game, int suppress)
+{
+	SEL get = sel_registerName("developerHUDProperties");
+	SEL set = sel_registerName("setDeveloperHUDProperties:");
+	if (game == nil || ![game respondsToSelector:get] || ![game respondsToSelector:set])
+		return;
+	if (suppress && !fg_hud_suppressed) {
+		id current = ((id (*)(id, SEL))objc_msgSend)(game, get);
+		fg_release(&fg_hud_saved);
+		fg_hud_saved = [current retain];
+		CFDictionaryRef empty = CFDictionaryCreate(NULL, NULL, NULL, 0, &kCFTypeDictionaryKeyCallBacks,
+		                                           &kCFTypeDictionaryValueCallBacks);
+		((void (*)(id, SEL, id))objc_msgSend)(game, set, (id)empty);
+		CFRelease(empty);
+		fg_hud_suppressed = 1;
+	} else if (!suppress && fg_hud_suppressed) {
+		((void (*)(id, SEL, id))objc_msgSend)(game, set, fg_hud_saved);
+		fg_release(&fg_hud_saved);
+		fg_hud_suppressed = 0;
+	}
+}
+
+// Shows or hides the covering layer, and with it swaps which layer carries the HUD
+static void fg_layer_set_hidden(int hidden)
+{
+	CAMetalLayer *layer = fg_layer, *game = (CAMetalLayer *)fg_game_layer;
+	if (layer == nil)
+		return;
+	fg_on_main(^{
+		fg_ca_begin();
+		layer.hidden = hidden ? YES : NO;
+		fg_hud_suppress(game, !hidden);
+		fg_ca_end();
+	});
 }
 
 static void fg_layer_sync_geometry(CAMetalLayer *game)
 {
 	CGRect bounds = game.bounds;
-	if (!CGRectEqualToRect(fg_layer.frame, bounds) || fg_layer.contentsScale != game.contentsScale) {
-		[CATransaction begin];
-		[CATransaction setDisableActions:YES];
-		fg_layer.frame = bounds;
-		fg_layer.contentsScale = game.contentsScale;
-		[CATransaction commit];
+	CGFloat scale = game.contentsScale;
+	CAMetalLayer *layer = fg_layer;
+	if (!CGRectEqualToRect(layer.frame, bounds) || layer.contentsScale != scale) {
+		fg_on_main(^{
+			fg_ca_begin();
+			layer.frame = bounds;
+			layer.contentsScale = scale;
+			fg_ca_end();
+		});
 	}
 }
 
@@ -1171,8 +1290,8 @@ static int fg_layer_create(CAMetalLayer *game, NSUInteger width, NSUInteger heig
 	if (layer == nil)
 		return 0;
 
-	[CATransaction begin];
-	[CATransaction setDisableActions:YES];
+	fg_on_main(^{
+	fg_ca_begin();
 	layer.device = fg_device;
 	layer.pixelFormat = (MTLPixelFormat)format;
 	layer.colorspace = game.colorspace;
@@ -1192,7 +1311,8 @@ static int fg_layer_create(CAMetalLayer *game, NSUInteger width, NSUInteger heig
 	layer.frame = game.bounds;
 	layer.drawableSize = CGSizeMake(width, height);
 	[game addSublayer:layer];
-	[CATransaction commit];
+	fg_ca_end();
+	});
 
 	fg_layer = layer;
 	return 1;
@@ -1200,13 +1320,16 @@ static int fg_layer_create(CAMetalLayer *game, NSUInteger width, NSUInteger heig
 
 static void fg_layer_destroy(void)
 {
-	if (fg_layer == nil)
+	CAMetalLayer *layer = fg_layer, *game = (CAMetalLayer *)fg_game_layer;
+	if (layer == nil)
 		return;
-	[CATransaction begin];
-	[CATransaction setDisableActions:YES];
-	[fg_layer removeFromSuperlayer];
-	[CATransaction commit];
-	[fg_layer release];
+	fg_on_main(^{
+		fg_ca_begin();
+		fg_hud_suppress(game, 0);
+		[layer removeFromSuperlayer];
+		fg_ca_end();
+	});
+	[layer release];
 	fg_layer = nil;
 }
 
@@ -1215,8 +1338,11 @@ static void fg_resources_destroy(void)
 {
 	fg_engine_destroy(&fg_engine);
 	fg_engine_kind = 0;
-	for (int i = 0; i < 2; i++)
+	for (int i = 0; i < 2; i++) {
 		fg_release((id *)&fg_hist[i]);
+		fg_release((id *)&fg_diag_buffer[i]);
+	}
+	fg_release((id *)&fg_diag_texture);
 	fg_layer_destroy();
 }
 
@@ -1237,6 +1363,14 @@ static void fg_configure(CAMetalLayer *game, NSUInteger width, NSUInteger height
 		                      framegen_quality, framegen_ui, framegen_fallback);
 	if (ok)
 		ok = fg_layer_create(game, width, height, format);
+	if (ok) {
+		NSUInteger dw = (width + 63) / 64, dh = (height + 63) / 64;
+		fg_diag_texture = fg_make_texture(fg_device, MTLPixelFormatR16Float, dw, dh,
+		                                  MTLTextureUsageShaderRead | MTLTextureUsageShaderWrite, 0);
+		for (int i = 0; i < 2; i++)
+			fg_diag_buffer[i] = [fg_device newBufferWithLength:dw * dh * 2
+			                                           options:MTLResourceStorageModeShared];
+	}
 
 	// Outside fg_lock: the present path waits on that lock.
 	double refresh_interval = framegen_refresh_override > 0 ? 1.0 / framegen_refresh_override
@@ -1255,7 +1389,10 @@ static void fg_configure(CAMetalLayer *game, NSUInteger width, NSUInteger height
 	fg_hist_next = 0;
 	fg_engine_kind = fg_engine.kind;
 	fg_refresh_interval = refresh_interval;
-	fg_slow_frames = 0;
+	fg_slow_since = fg_fast_since = 0;
+	fg_rate_start = 0;
+	fg_rate_frames = 0;
+	fg_rate_interval = 0;
 	atomic_store(&fg_mode, ok ? fg_mode_passthrough : fg_mode_idle);
 	os_unfair_lock_unlock(&fg_lock);
 
@@ -1304,6 +1441,121 @@ static void fg_note_gpu(id<MTLCommandBuffer> buffer)
 	os_unfair_lock_unlock(&fg_lock);
 }
 
+static void fg_track_present(id<CAMetalDrawable> drawable)
+{
+	[drawable addPresentedHandler:^(id<MTLDrawable> done) {
+		if (done.presentedTime > 0)
+			atomic_fetch_add(&fg_total_presented, 1);
+		else
+			atomic_fetch_add(&fg_total_dropped, 1);
+	}];
+}
+
+// The game's own presents while passing through: whether this layer reaches a
+// display at all. Offscreen layers (tests) report every drawable dropped, and
+// the safety net must not fire there.
+static void fg_track_game_present(id drawable)
+{
+	if (atomic_load(&fg_game_presented) > 0)
+		return;
+	[(id<CAMetalDrawable>)drawable addPresentedHandler:^(id<MTLDrawable> done) {
+		if (done.presentedTime > 0)
+			atomic_fetch_add(&fg_game_presented, 1);
+	}];
+}
+
+static float fg_half_to_float(uint16_t h)
+{
+	unsigned sign = (h >> 15) & 1, exp = (h >> 10) & 0x1f, mant = h & 0x3ff;
+	float value;
+	if (exp == 0)
+		value = (float)mant / 1024.0f / 16384.0f;
+	else if (exp == 31)
+		value = mant ? 0.0f : 1e30f;
+	else
+		value = ldexpf(1.0f + (float)mant / 1024.0f, (int)exp - 15);
+	return sign ? -value : value;
+}
+
+// Mean luma of texture into fg_diag_luma[which] once the buffer completes
+static void fg_diag_encode(id<MTLCommandBuffer> buffer, id<MTLTexture> texture, int which)
+{
+	if (fg_diag_texture == nil || fg_diag_buffer[which] == nil || fg_engine.ps_luma == nil)
+		return;
+	id<MTLComputeCommandEncoder> encoder = [buffer computeCommandEncoder];
+	struct { unsigned scale; } params = { 64 };
+	[encoder setTexture:texture atIndex:0];
+	[encoder setTexture:fg_diag_texture atIndex:1];
+	[encoder setBytes:&params length:sizeof(params) atIndex:0];
+	fg_dispatch(encoder, fg_engine.ps_luma, fg_diag_texture.width, fg_diag_texture.height);
+	[encoder endEncoding];
+	NSUInteger w = fg_diag_texture.width, h = fg_diag_texture.height;
+	id<MTLBlitCommandEncoder> blit = [buffer blitCommandEncoder];
+	[blit copyFromTexture:fg_diag_texture
+	                sourceSlice:0
+	                sourceLevel:0
+	               sourceOrigin:MTLOriginMake(0, 0, 0)
+	                 sourceSize:MTLSizeMake(w, h, 1)
+	                   toBuffer:fg_diag_buffer[which]
+	          destinationOffset:0
+	     destinationBytesPerRow:w * 2
+	   destinationBytesPerImage:w * h * 2];
+	[blit endEncoding];
+	id<MTLBuffer> result = fg_diag_buffer[which];
+	[buffer addCompletedHandler:^(id<MTLCommandBuffer> done) {
+		if (done.error != nil)
+			return;
+		const uint16_t *px = result.contents;
+		double sum = 0;
+		for (NSUInteger i = 0; i < w * h; i++)
+			sum += fg_half_to_float(px[i]);
+		os_unfair_lock_lock(&fg_lock);
+		fg_diag_luma[which] = sum / (double)(w * h);
+		os_unfair_lock_unlock(&fg_lock);
+	}];
+}
+
+static const char *fg_colorspace_name(CGColorSpaceRef space, char *scratch, size_t size)
+{
+	if (space == NULL)
+		return "none";
+	CFStringRef name = CGColorSpaceCopyName(space);
+	if (name == NULL)
+		return "unnamed";
+	if (!CFStringGetCString(name, scratch, (CFIndex)size, kCFStringEncodingUTF8))
+		snprintf(scratch, size, "?");
+	CFRelease(name);
+	const char *tail = strrchr(scratch, ' ');
+	return tail != NULL ? tail + 1 : scratch;
+}
+
+// The overlay layer against the game's, for the stats line. Game thread.
+static void fg_describe_layers(char *out, size_t size)
+{
+	CAMetalLayer *game = (CAMetalLayer *)fg_game_layer;
+	CAMetalLayer *layer = fg_layer;
+	if (layer == nil || game == nil) {
+		snprintf(out, size, "layer=none");
+		return;
+	}
+	char ours[64], theirs[64];
+	CGRect frame = layer.frame, bounds = game.bounds;
+	int edr_game = [game respondsToSelector:@selector(wantsExtendedDynamicRangeContent)] ?
+	                       game.wantsExtendedDynamicRangeContent : -1;
+	int edr_ours = [layer respondsToSelector:@selector(wantsExtendedDynamicRangeContent)] ?
+	                       layer.wantsExtendedDynamicRangeContent : -1;
+	snprintf(out, size,
+	         "layer[hidden=%d opacity=%.2f frame=%.0fx%.0f@%.0f,%.0f bounds=%.0fx%.0f scale=%.1f/%.1f "
+	         "z=%.0f super=%s cs=%s/%s edr=%d/%d sync=%d/%d]",
+	         layer.hidden, layer.opacity, frame.size.width, frame.size.height, frame.origin.x,
+	         frame.origin.y, bounds.size.width, bounds.size.height, layer.contentsScale,
+	         game.contentsScale, layer.zPosition,
+	         layer.superlayer == game ? "game" : layer.superlayer == nil ? "none" : "other",
+	         fg_colorspace_name(layer.colorspace, ours, sizeof(ours)),
+	         fg_colorspace_name(game.colorspace, theirs, sizeof(theirs)), edr_ours, edr_game,
+	         layer.displaySyncEnabled, game.displaySyncEnabled);
+}
+
 static void fg_log_stats(double now)
 {
 	if (!framegen_stats_log)
@@ -1328,13 +1580,24 @@ static void fg_log_stats(double now)
 		if (used >= (int)sizeof(skips))
 			break;
 	}
+	int presented = atomic_load(&fg_total_presented), dropped = atomic_load(&fg_total_dropped);
+	int presented_now = presented - fg_stat_presented, dropped_now = dropped - fg_stat_dropped;
+	fg_stat_presented = presented;
+	fg_stat_dropped = dropped;
+	double luma_real = fg_diag_luma[0], luma_gen = fg_diag_luma[1];
+	os_unfair_lock_unlock(&fg_lock);
+	char layers[320];
+	fg_describe_layers(layers, sizeof(layers));
+	os_unfair_lock_lock(&fg_lock);
 	shim_log("NP framegen stats: real=%.1f fps generated=%.1f fps gpu=%.2f ms avg %.2f ms max "
-	        "engine=%s mode=%s quality=%s ui=%d fallback=%d state=%d lead=%.1f ms skips:%s\n",
+	        "engine=%s mode=%s quality=%s ui=%d fallback=%d state=%d lead=%.1f ms presented=%d "
+	        "dropped=%d luma real=%.3f gen=%.3f %s skips:%s\n",
 	        fg_stat_real / span, fg_stat_generated / span,
 	        fg_stat_gpu_n > 0 ? fg_stat_gpu_ms / fg_stat_gpu_n : 0.0, fg_stat_gpu_max_ms,
 	        fg_engine_name(fg_engine_kind), fg_multiplier_name(framegen_multiplier),
 	        fg_quality_names[framegen_quality], framegen_ui, framegen_fallback, atomic_load(&fg_mode),
-	        fg_lead * 1000.0, skips[0] != '\0' ? skips : " none");
+	        fg_lead * 1000.0, presented_now, dropped_now, luma_real, luma_gen, layers,
+	        skips[0] != '\0' ? skips : " none");
 	fg_stat_start = now;
 	fg_stat_real = fg_stat_generated = 0;
 	fg_stat_gpu_ms = fg_stat_gpu_max_ms = 0;
@@ -1343,11 +1606,58 @@ static void fg_log_stats(double now)
 	os_unfair_lock_unlock(&fg_lock);
 }
 
-// Per-second stats, driven from the game's present path
+// Active, presents issued, none reached the glass for about a second: the
+// game's own presents are suppressed meanwhile, so hand presentation back.
+static void fg_display_check(double now)
+{
+	if (atomic_load(&fg_mode) != fg_mode_active) {
+		fg_display_check_time = 0;
+		return;
+	}
+	int presented = atomic_load(&fg_total_presented);
+	int issued = atomic_load(&fg_total_real_copies);
+	if (fg_display_check_time == 0) {
+		fg_display_check_time = now;
+		fg_display_check_presented = presented;
+		fg_display_check_issued = issued;
+		return;
+	}
+	if (now - fg_display_check_time < 1.0)
+		return;
+	int issued_since = issued - fg_display_check_issued;
+	int presented_since = presented - fg_display_check_presented;
+	fg_display_check_time = now;
+	fg_display_check_presented = presented;
+	fg_display_check_issued = issued;
+	if (issued_since < 10 || presented_since > 0 || atomic_load(&fg_game_presented) == 0)
+		return;
+	os_unfair_lock_lock(&fg_lock);
+	int still_active = atomic_load(&fg_mode) == fg_mode_active;
+	if (still_active) {
+		fg_mode_store(fg_mode_passthrough);
+		fg_hist_valid = 0;
+		fg_retry_not_before = now + 5.0; // a few seconds of pass-through before trying again
+		fg_slow_since = 0;
+		fg_stat_skips[fg_skip_display_dropped]++;
+	}
+	os_unfair_lock_unlock(&fg_lock);
+	if (still_active) {
+		fg_layer_set_hidden(1);
+		shim_log("overlay_shim framegen: %d presents issued in the last second, none reached the "
+		        "display (%d dropped); pass-through\n",
+		        issued_since, atomic_load(&fg_total_dropped));
+	}
+}
+
+// Per-second stats and the display check, driven from the game's present path
 static void framegen_tick(void)
 {
-	if (framegen_enabled && framegen_stats_log)
-		fg_log_stats(fg_now());
+	if (!framegen_enabled)
+		return;
+	double now = fg_now();
+	fg_display_check(now);
+	if (framegen_stats_log)
+		fg_log_stats(now);
 }
 
 // Releases the game's drawable, no earlier than not_before: a game that asked
@@ -1395,6 +1705,8 @@ static void fg_run_job(struct fg_job *job)
 	double target_generated = job->arrived + lead;
 	double target_real = target_generated + (double)count * step;
 	int failed = 0;
+	double now = fg_now();
+	int diag = now - fg_diag_time > 1.0; // measure luma on this pair
 
 	if (job->interpolate && fg_engine.kind == 2 &&
 	    (job->reset || fg_engine.warm < fg_metalfx_warmup)) {
@@ -1418,6 +1730,8 @@ static void fg_run_job(struct fg_job *job)
 		// Flow once for the pair on the first buffer, then one synthesis per
 		// generated frame; each frame gets its own drawable and present time
 		id<MTLBuffer> stats = nil;
+		if (diag)
+			fg_diag_time = now;
 		for (int k = 1; k <= count; k++) {
 			id<CAMetalDrawable> drawable = [fg_layer nextDrawable];
 			if (drawable == nil) {
@@ -1440,6 +1754,9 @@ static void fg_run_job(struct fg_job *job)
 			id<MTLBlitCommandEncoder> blit = [buffer blitCommandEncoder];
 			[blit copyFromTexture:fg_engine.out toTexture:drawable.texture];
 			[blit endEncoding];
+			if (k == 1 && diag)
+				fg_diag_encode(buffer, fg_engine.out, 1);
+			fg_track_present(drawable);
 			[buffer presentDrawable:drawable atTime:target_generated + (double)(k - 1) * step];
 			double started = fg_now();
 			int first_of_pair = k == 1;
@@ -1484,6 +1801,11 @@ static void fg_run_job(struct fg_job *job)
 		id<MTLBlitCommandEncoder> blit = [buffer blitCommandEncoder];
 		[blit copyFromTexture:fg_hist[job->slot] toTexture:real.texture];
 		[blit endEncoding];
+		if (diag) {
+			fg_diag_encode(buffer, fg_hist[job->slot], 0);
+			fg_diag_time = now;
+		}
+		fg_track_present(real);
 		[buffer presentDrawable:real atTime:target_real];
 		atomic_fetch_add(&fg_total_real_copies, 1);
 		int first = job->first;
@@ -1500,11 +1822,12 @@ static void fg_run_job(struct fg_job *job)
 
 	if (failed && atomic_load(&fg_mode) == fg_mode_active) {
 		// The overlay layer cannot keep up; hand presentation back to the game
-		atomic_store(&fg_mode, fg_mode_passthrough);
+		fg_mode_store(fg_mode_passthrough);
 		fg_layer_set_hidden(1);
 		os_unfair_lock_lock(&fg_lock);
 		fg_hist_valid = 0;
-		fg_slow_frames = 0;
+		fg_slow_since = 0;
+		fg_retry_not_before = fg_now() + 1.0;
 		os_unfair_lock_unlock(&fg_lock);
 	}
 }
@@ -1697,19 +2020,36 @@ static int fg_decide(id drawable, int *interpolate)
 		os_unfair_lock_lock(&fg_lock);
 	}
 
-	// Real-frame timing
+	// Real-frame timing. The EMA paces the presents; a gap under a quarter of it
+	// is a second present inside one vsync (a double present), a gap over 250 ms
+	// a stall: neither moves the EMA, neither gets an interpolated frame.
 	double interval = fg_interval;
+	int double_present = 0, stall = 0;
 	if (fg_last_present_time > 0) {
 		double gap = now - fg_last_present_time;
-		if (gap > 0.25 || gap < 0.0005) {
-			interval = 0; // a stall or a burst; start over
-		} else {
+		if (gap > 0.25)
+			stall = 1;
+		else if (interval > 0 && gap < interval * 0.25)
+			double_present = 1;
+		else
 			interval = interval == 0 ? gap : interval * 0.8 + gap * 0.2;
-		}
 	}
 	fg_last_present_time = now;
 	fg_interval = interval;
 	fg_stat_real++;
+
+	// The smoothed rate: frames per half-second window
+	if (fg_rate_start == 0 || stall) {
+		fg_rate_start = now;
+		fg_rate_frames = 0;
+		if (stall)
+			fg_rate_interval = 0;
+	} else if (now - fg_rate_start >= 0.5) {
+		fg_rate_interval = (now - fg_rate_start) / (double)fg_rate_frames;
+		fg_rate_start = now;
+		fg_rate_frames = 0;
+	}
+	fg_rate_frames++;
 
 	int mode = atomic_load(&fg_mode);
 	int mismatch = texture.width != fg_width || texture.height != fg_height ||
@@ -1724,7 +2064,7 @@ static int fg_decide(id drawable, int *interpolate)
 		}
 		unsigned generation = atomic_fetch_add(&fg_generation, 1) + 1;
 		NSUInteger width = texture.width, height = texture.height, format = texture.pixelFormat;
-		atomic_store(&fg_mode, fg_mode_configuring);
+		fg_mode_store(fg_mode_configuring);
 		fg_hist_valid = 0;
 		fg_blit_texture = nil;
 		os_unfair_lock_unlock(&fg_lock);
@@ -1746,55 +2086,72 @@ static int fg_decide(id drawable, int *interpolate)
 	}
 
 	// Near the refresh rate already there is nothing to add; generation starts
-	// below ~77% of it and stops above ~87%, so a few quick frames do not flap.
+	// when the smoothed rate has been below ~77% of it for a second and stops
+	// when it has been above ~87% for a second, so a cutscene's uneven cadence
+	// or a few quick frames do not move the picture between the layers.
 	// 3x needs two free slots per real frame, so its thresholds sit at half the
 	// refresh rate; adaptive engages like 2x and adds frames as they fit.
 	double needed = fg_refresh_interval * (framegen_multiplier == fg_mult_3x ? 2.0 : 1.0);
-	int fast = interval == 0 || interval < needed * 1.15;
-	int slow = interval > needed * 1.3;
-	if (fast) {
-		fg_slow_frames = 0;
-		if (mode == fg_mode_active) {
-			atomic_store(&fg_mode, fg_mode_passthrough);
-			fg_hist_valid = 0;
+	int rate_known = fg_rate_interval > 0;
+	int fast = rate_known && fg_rate_interval < needed * 1.15;
+	int slow = rate_known && fg_rate_interval > needed * 1.3;
+	if (mode == fg_mode_active) {
+		if (fast) {
+			if (fg_fast_since == 0)
+				fg_fast_since = now;
+			if (now - fg_fast_since >= 1.0) {
+				fg_mode_store(fg_mode_passthrough);
+				fg_hist_valid = 0;
+				fg_fast_since = fg_slow_since = 0;
+				os_unfair_lock_unlock(&fg_lock);
+				fg_layer_set_hidden(1);
+				fg_stat_skip(fg_skip_fast);
+				return 0;
+			}
+		} else {
+			fg_fast_since = 0;
+		}
+	} else {
+		// Pass-through: wait for a second of slow frames and an idle worker
+		if (!slow || now < fg_retry_not_before) {
+			fg_slow_since = 0;
+			fg_stat_skips[fast ? fg_skip_fast : fg_skip_settling]++;
 			os_unfair_lock_unlock(&fg_lock);
-			fg_layer_set_hidden(1);
-			fg_stat_skip(fg_skip_fast);
 			return 0;
 		}
-		fg_stat_skips[fg_skip_fast]++;
-		os_unfair_lock_unlock(&fg_lock);
-		return 0;
-	}
-	if (mode == fg_mode_passthrough) {
-		if (atomic_load(&fg_inflight) > 0) {
-			os_unfair_lock_unlock(&fg_lock);
-			return 0;
-		}
-		fg_slow_frames = slow ? fg_slow_frames + 1 : 0;
-		if (fg_slow_frames < 30) {
+		if (fg_slow_since == 0)
+			fg_slow_since = now;
+		if (now - fg_slow_since < 1.0 || atomic_load(&fg_inflight) > 0) {
 			fg_stat_skips[fg_skip_settling]++;
 			os_unfair_lock_unlock(&fg_lock);
 			return 0;
 		}
-		atomic_store(&fg_mode, fg_mode_active);
+		fg_mode_store(fg_mode_active);
 		fg_hist_valid = 0;
+		fg_fast_since = 0;
 		fg_unhide_pending = 1;
 	}
 
 	int inflight = atomic_load(&fg_inflight);
 	if (inflight >= 4) {
-		atomic_store(&fg_mode, fg_mode_passthrough);
+		fg_mode_store(fg_mode_passthrough);
 		fg_hist_valid = 0;
-		fg_slow_frames = 0;
+		fg_slow_since = 0;
+		fg_retry_not_before = now + 1.0;
 		os_unfair_lock_unlock(&fg_lock);
 		fg_layer_set_hidden(1);
 		fg_stat_skip(fg_skip_lag);
 		return 0;
 	}
-	*interpolate = fg_hist_valid >= 1 && inflight < 2 && interval > 0;
-	if (!*interpolate && fg_hist_valid >= 1 && interval > 0)
-		fg_stat_skips[fg_skip_lag]++;
+	if (stall)
+		fg_hist_valid = 0; // the pair across a stall is not worth a frame
+	*interpolate = fg_hist_valid >= 1 && inflight < 2 && interval > 0 && !double_present && !stall;
+	if (!*interpolate && fg_hist_valid >= 1 && interval > 0) {
+		if (double_present)
+			fg_stat_skips[fg_skip_double_present]++;
+		else if (!stall)
+			fg_stat_skips[fg_skip_lag]++;
+	}
 	os_unfair_lock_unlock(&fg_lock);
 	return 1;
 }
@@ -1878,6 +2235,7 @@ static int fg_divert_present(id buffer, id drawable, double min_duration)
 		// The original present follows; the drawable-level hook must not count it again
 		fg_passthrough_drawable = drawable;
 		os_unfair_lock_unlock(&fg_lock);
+		fg_track_game_present(drawable);
 		return 0;
 	}
 	struct fg_pending *entry = fg_pending_find(buffer, 1);
@@ -2054,6 +2412,26 @@ static void framegen_install_layer_hooks(Class layer)
 		return;
 	interpose(layer, "setFramebufferOnly:", (IMP)hook_set_framebuffer_only,
 	          (IMP *)&next_set_framebuffer_only);
+}
+
+// Test entry: what the display did with the overlay layer, and what it was shown
+__attribute__((visibility("default"))) void np_framegen_probe_display(int *presented, int *dropped,
+                                                                      double *luma_real,
+                                                                      double *luma_generated,
+                                                                      int *state_changes)
+{
+	if (state_changes != NULL)
+		*state_changes = atomic_load(&fg_total_state_changes);
+	if (presented != NULL)
+		*presented = atomic_load(&fg_total_presented);
+	if (dropped != NULL)
+		*dropped = atomic_load(&fg_total_dropped);
+	os_unfair_lock_lock(&fg_lock);
+	if (luma_real != NULL)
+		*luma_real = fg_diag_luma[0];
+	if (luma_generated != NULL)
+		*luma_generated = fg_diag_luma[1];
+	os_unfair_lock_unlock(&fg_lock);
 }
 
 // Test entry: what framegen has done so far

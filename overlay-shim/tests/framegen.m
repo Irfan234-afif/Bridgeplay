@@ -1,5 +1,6 @@
 #import <Metal/Metal.h>
 #import <QuartzCore/CAMetalLayer.h>
+#import <objc/message.h>
 #import <objc/runtime.h>
 
 #import <crt_externs.h>
@@ -22,6 +23,8 @@ typedef int (*interpolate_fn)(id, id, id, id, int, double *);
 typedef int (*interpolate_opts_fn)(id, id, id, id, int, int, int, int, double, double *, int *);
 
 static interpolate_opts_fn interpolate_opts;
+typedef void (*probe_display_fn)(int *, int *, double *, double *, int *);
+static probe_display_fn probe_display;
 
 static void *load_shim(const char *path, probe_fn *probe, interpolate_fn *interpolate)
 {
@@ -350,8 +353,22 @@ static int full_frame_cost(id<MTLDevice> device, int engine, int quality, const 
 	return 0;
 }
 
+static int hud_hidden_on(CAMetalLayer *layer)
+{
+	SEL get = sel_registerName("developerHUDProperties");
+	if (![layer respondsToSelector:get])
+		return -1;
+	id props = ((id (*)(id, SEL))objc_msgSend)(layer, get);
+	if (props == nil)
+		return 0;
+	id mode = ((id (*)(id, SEL, id))objc_msgSend)(props, sel_registerName("objectForKey:"), @"mode");
+	return mode == nil;
+}
+
 // The live path, in a child with the environment set: the worker builds, the
-// mode engages at 40 fps, and generates `per_pair` frames for each real one
+// mode engages at 40 fps after a second of slow frames, and generates
+// `per_pair` frames for each real one. The game layer's own Metal HUD is
+// switched off while the covering layer shows and restored afterwards.
 static int live_path(probe_fn probe, id<MTLDevice> device, const char *label, double per_pair, int burst)
 {
 	int enabled = 0, hooks = 0, mode = 0, objects = 0, generated = 0, copies = 0;
@@ -371,10 +388,12 @@ static int live_path(probe_fn probe, id<MTLDevice> device, const char *label, do
 		probe(&enabled, &hooks, &mode, &objects, &generated, &copies);
 	}
 	CHECK(mode == 3, "framegen mode %d after setup, expected pass-through", mode);
-	CHECK(present_frames(device, layer, 60, 25000), "offscreen layer vends no drawable");
+	CHECK(hud_hidden_on(layer) <= 0, "game layer HUD hidden before framegen engaged");
+	CHECK(present_frames(device, layer, 110, 25000), "offscreen layer vends no drawable");
 	usleep(200000);
 	probe(&enabled, &hooks, &mode, &objects, &generated, &copies);
-	CHECK(mode == 2, "framegen mode %d after 60 frames at 40 fps, expected active", mode);
+	CHECK(mode == 2, "framegen mode %d after 110 frames at 40 fps, expected active", mode);
+	CHECK(hud_hidden_on(layer) != 0, "game layer HUD not hidden while the covering layer shows");
 	CHECK(copies > 0, "no real frame copy presented while active");
 	CHECK(generated > 0, "no frame generated while active");
 	double ratio = (double)generated / copies;
@@ -384,14 +403,173 @@ static int live_path(probe_fn probe, id<MTLDevice> device, const char *label, do
 	      label, ratio, per_pair);
 	if (!burst)
 		return 0;
+	// A short burst of fast frames must not drop out of active mode; a sustained one must
+	int changes_before = 0, changes_after = 0;
+	probe_display(NULL, NULL, NULL, NULL, &changes_before);
 	double burst_start = CACurrentMediaTime();
 	CHECK(present_frames(device, layer, 40, 0), "offscreen layer vends no drawable");
 	double burst_ms = (CACurrentMediaTime() - burst_start) * 1000.0;
 	probe(&enabled, &hooks, &mode, &objects, &generated, &copies);
-	CHECK(mode == 3, "framegen mode %d after a fast burst (40 frames in %.1f ms), expected pass-through",
+	CHECK(mode == 2, "framegen mode %d after a short fast burst (40 frames in %.1f ms), expected still active",
 	      mode, burst_ms);
-	printf("%-14s back to pass-through above the refresh rate (40 frames in %.1f ms)\n",
-	       "framegen fast", burst_ms);
+	CHECK(present_frames(device, layer, 20, 25000), "offscreen layer vends no drawable");
+	int fast_frames = 0;
+	burst_start = CACurrentMediaTime();
+	while (CACurrentMediaTime() - burst_start < 2.2) {
+		CHECK(present_frames(device, layer, 10, 0), "offscreen layer vends no drawable");
+		fast_frames += 10;
+	}
+	burst_ms = (CACurrentMediaTime() - burst_start) * 1000.0;
+	probe(&enabled, &hooks, &mode, &objects, &generated, &copies);
+	probe_display(NULL, NULL, NULL, NULL, &changes_after);
+	CHECK(mode == 3, "framegen mode %d after a sustained fast burst (%d frames in %.0f ms), expected pass-through",
+	      mode, fast_frames, burst_ms);
+	CHECK(changes_after - changes_before == 1, "%d state changes across a short and a sustained burst, expected 1",
+	      changes_after - changes_before);
+	CHECK(hud_hidden_on(layer) <= 0, "game layer HUD still hidden after pass-through");
+	printf("%-14s short burst (40 frames in %.0f ms) stays active; %d fast frames in %.0f ms drop to pass-through\n",
+	       "framegen fast", 40 * burst_ms / fast_frames, fast_frames, burst_ms);
+	return 0;
+}
+
+
+// The game as TEKKEN 8 under D3DMetal presents it: a 10-bit PQ layer, frames
+// rendered on a Metal 4 queue, signalDrawable: then [drawable present]. Or the
+// same layer on the Metal 3 present family when metal4 is 0. The frames are a
+// mid-grey clear, so a black copy or a black generated frame shows as luma 0.
+static int pq_path_layer(probe_fn probe, id<MTLDevice> device, int metal4, CAMetalLayer *layer,
+                         const char *label);
+
+static int pq_path(probe_fn probe, id<MTLDevice> device, int metal4)
+{
+	CAMetalLayer *layer = [CAMetalLayer layer];
+	layer.device = device;
+	layer.pixelFormat = MTLPixelFormatRGB10A2Unorm;
+	layer.drawableSize = CGSizeMake(1024, 768);
+	return pq_path_layer(probe, device, metal4, layer, metal4 ? "pq metal4" : "pq metal3");
+}
+
+static int pq_path_layer(probe_fn probe, id<MTLDevice> device, int metal4, CAMetalLayer *layer,
+                         const char *label)
+{
+	// CoreGraphics is not linked by the test flags; QuartzCore has it loaded
+	CGColorSpaceRef (*create_space)(CFStringRef) = dlsym(RTLD_DEFAULT, "CGColorSpaceCreateWithName");
+	CFStringRef *pq_name = dlsym(RTLD_DEFAULT, "kCGColorSpaceITUR_2100_PQ");
+	CHECK(create_space != NULL && pq_name != NULL, "CoreGraphics colorspace symbols missing");
+	CGColorSpaceRef pq = create_space(*pq_name);
+	layer.colorspace = pq;
+	if ([layer respondsToSelector:@selector(setWantsExtendedDynamicRangeContent:)])
+		layer.wantsExtendedDynamicRangeContent = YES;
+
+	id<MTLCommandQueue> queue = nil;
+	id queue4 = nil, allocator = nil;
+	if (metal4) {
+		if (@available(macOS 26.0, *)) {
+			queue4 = [device newMTL4CommandQueue];
+			allocator = [device newCommandAllocator];
+			if (queue4 != nil && layer.residencySet != nil)
+				[(id<MTL4CommandQueue>)queue4 addResidencySet:layer.residencySet];
+		}
+		SKIP_IF(queue4 == nil || allocator == nil, "no Metal 4 command queue on this machine");
+	} else {
+		queue = [device newCommandQueue];
+	}
+
+	int enabled = 0, hooks = 0, mode = 0, objects = 0, generated = 0, copies = 0;
+	double start = CACurrentMediaTime();
+	for (int i = 0; i < 180; i++) {
+		@autoreleasepool {
+			id<CAMetalDrawable> drawable = [layer nextDrawable];
+			CHECK(drawable != nil, "%s: layer vends no drawable at frame %d", label, i);
+			double grey = 0.55 + 0.1 * ((i / 30) & 1);
+			if (metal4) {
+				if (@available(macOS 26.0, *)) {
+					id<MTL4CommandBuffer> buffer = [device newCommandBuffer];
+					[buffer beginCommandBufferWithAllocator:allocator];
+					MTL4RenderPassDescriptor *pass = [MTL4RenderPassDescriptor new];
+					pass.colorAttachments[0].texture = drawable.texture;
+					pass.colorAttachments[0].loadAction = MTLLoadActionClear;
+					pass.colorAttachments[0].storeAction = MTLStoreActionStore;
+					pass.colorAttachments[0].clearColor = MTLClearColorMake(grey, grey, grey, 1.0);
+					id<MTL4RenderCommandEncoder> encoder =
+					        [buffer renderCommandEncoderWithDescriptor:pass];
+					[encoder endEncoding];
+					[buffer endCommandBuffer];
+					id<MTL4CommandQueue> q4 = queue4;
+					[q4 waitForDrawable:drawable];
+					[q4 commit:&buffer count:1];
+					[q4 signalDrawable:drawable];
+					[drawable present];
+					[pass release];
+					[buffer release];
+				}
+			} else {
+				id<MTLCommandBuffer> buffer = [queue commandBuffer];
+				MTLRenderPassDescriptor *pass = [MTLRenderPassDescriptor renderPassDescriptor];
+				pass.colorAttachments[0].texture = drawable.texture;
+				pass.colorAttachments[0].loadAction = MTLLoadActionClear;
+				pass.colorAttachments[0].storeAction = MTLStoreActionStore;
+				pass.colorAttachments[0].clearColor = MTLClearColorMake(grey, grey, grey, 1.0);
+				id<MTLRenderCommandEncoder> encoder = [buffer renderCommandEncoderWithDescriptor:pass];
+				[encoder endEncoding];
+				[buffer presentDrawable:drawable];
+				[buffer commit];
+			}
+			double wait = start + (i + 1) / 60.0 - CACurrentMediaTime();
+			if (wait > 0)
+				usleep((useconds_t)(wait * 1e6));
+		}
+	}
+	usleep(300000);
+	probe(&enabled, &hooks, &mode, &objects, &generated, &copies);
+	int presented = -1, dropped = -1;
+	double luma_real = -1, luma_generated = -1;
+	probe_display(&presented, &dropped, &luma_real, &luma_generated, NULL);
+	printf("%-14s mode=%d copies=%d generated=%d presented=%d dropped=%d luma real=%.3f generated=%.3f\n",
+	       label, mode, copies, generated, presented, dropped, luma_real, luma_generated);
+	CHECK(mode == 2, "%s: framegen mode %d after 180 frames at 60 fps on 120 Hz, expected active", label,
+	      mode);
+	CHECK(generated > 0 && copies > 0, "%s: nothing generated or copied", label);
+	CHECK(luma_real > 0.3, "%s: the real frame copy is dark (luma %.3f), the copy read an unrendered "
+	      "drawable", label, luma_real);
+	CHECK(luma_generated > 0.3, "%s: the generated frame is dark (luma %.3f)", label, luma_generated);
+	return 0;
+}
+
+// A cutscene-like cadence: 8 ms and 25 ms gaps alternating, 60.6 fps on average
+// on a 120 Hz refresh. The smoothed rate must engage once and then hold.
+static int irregular_cadence(probe_fn probe, id<MTLDevice> device)
+{
+	int enabled = 0, hooks = 0, mode = 0, objects = 0, generated = 0, copies = 0;
+	CAMetalLayer *layer = game_layer(device);
+	CHECK(present_frames(device, layer, 8, 20000), "offscreen layer vends no drawable");
+	probe(&enabled, &hooks, &mode, &objects, &generated, &copies);
+	for (int i = 0; i < 100 && mode == 1; i++) {
+		usleep(50000);
+		probe(&enabled, &hooks, &mode, &objects, &generated, &copies);
+	}
+	CHECK(mode == 3, "framegen mode %d after setup, expected pass-through", mode);
+	int changes_before = 0, changes_after = 0;
+	probe_display(NULL, NULL, NULL, NULL, &changes_before);
+	double start = CACurrentMediaTime(), next = start;
+	int frames = 0;
+	while (CACurrentMediaTime() - start < 3.5) {
+		CHECK(present_frames(device, layer, 1, 0), "offscreen layer vends no drawable");
+		next += (frames & 1) ? 0.025 : 0.008;
+		double wait = next - CACurrentMediaTime();
+		if (wait > 0)
+			usleep((useconds_t)(wait * 1e6));
+		frames++;
+	}
+	usleep(200000);
+	probe(&enabled, &hooks, &mode, &objects, &generated, &copies);
+	probe_display(NULL, NULL, NULL, NULL, &changes_after);
+	printf("%-14s %d frames in 3.5 s (8/25 ms alternating): mode=%d generated=%d copies=%d state changes=%d\n",
+	       "irregular", frames, mode, generated, copies, changes_after - changes_before);
+	CHECK(mode == 2, "framegen mode %d on an irregular 60 fps cadence, expected active", mode);
+	CHECK(changes_after - changes_before <= 1, "%d state changes on an irregular cadence, expected at most 1",
+	      changes_after - changes_before);
+	CHECK(generated > 0, "nothing generated on the irregular cadence");
 	return 0;
 }
 
@@ -407,6 +585,14 @@ static int child_with_env(const char *path, const char *which)
 	id<MTLDevice> device = MTLCreateSystemDefaultDevice();
 	SKIP_IF(device == nil, "no Metal device on this machine");
 
+	probe_display = (probe_display_fn)dlsym(dlopen(path, RTLD_NOW | RTLD_LOCAL), "np_framegen_probe_display");
+	CHECK(probe_display != NULL, "%s exports no np_framegen_probe_display", path);
+	if (strcmp(which, "metal4") == 0)
+		return pq_path(probe, device, 1);
+	if (strcmp(which, "metal3") == 0)
+		return pq_path(probe, device, 0);
+	if (strcmp(which, "irregular") == 0)
+		return irregular_cadence(probe, device);
 	if (strcmp(which, "3") == 0)
 		return live_path(probe, device, "framegen 3x", 2, 0);
 	if (strcmp(which, "adaptive") == 0)
@@ -445,7 +631,7 @@ static int child_with_env(const char *path, const char *which)
 	return 0;
 }
 
-static int spawn_child(char *exe, const char *mode, const char *refresh)
+static int spawn_child(char *exe, const char *mode, const char *child_name, const char *refresh)
 {
 	// The shim reads the environment when it loads, so the on cases are children
 	char **environ_now = *_NSGetEnviron();
@@ -456,7 +642,7 @@ static int spawn_child(char *exe, const char *mode, const char *refresh)
 	memcpy(env, environ_now, (size_t)count * sizeof(char *));
 	char framegen[64], child[64], hz[64];
 	snprintf(framegen, sizeof(framegen), "NOTPROTON_FRAMEGEN=%s", mode);
-	snprintf(child, sizeof(child), "NP_FRAMEGEN_TEST_CHILD=%s", mode);
+	snprintf(child, sizeof(child), "NP_FRAMEGEN_TEST_CHILD=%s", child_name);
 	snprintf(hz, sizeof(hz), "NOTPROTON_FRAMEGEN_REFRESH_HZ=%s", refresh);
 	env[count] = framegen;
 	env[count + 1] = child;
@@ -489,9 +675,16 @@ int main(int argc, char **argv)
 		return rc;
 	// 2x on a 120 Hz display: the whole suite. 3x and adaptive at a simulated
 	// 40 fps on 120 Hz: two generated frames per real one.
-	if ((rc = spawn_child(argv[0], "1", "120")) != 0)
+	if ((rc = spawn_child(argv[0], "1", "1", "120")) != 0)
 		return rc;
-	if ((rc = spawn_child(argv[0], "3", "120")) != 0)
+	if ((rc = spawn_child(argv[0], "3", "3", "120")) != 0)
 		return rc;
-	return spawn_child(argv[0], "adaptive", "120");
+	if ((rc = spawn_child(argv[0], "adaptive", "adaptive", "120")) != 0)
+		return rc;
+	// A 10-bit PQ layer on the Metal 3 and the Metal 4 (signalDrawable) present paths
+	if ((rc = spawn_child(argv[0], "1", "metal3", "120")) != 0)
+		return rc;
+	if ((rc = spawn_child(argv[0], "1", "metal4", "120")) != 0)
+		return rc;
+	return spawn_child(argv[0], "1", "irregular", "120");
 }
