@@ -636,3 +636,24 @@ rebuild: clean all
 -include $(DEPS)
 
 FORCE:
+
+# np-native: Steam launch-option wrapper for native macOS games (arm64
+# preferred, Steam's DYLD_INSERT_LIBRARIES kept). Installed later to
+# ~/.notproton/np-native.
+NP_NATIVE     := $(OUT_DIR)/np-native/np-native
+NP_NATIVE_SRC := native-launch/np-native.c
+
+.PHONY: np-native np-native-tests
+
+np-native: $(NP_NATIVE)
+
+$(NP_NATIVE): $(NP_NATIVE_SRC)
+	@mkdir -p $(dir $@)
+	$(CC) -arch arm64 -arch x86_64 -mmacosx-version-min=11.0 -std=c17 -O2 \
+		-Wall -Wextra -Werror $< -o $@
+	codesign -s - -f $@
+	@echo "==> Built $@ ($$(lipo -archs $@))"
+
+np-native-tests: $(NP_NATIVE)
+	@if [ ! -f native-launch/tests/run.sh ]; then $(call SKIP,np-native-tests,native-launch/tests/run.sh); exit 0; fi; \
+	sh native-launch/tests/run.sh $(NP_NATIVE)

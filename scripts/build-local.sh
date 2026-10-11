@@ -228,7 +228,7 @@ if [ "$run_checks" -eq 1 ]; then
 	start=$(date +%s)
 	for target in sigcheck callscheck webpatch-fixtures peicon-fixtures panel-behavior \
 		spawn-env compatcheck compatsvc-check launch-shell envcheck buildcheck \
-		settingscheck routecheck bridgecheck gamedrivecheck seedcheck padcheck app-tests; do
+		settingscheck routecheck bridgecheck gamedrivecheck seedcheck padcheck np-native-tests app-tests; do
 		echo "==> [check] make -s $target" | tee -a "$check_log"
 		[ "$target" != app-tests ] || link_test_sparkle >>"$check_log" 2>&1 || true
 		if make -s "$target" >>"$check_log" 2>&1; then
