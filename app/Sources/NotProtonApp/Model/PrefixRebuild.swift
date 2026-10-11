@@ -82,6 +82,13 @@ extension PrefixTools {
             )
         }
 
+        let rerun = InstallScriptMarkers.clear(
+            userReg: fresh.appending(path: "user.reg"),
+            installDirectory: PrefixStore.installDirectory(of: prefix))
+        if !rerun.isEmpty {
+            AppLog.note("rebuild \(prefix.appID) Steam will rerun: \(rerun.joined(separator: ", "))")
+        }
+
         let parked = fm.fileExists(atPath: prefix.pfx.path(percentEncoded: false))
         let previous = backupSlot(in: prefix.root, at: now)
         if parked {
