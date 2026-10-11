@@ -98,7 +98,7 @@ lib/wine/x86_64-unix/winemac.so                   Retina fix, replacing the arch
 lib/wine/x86_64-unix/winebus.so                   built with SDL2, replacing the archive's (Controllers)
 lib/wine/x86_64-windows/winebus.sys               11.17 only: map-key fix, replacing the archive's (Controllers)
 lib/wine/x86_64-windows/ws2_32.dll                11.17 only: own host name without loopback, replacing the archive's (Own host name)
-lib/libSDL2-2.0.0.dylib                           SDL 2.32.8, x86_64, for winebus.so (Controllers)
+lib/libSDL2-2.0.0.dylib                           SDL 2.32.10, x86_64, for winebus.so (Controllers)
 ```
 
 DXMT comes from `dxmt-e94c312.tar.gz` (the WineHQ engine's pin, shared download cache).
@@ -138,9 +138,14 @@ NotProton installs `winebus-winecx-<build>.so`: that winecx tree's own, built wi
 SDL's bus then presents the pad as a gamepad (`is_gamepad 1`), the device XInput opens.
 dyld resolves the leaf name through the caller's `LC_RPATH`s, and `winebus.so` carries
 `@loader_path/../../` (the CI adds it to every unix module), so the library sits in `lib/`.
-That `libSDL2-2.0.0.dylib` is the WineHQ engine runner's x86_64 SDL 2.32.8 (zlib license,
-`NOTICE`), signed ad hoc and otherwise unchanged: a SwiftPM release build runs `strip` on
-every unsigned Mach-O resource, which would change its bytes and break the pin. The PE half `winebus.sys` is unchanged: it starts the SDL bus
+That `libSDL2-2.0.0.dylib` is SDL 2.32.10 (zlib license, `NOTICE`) with
+`winemac-patch/sdl2-iokit-gamepad-collection.patch`, signed ad hoc: a SwiftPM release build
+runs `strip` on every unsigned Mach-O resource, which would change its bytes and break the
+pin. To rebuild it, apply the patch to the release tarball (strip the `/private/tmp/...`
+prefix from its paths, `patch -p0`), then
+`cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_OSX_ARCHITECTURES=x86_64 -DCMAKE_OSX_DEPLOYMENT_TARGET=11.0 -DSDL_STATIC=OFF -DSDL_TEST=OFF`,
+build, and `codesign -fs -`. The result exports the same 837 symbols and links the same
+frameworks as the 2.32.8 build it replaced. The PE half `winebus.sys` is unchanged: it starts the SDL bus
 either way, and only the unix half lacked it.
 
 A per-device `Hidraw=1` under `HKLM\System\CurrentControlSet\Services\winebus\Devices\<vid>/<pid>`

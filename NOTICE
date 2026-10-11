@@ -45,11 +45,11 @@ The WineCX engine gets an x86_64 SDL2 from the app bundle, for controller suppor
 in winebus.so (docs/WINECX.md):
 
   app/Sources/NotProtonApp/Resources/libSDL2-2.0.0.dylib
-      Simple DirectMedia Layer 2.32.8 (SDL-release-2.32.8-0-g98d1f3a45),
-      https://github.com/libsdl-org/SDL/tree/release-2.32.8, binary unmodified
-      except for an ad-hoc code signature.
+      Simple DirectMedia Layer 2.32.10 (SDL-release-2.32.10-0-g5d2495703),
+      https://github.com/libsdl-org/SDL/tree/release-2.32.10, built x86_64 with
+      winemac-patch/sdl2-iokit-gamepad-collection.patch and signed ad hoc.
       Copyright (C) 1997-2025 Sam Lantinga <slouken@libsdl.org>.
-      zlib license, https://github.com/libsdl-org/SDL/blob/release-2.32.8/LICENSE.txt
+      zlib license, https://github.com/libsdl-org/SDL/blob/release-2.32.10/LICENSE.txt
 
   app/Sources/NotProtonApp/Resources/winebus-winecx-11.15.so
       winecx 5b45f45 (Wine, LGPL-2.1-or-later), built with SDL2 support.
