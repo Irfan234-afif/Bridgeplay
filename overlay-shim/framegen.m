@@ -758,10 +758,13 @@ __attribute__((visibility("default"))) int np_framegen_interpolate_sync(id devic
 // screen whose backing size matches the drawable wins; else the fastest screen.
 static double fg_display_interval(NSUInteger width, NSUInteger height)
 {
+	// Only object and integer returns go through objc_msgSend here: a struct return such
+	// as -[NSScreen frame] needs objc_msgSend_stret on x86_64, and getting that wrong
+	// crashed the worker under Rosetta.
 	typedef id (*obj_fn)(id, SEL);
+	typedef id (*obj_arg_fn)(id, SEL, id);
 	typedef NSInteger (*fps_fn)(id, SEL);
-	typedef CGFloat (*scale_fn)(id, SEL);
-	typedef NSRect (*rect_fn)(id, SEL);
+	typedef unsigned int (*uint_fn)(id, SEL);
 
 	NSInteger matched = 0, fastest = 0;
 	Class screen_class = objc_getClass("NSScreen");
@@ -774,11 +777,18 @@ static double fg_display_interval(NSUInteger width, NSUInteger height)
 			NSInteger fps = ((fps_fn)objc_msgSend)(screen, fps_sel);
 			if (fps > fastest)
 				fastest = fps;
-			CGFloat scale = ((scale_fn)objc_msgSend)(screen, sel_registerName("backingScaleFactor"));
-			NSRect frame = ((rect_fn)objc_msgSend)(screen, sel_registerName("frame"));
-			if (fps > 0 && (NSUInteger)(frame.size.width * scale + 0.5) == width &&
-			    (NSUInteger)(frame.size.height * scale + 0.5) == height)
+			id info = ((obj_fn)objc_msgSend)(screen, sel_registerName("deviceDescription"));
+			id number = info ? ((obj_arg_fn)objc_msgSend)(info, sel_registerName("objectForKey:"),
+			                                             @"NSScreenNumber") : nil;
+			if (fps <= 0 || number == nil)
+				continue;
+			CGDirectDisplayID display = ((uint_fn)objc_msgSend)(number, sel_registerName("unsignedIntValue"));
+			CGDisplayModeRef mode = CGDisplayCopyDisplayMode(display);
+			if (mode == NULL)
+				continue;
+			if (CGDisplayModeGetPixelWidth(mode) == width && CGDisplayModeGetPixelHeight(mode) == height)
 				matched = fps;
+			CGDisplayModeRelease(mode);
 		}
 	}
 	if (matched > 0)
@@ -887,6 +897,9 @@ static void fg_configure(CAMetalLayer *game, NSUInteger width, NSUInteger height
 	if (ok)
 		ok = fg_layer_create(game, width, height, format);
 
+	// Outside fg_lock: the present path waits on that lock.
+	double refresh_interval = fg_display_interval(width, height);
+
 	os_unfair_lock_lock(&fg_lock);
 	if (atomic_load(&fg_generation) != generation) {
 		// Reconfigured again meanwhile; the next configure replaces this
@@ -899,7 +912,7 @@ static void fg_configure(CAMetalLayer *game, NSUInteger width, NSUInteger height
 	fg_hist_valid = 0;
 	fg_hist_next = 0;
 	fg_engine_kind = fg_engine.kind;
-	fg_refresh_interval = fg_display_interval(width, height);
+	fg_refresh_interval = refresh_interval;
 	fg_slow_frames = 0;
 	atomic_store(&fg_mode, ok ? fg_mode_passthrough : fg_mode_idle);
 	os_unfair_lock_unlock(&fg_lock);
