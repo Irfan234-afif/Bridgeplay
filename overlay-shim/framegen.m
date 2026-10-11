@@ -1,8 +1,33 @@
 // Frame generation for the overlay shim. Included textually by overlay_shim.m
 // so the Makefile keeps building one translation unit.
 //
-// Enabled only by NOTPROTON_FRAMEGEN=1. Off, nothing in here runs: no hook is
+// Enabled only by NOTPROTON_FRAMEGEN. Off, nothing in here runs: no hook is
 // installed and no object is created, so the per-frame cost is the shim's own.
+//
+// Environment
+//   NOTPROTON_FRAMEGEN          0|off: disabled. 1|2: 2x, one generated frame at
+//                               t=1/2. 3: 3x, two generated frames at t=1/3 and
+//                               2/3. adaptive: as many generated frames as fit
+//                               before the next real frame, one per refresh
+//                               interval and paced to it (up to three).
+//   NOTPROTON_FRAMEGEN_QUALITY  performance|balanced|quality (default balanced):
+//                               motion is estimated at 1/8, 1/4 or 1/2 of the
+//                               frame, with a 5x5 window at the finest level on
+//                               quality and 3x3 otherwise.
+//   NOTPROTON_FRAMEGEN_UI       1 (default): pixels identical in both real frames
+//                               are taken from the newer one unwarped, and pixels
+//                               whose forward and backward flows disagree or whose
+//                               warped samples differ fall back to the nearer real
+//                               frame. 0: plain bidirectional warp.
+//   NOTPROTON_FRAMEGEN_FALLBACK 1 (default): a pair whose motion saturates the
+//                               search range or whose flow is inconsistent over a
+//                               quarter of the textured area shows the nearer real
+//                               frame in place of each generated frame, counted as
+//                               the "fast-motion" skip. 0: always interpolate.
+//   NOTPROTON_FRAMEGEN_ENGINE   own (default) | metalfx. MetalFX generates one
+//                               frame per pair whatever the mode; UI protection and
+//                               the fallback run as a pass over its output.
+//   NOTPROTON_FRAMEGEN_REFRESH_HZ  overrides the detected display refresh (tests).
 //
 // How it works
 //   Real frame N is the drawable the game presents. Its present is diverted:
@@ -23,15 +48,18 @@
 //   MetalFX is preferred when the device supports it; NOTPROTON_FRAMEGEN_ENGINE
 //   = own|metalfx overrides.
 //
-//   Pacing: the generated frame is presented at t_N + lead and the real frame
-//   at t_N + lead + interval/2 through presentDrawable:atTime:. The real frame
-//   therefore reaches the glass lead + interval/2 later than today; lead is the
-//   measured generation latency, clamped to [3 ms, interval/2].
+//   Pacing: with n generated frames per pair, frame k (1..n) is presented at
+//   t_N + lead + (k-1)*step and the real frame at t_N + lead + n*step through
+//   presentDrawable:atTime:, where step is interval/(n+1) for the fixed modes
+//   and the refresh interval for adaptive. The real frame therefore reaches the
+//   glass lead + n*step later than today; lead is the measured generation
+//   latency, clamped to [3 ms, step]. Flow is estimated once per pair; each
+//   generated frame costs one synthesis pass on top.
 //
 //   Pass-through (the game's own present goes ahead, overlay layer hidden) on:
 //   a second layer, a size or format change (until the worker has rebuilt),
-//   game fps at or above the display refresh, the worker falling behind, no
-//   drawable within the timeout, or any Metal failure.
+//   game fps at or above the display refresh (refresh/2 for 3x), the worker
+//   falling behind, no drawable within the timeout, or any Metal failure.
 
 #import <QuartzCore/CATransaction.h>
 #import <dispatch/dispatch.h>
@@ -39,11 +67,47 @@
 #import <pthread.h>
 #import <stdatomic.h>
 #import <stdlib.h>
+#import <strings.h>
+
+enum fg_multiplier {
+	fg_mult_off = 0,
+	fg_mult_2x = 2,
+	fg_mult_3x = 3,
+	fg_mult_adaptive = 4,
+};
+
+enum fg_quality {
+	fg_quality_performance = 0,
+	fg_quality_balanced,
+	fg_quality_quality,
+};
+
+#define fg_adaptive_max 3 // generated frames per pair at most
 
 static int framegen_enabled;
-static int framegen_multiplier;
+static int framegen_multiplier; // enum fg_multiplier
+static int framegen_quality; // enum fg_quality
+static int framegen_ui = 1;
+static int framegen_fallback = 1;
+static double framegen_refresh_override; // Hz, 0 = detect
 static int framegen_engine_pref; // 0 auto, 1 own, 2 metalfx
 static int framegen_stats_log;
+
+static const char *fg_multiplier_name(int multiplier)
+{
+	switch (multiplier) {
+	case fg_mult_2x:
+		return "2x";
+	case fg_mult_3x:
+		return "3x";
+	case fg_mult_adaptive:
+		return "adaptive";
+	default:
+		return "off";
+	}
+}
+
+static const char *const fg_quality_names[] = { "performance", "balanced", "quality" };
 
 enum fg_mode {
 	fg_mode_idle = 0,
@@ -62,12 +126,13 @@ enum fg_skip {
 	fg_skip_unordered,
 	fg_skip_warmup,
 	fg_skip_settling,
+	fg_skip_fast_motion,
 	fg_skip_count,
 };
 
 static const char *const fg_skip_names[fg_skip_count] = {
 	"other-layer", "mismatch", "fps>=refresh", "worker-lag", "no-drawable", "error", "unordered",
-	"metalfx-warmup", "settling",
+	"metalfx-warmup", "settling", "fast-motion",
 };
 
 // Shared between the game thread and the worker; fg_lock guards everything
@@ -162,22 +227,27 @@ static const char *const fg_shader_source =
 "    if (gid.x >= dst.get_width() || gid.y >= dst.get_height()) return;\n"
 "    dst.write(float4(p.value), gid);\n"
 "}\n"
-// Luma at a quarter of the resolution, each output pixel a 4x4 box of the input
+// Luma at 1/scale of the resolution, each output pixel a scale x scale box of the input
+"struct fg_luma_params { uint scale; };\n"
 "kernel void np_fg_luma(texture2d<float, access::sample> src [[texture(0)]],\n"
 "                       texture2d<float, access::write> dst [[texture(1)]],\n"
+"                       constant fg_luma_params &p [[buffer(0)]],\n"
 "                       uint2 gid [[thread_position_in_grid]]) {\n"
 "    if (gid.x >= dst.get_width() || gid.y >= dst.get_height()) return;\n"
 "    float2 inv = 1.0 / float2(src.get_width(), src.get_height());\n"
-"    float2 base = (float2(gid) * 4.0 + 1.0) * inv;\n"
+"    float2 base = (float2(gid) * float(p.scale) + 1.0) * inv;\n"
+"    int n = max(int(p.scale / 2), 1);\n"
 "    float l = 0.0;\n"
-"    for (int y = 0; y < 2; y++) for (int x = 0; x < 2; x++) {\n"
+"    for (int y = 0; y < n; y++) for (int x = 0; x < n; x++) {\n"
 "        float3 c = src.sample(fg_lin, base + float2(x, y) * 2.0 * inv).rgb;\n"
 "        l += dot(c, float3(0.299, 0.587, 0.114));\n"
 "    }\n"
-"    dst.write(float4(l * 0.25), gid);\n"
+"    dst.write(float4(l / float(n * n)), gid);\n"
 "}\n"
 // One pyramid level of block matching: a -> b. Flow is in this level's pixels.
-// The radius is a template parameter so the cost window stays in registers.
+// The radius is a template parameter so the cost window stays in registers. A
+// tiny penalty on the displacement breaks ties towards the coarser estimate, so
+// flat areas carry their neighbourhood's motion instead of the first candidate.
 "template <int R, int HALF>\n"
 "static inline float2 fg_flow_search(texture2d<float, access::sample> a,\n"
 "                                    texture2d<float, access::sample> b,\n"
@@ -186,7 +256,7 @@ static const char *const fg_shader_source =
 "    float best = 1e30; int bi = R, bj = R;\n"
 "    for (int dy = -R; dy <= R; dy++) for (int dx = -R; dx <= R; dx++) {\n"
 "        float2 v = base + float2(dx, dy);\n"
-"        float s = 0.0;\n"
+"        float s = 1e-4 * float(dx * dx + dy * dy);\n"
 "        for (int j = -HALF; j <= HALF; j++) for (int i = -HALF; i <= HALF; i++) {\n"
 "            float2 q = pos + float2(i, j);\n"
 "            s += abs(a.sample(fg_px, q).r - b.sample(fg_px, q + v).r);\n"
@@ -239,56 +309,160 @@ static const char *const fg_shader_source =
 "    float2 base = round(2.0 * prev.sample(fg_lin, pos / float2(w, h)).xy);\n"
 "    out.write(float4(fg_flow_search<1, 1>(a, b, pos, base), 0.0, 0.0), gid);\n"
 "}\n"
-// Quarter-resolution flow to full-resolution motion vectors in pixels, the
-// layout MetalFX wants: each pixel of the new frame points to where it was.
+// Per pair, over the finest flow level: how much of the textured area has a flow
+// that disagrees with its reverse or sits at the edge of the search range, and the
+// mean motion. counts[0] textured pixels, [1] bad ones, [2] sum of |flow| in 1/4 px.
+"struct fg_stats_params { float range; float grad; };\n"
+"kernel void np_fg_stats(texture2d<float, access::sample> la [[texture(0)]],\n"
+"                        texture2d<float, access::sample> fab [[texture(1)]],\n"
+"                        texture2d<float, access::sample> fba [[texture(2)]],\n"
+"                        constant fg_stats_params &p [[buffer(0)]],\n"
+"                        device atomic_uint *counts [[buffer(1)]],\n"
+"                        uint2 gid [[thread_position_in_grid]],\n"
+"                        uint tid [[thread_index_in_threadgroup]],\n"
+"                        uint lane [[thread_index_in_simdgroup]]) {\n"
+"    threadgroup atomic_uint local[3];\n"
+"    if (tid == 0) for (int i = 0; i < 3; i++) atomic_store_explicit(&local[i], 0u, memory_order_relaxed);\n"
+"    threadgroup_barrier(mem_flags::mem_threadgroup);\n"
+"    uint w = fab.get_width(), h = fab.get_height();\n"
+"    uint tex = 0, bad = 0, mag = 0;\n"
+"    if (gid.x < w && gid.y < h) {\n"
+"        float2 pos = float2(gid) + 0.5;\n"
+"        float gx = la.sample(fg_px, pos + float2(1.0, 0.0)).r - la.sample(fg_px, pos - float2(1.0, 0.0)).r;\n"
+"        float gy = la.sample(fg_px, pos + float2(0.0, 1.0)).r - la.sample(fg_px, pos - float2(0.0, 1.0)).r;\n"
+"        if (max(abs(gx), abs(gy)) > p.grad) {\n"
+"            tex = 1;\n"
+"            float2 f = fab.sample(fg_px, pos).xy;\n"
+"            float2 g = fba.sample(fg_lin, (pos + f) / float2(w, h)).xy;\n"
+"            if (length(f + g) > 2.0 || max(abs(f.x), abs(f.y)) > p.range) bad = 1;\n"
+"            mag = uint(min(length(f), 255.0) * 4.0);\n"
+"        }\n"
+"    }\n"
+"    tex = simd_sum(tex); bad = simd_sum(bad); mag = simd_sum(mag);\n"
+"    if (lane == 0) {\n"
+"        atomic_fetch_add_explicit(&local[0], tex, memory_order_relaxed);\n"
+"        atomic_fetch_add_explicit(&local[1], bad, memory_order_relaxed);\n"
+"        atomic_fetch_add_explicit(&local[2], mag, memory_order_relaxed);\n"
+"    }\n"
+"    threadgroup_barrier(mem_flags::mem_threadgroup);\n"
+"    if (tid == 0) for (int i = 0; i < 3; i++)\n"
+"        atomic_fetch_add_explicit(&counts[i], atomic_load_explicit(&local[i], memory_order_relaxed), memory_order_relaxed);\n"
+"}\n"
+// The fallback verdict from those counts; fg_verdict on the CPU side must agree.
+"static inline bool fg_fallback(device const uint *counts, uint total, float range) {\n"
+"    uint tex = counts[0];\n"
+"    if (tex * 100u < total) return false;\n"
+"    if (counts[1] * 4u > tex) return true;\n"
+"    return float(counts[2]) > 0.6 * range * 4.0 * float(tex);\n"
+"}\n"
+"struct fg_synth_params { float t; float scale; float range; uint ui; uint fallback; uint total; };\n"
+// Flow-resolution flow to full-resolution motion vectors in pixels, the layout
+// MetalFX wants: each pixel of the new frame points to where it was.
 "kernel void np_fg_motion(texture2d<float, access::sample> flow [[texture(0)]],\n"
 "                         texture2d<float, access::write> out [[texture(1)]],\n"
+"                         constant fg_synth_params &p [[buffer(0)]],\n"
 "                         uint2 gid [[thread_position_in_grid]]) {\n"
 "    uint w = out.get_width(), h = out.get_height();\n"
 "    if (gid.x >= w || gid.y >= h) return;\n"
 "    float2 uv = (float2(gid) + 0.5) / float2(w, h);\n"
-"    out.write(float4(flow.sample(fg_lin, uv).xy * 4.0, 0.0, 0.0), gid);\n"
+"    out.write(float4(flow.sample(fg_lin, uv).xy * p.scale, 0.0, 0.0), gid);\n"
 "}\n"
-// The frame between a and b, from the forward and backward flows at quarter
-// resolution. Where neither flow explains a pixel, lean on the newer frame.
+// Pixels the two real frames agree on exactly: HUD, menus, text, letterbox
+"static inline bool fg_static(float4 a0, float4 b0) {\n"
+"    float3 d = abs(a0.rgb - b0.rgb);\n"
+"    float peak = max(max(a0.r, a0.g), max(a0.b, 1.0));\n"
+"    return max(max(d.r, d.g), d.b) < 0.006 * peak;\n"
+"}\n"
+// The frame at t between a and b, from the forward and backward flows. Where
+// neither flow explains a pixel, or the flows contradict each other, lean on the
+// nearer real frame.
 "kernel void np_fg_synth(texture2d<float, access::sample> a [[texture(0)]],\n"
 "                        texture2d<float, access::sample> b [[texture(1)]],\n"
 "                        texture2d<float, access::sample> fab [[texture(2)]],\n"
 "                        texture2d<float, access::sample> fba [[texture(3)]],\n"
 "                        texture2d<float, access::write> out [[texture(4)]],\n"
+"                        constant fg_synth_params &p [[buffer(0)]],\n"
+"                        device const uint *counts [[buffer(1)]],\n"
 "                        uint2 gid [[thread_position_in_grid]]) {\n"
 "    uint w = out.get_width(), h = out.get_height();\n"
 "    if (gid.x >= w || gid.y >= h) return;\n"
+"    float4 a0 = a.read(gid), b0 = b.read(gid);\n"
+"    float t = p.t;\n"
+"    if (p.fallback != 0 && fg_fallback(counts, p.total, p.range)) {\n"
+"        out.write(t < 0.5 ? a0 : b0, gid);\n"
+"        return;\n"
+"    }\n"
+"    if (p.ui != 0 && fg_static(a0, b0)) {\n"
+"        out.write(b0, gid);\n"
+"        return;\n"
+"    }\n"
 "    float2 size = float2(w, h);\n"
 "    float2 uv = (float2(gid) + 0.5) / size;\n"
-"    float2 f = fab.sample(fg_lin, uv).xy * 4.0 / size;\n"
-"    float2 g = fba.sample(fg_lin, uv).xy * 4.0 / size;\n"
-"    float4 a1 = a.sample(fg_lin, uv - 0.5 * f), b1 = b.sample(fg_lin, uv + 0.5 * f);\n"
-"    float4 b2 = b.sample(fg_lin, uv - 0.5 * g), a2 = a.sample(fg_lin, uv + 0.5 * g);\n"
+"    float2 fpx = fab.sample(fg_lin, uv).xy * p.scale;\n"
+"    float2 gpx = fba.sample(fg_lin, uv).xy * p.scale;\n"
+"    float2 f = fpx / size, g = gpx / size;\n"
+"    float4 a1 = a.sample(fg_lin, uv - t * f), b1 = b.sample(fg_lin, uv + (1.0 - t) * f);\n"
+"    float4 b2 = b.sample(fg_lin, uv - (1.0 - t) * g), a2 = a.sample(fg_lin, uv + t * g);\n"
 "    float e1 = dot(abs(a1.rgb - b1.rgb), float3(1.0 / 3.0));\n"
 "    float e2 = dot(abs(a2.rgb - b2.rgb), float3(1.0 / 3.0));\n"
-"    float4 c, newer; float e;\n"
-"    if (e1 <= e2) { c = 0.5 * (a1 + b1); newer = b1; e = e1; }\n"
-"    else { c = 0.5 * (a2 + b2); newer = b2; e = e2; }\n"
+"    float4 c, nearer; float e, inconsistent;\n"
+"    if (e1 <= e2) {\n"
+"        c = mix(a1, b1, t); nearer = t < 0.5 ? a1 : b1; e = e1;\n"
+"        inconsistent = length(fpx + fba.sample(fg_lin, uv + f).xy * p.scale);\n"
+"    } else {\n"
+"        c = mix(a2, b2, t); nearer = t < 0.5 ? a2 : b2; e = e2;\n"
+"        inconsistent = length(gpx + fab.sample(fg_lin, uv + g).xy * p.scale);\n"
+"    }\n"
 "    float k = smoothstep(0.08, 0.25, e);\n"
-"    out.write(mix(c, newer, k), gid);\n"
+"    if (p.ui != 0) k = max(k, smoothstep(2.0 * p.scale, 6.0 * p.scale, inconsistent));\n"
+"    out.write(mix(c, nearer, k), gid);\n"
+"}\n"
+// UI protection and the fallback over MetalFX's output
+"kernel void np_fg_post(texture2d<float, access::sample> a [[texture(0)]],\n"
+"                       texture2d<float, access::sample> b [[texture(1)]],\n"
+"                       texture2d<float, access::sample> fx [[texture(2)]],\n"
+"                       texture2d<float, access::write> out [[texture(3)]],\n"
+"                       constant fg_synth_params &p [[buffer(0)]],\n"
+"                       device const uint *counts [[buffer(1)]],\n"
+"                       uint2 gid [[thread_position_in_grid]]) {\n"
+"    uint w = out.get_width(), h = out.get_height();\n"
+"    if (gid.x >= w || gid.y >= h) return;\n"
+"    float4 a0 = a.read(gid), b0 = b.read(gid);\n"
+"    if (p.fallback != 0 && fg_fallback(counts, p.total, p.range)) out.write(p.t < 0.5 ? a0 : b0, gid);\n"
+"    else if (p.ui != 0 && fg_static(a0, b0)) out.write(b0, gid);\n"
+"    else out.write(fx.read(gid), gid);\n"
 "}\n";
 
-#define fg_levels 5
+#define fg_levels_max 6
+#define fg_stats_ring 4
+
+struct fg_synth_params {
+	float t, scale, range;
+	unsigned ui, fallback, total;
+};
 
 struct fg_engine {
 	id<MTLDevice> device;
 	NSUInteger width, height, format;
 	int kind;
+	int quality, ui, fallback;
 	// own
-	id<MTLComputePipelineState> ps_const, ps_luma, ps_flow1, ps_flow1f, ps_flow3, ps_motion, ps_synth;
+	unsigned scale; // luma at 1/scale
+	int levels; // pyramid levels
+	int fine_half2; // 5x5 window at the finest level instead of 3x3
+	float range; // reach of the search at the finest level, flow pixels
+	id<MTLComputePipelineState> ps_const, ps_luma, ps_flow1, ps_flow1f, ps_flow3, ps_stats, ps_motion,
+	        ps_synth, ps_post;
 	id<MTLTexture> luma[2];
-	id<MTLTexture> luma_view[2][fg_levels];
-	id<MTLTexture> flow_ab[fg_levels], flow_ba[fg_levels];
+	id<MTLTexture> luma_view[2][fg_levels_max];
+	id<MTLTexture> flow_ab[fg_levels_max], flow_ba[fg_levels_max];
+	id<MTLBuffer> stats[fg_stats_ring];
+	int stats_next;
+	id<MTLBuffer> stats_cur; // unretained; the pair's counts, from fg_engine_prepare on
 	id<MTLTexture> out;
 	// metalfx
 	id interpolator;
-	id<MTLTexture> depth, motion;
+	id<MTLTexture> depth, motion, fx_out;
 	int reset_pending;
 	int warm; // MetalFX encodes since the last reset; the first two echo the new frame
 	int luma_valid[2];
@@ -371,21 +545,26 @@ static void fg_engine_destroy(struct fg_engine *engine)
 	fg_release((id *)&engine->ps_flow1);
 	fg_release((id *)&engine->ps_flow1f);
 	fg_release((id *)&engine->ps_flow3);
+	fg_release((id *)&engine->ps_stats);
 	fg_release((id *)&engine->ps_motion);
 	fg_release((id *)&engine->ps_synth);
+	fg_release((id *)&engine->ps_post);
 	for (int i = 0; i < 2; i++) {
 		fg_release((id *)&engine->luma[i]);
-		for (int l = 0; l < fg_levels; l++)
+		for (int l = 0; l < fg_levels_max; l++)
 			fg_release((id *)&engine->luma_view[i][l]);
 	}
-	for (int l = 0; l < fg_levels; l++) {
+	for (int l = 0; l < fg_levels_max; l++) {
 		fg_release((id *)&engine->flow_ab[l]);
 		fg_release((id *)&engine->flow_ba[l]);
 	}
+	for (int i = 0; i < fg_stats_ring; i++)
+		fg_release((id *)&engine->stats[i]);
 	fg_release((id *)&engine->out);
 	fg_release(&engine->interpolator);
 	fg_release((id *)&engine->depth);
 	fg_release((id *)&engine->motion);
+	fg_release((id *)&engine->fx_out);
 	fg_release((id *)&engine->device);
 	memset(engine, 0, sizeof(*engine));
 }
@@ -405,6 +584,30 @@ static id<MTLComputePipelineState> fg_pipeline(id<MTLDevice> device, id<MTLLibra
 		shim_log("overlay_shim framegen: pipeline %s failed: %s\n", name,
 		        error != nil ? [[error localizedDescription] UTF8String] : "no reason given");
 	return state;
+}
+
+// Quality presets: where motion is estimated and how hard the finest level looks
+static void fg_engine_apply_quality(struct fg_engine *engine)
+{
+	switch (engine->quality) {
+	case fg_quality_performance:
+		engine->scale = 8;
+		engine->levels = 5;
+		engine->fine_half2 = 0;
+		break;
+	case fg_quality_quality:
+		engine->scale = 2;
+		engine->levels = 6;
+		engine->fine_half2 = 0; // 5x5 here doubles the cost again (measured 4 ms vs 2 ms)
+		break;
+	default:
+		engine->scale = 4;
+		engine->levels = 5;
+		engine->fine_half2 = 0;
+		break;
+	}
+	// Coarsest level searches +-3, each finer one +-1 around the doubled estimate
+	engine->range = (float)(4 * (1 << (engine->levels - 1)) - 1);
 }
 
 static int fg_engine_build_own(struct fg_engine *engine)
@@ -428,27 +631,37 @@ static int fg_engine_build_own(struct fg_engine *engine)
 	engine->ps_flow1 = fg_pipeline(device, library, "np_fg_flow1");
 	engine->ps_flow1f = fg_pipeline(device, library, "np_fg_flow1f");
 	engine->ps_flow3 = fg_pipeline(device, library, "np_fg_flow3");
+	engine->ps_stats = fg_pipeline(device, library, "np_fg_stats");
 	engine->ps_motion = fg_pipeline(device, library, "np_fg_motion");
 	engine->ps_synth = fg_pipeline(device, library, "np_fg_synth");
+	engine->ps_post = fg_pipeline(device, library, "np_fg_post");
 	[library release];
 	if (engine->ps_const == nil || engine->ps_luma == nil || engine->ps_flow1 == nil ||
-	    engine->ps_flow1f == nil || engine->ps_flow3 == nil || engine->ps_motion == nil || engine->ps_synth == nil)
+	    engine->ps_flow1f == nil || engine->ps_flow3 == nil || engine->ps_stats == nil ||
+	    engine->ps_motion == nil || engine->ps_synth == nil || engine->ps_post == nil)
 		return 0;
 
-	NSUInteger lw = (engine->width + 3) / 4, lh = (engine->height + 3) / 4;
+	fg_engine_apply_quality(engine);
+	NSUInteger s = engine->scale;
+	NSUInteger lw = (engine->width + s - 1) / s, lh = (engine->height + s - 1) / s;
+	int levels = engine->levels;
+	while (levels > 1 && ((lw >> (levels - 1)) < 4 || (lh >> (levels - 1)) < 4))
+		levels--; // tiny frames: keep the coarsest level at least 4x4
+	engine->levels = levels;
+	engine->range = (float)(4 * (1 << (levels - 1)) - 1);
 	for (int i = 0; i < 2; i++) {
 		MTLTextureDescriptor *descriptor =
 		        [MTLTextureDescriptor texture2DDescriptorWithPixelFormat:MTLPixelFormatR16Float
 		                                                           width:lw
 		                                                          height:lh
 		                                                       mipmapped:YES];
-		descriptor.mipmapLevelCount = fg_levels;
+		descriptor.mipmapLevelCount = levels;
 		descriptor.usage = MTLTextureUsageShaderRead | MTLTextureUsageShaderWrite;
 		descriptor.storageMode = MTLStorageModePrivate;
 		engine->luma[i] = [device newTextureWithDescriptor:descriptor];
 		if (engine->luma[i] == nil)
 			return 0;
-		for (int l = 0; l < fg_levels; l++) {
+		for (int l = 0; l < levels; l++) {
 			engine->luma_view[i][l] =
 			        [engine->luma[i] newTextureViewWithPixelFormat:MTLPixelFormatR16Float
 			                                           textureType:MTLTextureType2D
@@ -458,7 +671,7 @@ static int fg_engine_build_own(struct fg_engine *engine)
 				return 0;
 		}
 	}
-	for (int l = 0; l < fg_levels; l++) {
+	for (int l = 0; l < levels; l++) {
 		NSUInteger w = lw >> l, h = lh >> l;
 		if (w == 0)
 			w = 1;
@@ -470,6 +683,12 @@ static int fg_engine_build_own(struct fg_engine *engine)
 		                                     MTLTextureUsageShaderRead | MTLTextureUsageShaderWrite, 0);
 		if (engine->flow_ab[l] == nil || engine->flow_ba[l] == nil)
 			return 0;
+	}
+	for (int i = 0; i < fg_stats_ring; i++) {
+		engine->stats[i] = [device newBufferWithLength:16 options:MTLResourceStorageModeShared];
+		if (engine->stats[i] == nil)
+			return 0;
+		memset(engine->stats[i].contents, 0, 16);
 	}
 	engine->out = fg_make_texture(device, engine->format, engine->width, engine->height,
 	                              MTLTextureUsageShaderRead | MTLTextureUsageShaderWrite, 0);
@@ -561,9 +780,9 @@ static int fg_engine_build_metalfx(struct fg_engine *engine)
 	engine->motion = fg_make_texture(engine->device, MTLPixelFormatRG16Float, engine->width,
 	                                 engine->height,
 	                                 [interpolator motionTextureUsage] | MTLTextureUsageShaderWrite, 0);
-	engine->out = fg_make_texture(engine->device, engine->format, engine->width, engine->height,
-	                              [interpolator outputTextureUsage] | MTLTextureUsageShaderRead, 0);
-	if (engine->depth == nil || engine->motion == nil || engine->out == nil)
+	engine->fx_out = fg_make_texture(engine->device, engine->format, engine->width, engine->height,
+	                                 [interpolator outputTextureUsage] | MTLTextureUsageShaderRead, 0);
+	if (engine->depth == nil || engine->motion == nil || engine->fx_out == nil)
 		return 0;
 
 	id<MTLCommandQueue> queue = [engine->device newCommandQueue];
@@ -585,15 +804,19 @@ static MTLTextureUsage fg_history_usage(void)
 }
 
 static int fg_engine_create(struct fg_engine *engine, id<MTLDevice> device, NSUInteger width,
-                            NSUInteger height, NSUInteger format, int pref)
+                            NSUInteger height, NSUInteger format, int pref, int quality, int ui,
+                            int fallback)
 {
 	memset(engine, 0, sizeof(*engine));
 	engine->device = [device retain];
 	engine->width = width;
 	engine->height = height;
 	engine->format = format;
+	engine->quality = quality;
+	engine->ui = ui ? 1 : 0;
+	engine->fallback = fallback ? 1 : 0;
 
-	// The own path's kernels are needed for the constant fills too
+	// The own path's kernels are needed for MetalFX's motion vectors and post pass too
 	if (!fg_engine_build_own(engine)) {
 		fg_engine_destroy(engine);
 		return 0;
@@ -608,15 +831,9 @@ static int fg_engine_create(struct fg_engine *engine, id<MTLDevice> device, NSUI
 		fg_release(&engine->interpolator);
 		fg_release((id *)&engine->depth);
 		fg_release((id *)&engine->motion);
+		fg_release((id *)&engine->fx_out);
 		if (pref == 2)
 			shim_log("overlay_shim framegen: metalfx requested but unavailable, using own\n");
-		fg_release((id *)&engine->out);
-		engine->out = fg_make_texture(device, format, width, height,
-		                              MTLTextureUsageShaderRead | MTLTextureUsageShaderWrite, 0);
-		if (engine->out == nil) {
-			fg_engine_destroy(engine);
-			return 0;
-		}
 	}
 	return 1;
 }
@@ -626,56 +843,138 @@ static void fg_engine_ingest(struct fg_engine *engine, id<MTLCommandBuffer> buff
                              id<MTLTexture> frame, int slot)
 {
 	id<MTLComputeCommandEncoder> encoder = [buffer computeCommandEncoder];
+	struct { unsigned scale; } params = { engine->scale };
 	[encoder setTexture:frame atIndex:0];
 	[encoder setTexture:engine->luma_view[slot][0] atIndex:1];
+	[encoder setBytes:&params length:sizeof(params) atIndex:0];
 	fg_dispatch(encoder, engine->ps_luma, engine->luma[slot].width, engine->luma[slot].height);
 	[encoder endEncoding];
 
-	id<MTLBlitCommandEncoder> blit = [buffer blitCommandEncoder];
-	[blit generateMipmapsForTexture:engine->luma[slot]];
-	[blit endEncoding];
+	if (engine->levels > 1) {
+		id<MTLBlitCommandEncoder> blit = [buffer blitCommandEncoder];
+		[blit generateMipmapsForTexture:engine->luma[slot]];
+		[blit endEncoding];
+	}
 	engine->luma_valid[slot] = 1;
 }
 
 static void fg_flow_pass(struct fg_engine *engine, id<MTLComputeCommandEncoder> encoder,
                          int from, int to, id<MTLTexture> *flows)
 {
-	for (int l = fg_levels - 1; l >= 0; l--) {
+	int top = engine->levels - 1;
+	for (int l = top; l >= 0; l--) {
+		id<MTLComputePipelineState> state;
+		if (l == top)
+			state = engine->ps_flow3;
+		else if (l == 0 && !engine->fine_half2)
+			state = engine->ps_flow1f;
+		else
+			state = engine->ps_flow1;
 		[encoder setTexture:engine->luma_view[from][l] atIndex:0];
 		[encoder setTexture:engine->luma_view[to][l] atIndex:1];
-		[encoder setTexture:l == fg_levels - 1 ? nil : flows[l + 1] atIndex:2];
+		[encoder setTexture:l == top ? nil : flows[l + 1] atIndex:2];
 		[encoder setTexture:flows[l] atIndex:3];
-		fg_dispatch(encoder,
-		            l == fg_levels - 1 ? engine->ps_flow3 : l == 0 ? engine->ps_flow1f : engine->ps_flow1,
-		            flows[l].width, flows[l].height);
+		fg_dispatch(encoder, state, flows[l].width, flows[l].height);
 	}
 }
 
-// Encodes the frame between prev (slot prev_slot) and cur (slot cur_slot) into engine->out
-static void fg_engine_interpolate(struct fg_engine *engine, id<MTLCommandBuffer> buffer,
-                                  id<MTLTexture> prev, int prev_slot, id<MTLTexture> cur,
-                                  int cur_slot, float delta)
+static struct fg_synth_params fg_engine_params(struct fg_engine *engine, float t)
+{
+	struct fg_synth_params params;
+	params.t = t;
+	params.scale = (float)engine->scale;
+	params.range = engine->range;
+	params.ui = (unsigned)engine->ui;
+	params.fallback = (unsigned)engine->fallback;
+	params.total = (unsigned)(engine->flow_ab[0].width * engine->flow_ab[0].height);
+	return params;
+}
+
+// CPU twin of the shader's fg_fallback, over a stats buffer the GPU has finished with
+// What the verdict needs from the engine, taken when the work is encoded: the completed
+// handler runs on Metal's thread and must not read engine objects a reconfigure may free.
+struct fg_verdict_args {
+	int fallback;
+	unsigned total;
+	float range;
+};
+
+static struct fg_verdict_args fg_verdict_args(struct fg_engine *engine)
+{
+	struct fg_verdict_args args = { engine->fallback, 0, engine->range };
+	if (engine->flow_ab[0] != nil)
+		args.total = (unsigned)(engine->flow_ab[0].width * engine->flow_ab[0].height);
+	return args;
+}
+
+static int fg_verdict(struct fg_verdict_args args, id<MTLBuffer> stats)
+{
+	if (!args.fallback || stats == nil || args.total == 0)
+		return 0;
+	const unsigned *counts = stats.contents;
+	unsigned tex = counts[0];
+	if (tex * 100u < args.total)
+		return 0;
+	if (counts[1] * 4u > tex)
+		return 1;
+	return (float)counts[2] > 0.6f * args.range * 4.0f * (float)tex;
+}
+
+// Once per pair: luma for new frames, the flows, their statistics and, for
+// MetalFX, the motion vectors. Returns the stats buffer the pair uses.
+static id<MTLBuffer> fg_engine_prepare(struct fg_engine *engine, id<MTLCommandBuffer> buffer,
+                                       id<MTLTexture> prev, int prev_slot, id<MTLTexture> cur,
+                                       int cur_slot)
 {
 	if (!engine->luma_valid[prev_slot])
 		fg_engine_ingest(engine, buffer, prev, prev_slot);
 	if (!engine->luma_valid[cur_slot])
 		fg_engine_ingest(engine, buffer, cur, cur_slot);
 
+	id<MTLBuffer> stats = engine->stats[engine->stats_next];
+	engine->stats_next = (engine->stats_next + 1) % fg_stats_ring;
+	engine->stats_cur = stats;
+	id<MTLBlitCommandEncoder> clear = [buffer blitCommandEncoder];
+	[clear fillBuffer:stats range:NSMakeRange(0, 16) value:0];
+	[clear endEncoding];
+
+	id<MTLComputeCommandEncoder> encoder = [buffer computeCommandEncoder];
+	fg_flow_pass(engine, encoder, prev_slot, cur_slot, engine->flow_ab);
+	fg_flow_pass(engine, encoder, cur_slot, prev_slot, engine->flow_ba);
+
+	struct { float range, grad; } stats_params = { engine->range * 0.9f, 0.03f };
+	[encoder setTexture:engine->luma_view[prev_slot][0] atIndex:0];
+	[encoder setTexture:engine->flow_ab[0] atIndex:1];
+	[encoder setTexture:engine->flow_ba[0] atIndex:2];
+	[encoder setBytes:&stats_params length:sizeof(stats_params) atIndex:0];
+	[encoder setBuffer:stats offset:0 atIndex:1];
+	fg_dispatch(encoder, engine->ps_stats, engine->flow_ab[0].width, engine->flow_ab[0].height);
+
 	if (engine->kind == 2) {
 		// MetalFX does not estimate motion; it gets ours, new frame to previous
-		id<MTLComputeCommandEncoder> encoder = [buffer computeCommandEncoder];
-		fg_flow_pass(engine, encoder, cur_slot, prev_slot, engine->flow_ba);
+		struct fg_synth_params params = fg_engine_params(engine, 0.5f);
 		[encoder setTexture:engine->flow_ba[0] atIndex:0];
 		[encoder setTexture:engine->motion atIndex:1];
+		[encoder setBytes:&params length:sizeof(params) atIndex:0];
 		fg_dispatch(encoder, engine->ps_motion, engine->width, engine->height);
-		[encoder endEncoding];
+	}
+	[encoder endEncoding];
+	return stats;
+}
 
+// After fg_engine_prepare: the frame at t between prev and cur into engine->out
+static void fg_engine_synth(struct fg_engine *engine, id<MTLCommandBuffer> buffer,
+                            id<MTLTexture> prev, id<MTLTexture> cur, float t, float delta)
+{
+	struct fg_synth_params params = fg_engine_params(engine, t);
+
+	if (engine->kind == 2) {
 		id<np_fx_interpolator> interpolator = engine->interpolator;
 		[interpolator setColorTexture:cur];
 		[interpolator setPrevColorTexture:prev];
 		[interpolator setDepthTexture:engine->depth];
 		[interpolator setMotionTexture:engine->motion];
-		[interpolator setOutputTexture:engine->out];
+		[interpolator setOutputTexture:engine->fx_out];
 		[interpolator setMotionVectorScaleX:1.0f];
 		[interpolator setMotionVectorScaleY:1.0f];
 		[interpolator setJitterOffsetX:0.0f];
@@ -692,33 +991,61 @@ static void fg_engine_interpolate(struct fg_engine *engine, id<MTLCommandBuffer>
 		engine->reset_pending = 0;
 		engine->warm++;
 		[interpolator encodeToCommandBuffer:buffer];
+
+		id<MTLComputeCommandEncoder> encoder = [buffer computeCommandEncoder];
+		[encoder setTexture:prev atIndex:0];
+		[encoder setTexture:cur atIndex:1];
+		[encoder setTexture:engine->fx_out atIndex:2];
+		[encoder setTexture:engine->out atIndex:3];
+		[encoder setBytes:&params length:sizeof(params) atIndex:0];
+		[encoder setBuffer:engine->stats_cur offset:0 atIndex:1];
+		fg_dispatch(encoder, engine->ps_post, engine->width, engine->height);
+		[encoder endEncoding];
 		return;
 	}
 
 	id<MTLComputeCommandEncoder> encoder = [buffer computeCommandEncoder];
-	fg_flow_pass(engine, encoder, prev_slot, cur_slot, engine->flow_ab);
-	fg_flow_pass(engine, encoder, cur_slot, prev_slot, engine->flow_ba);
 	[encoder setTexture:prev atIndex:0];
 	[encoder setTexture:cur atIndex:1];
 	[encoder setTexture:engine->flow_ab[0] atIndex:2];
 	[encoder setTexture:engine->flow_ba[0] atIndex:3];
 	[encoder setTexture:engine->out atIndex:4];
+	[encoder setBytes:&params length:sizeof(params) atIndex:0];
+	[encoder setBuffer:engine->stats_cur offset:0 atIndex:1];
 	fg_dispatch(encoder, engine->ps_synth, engine->width, engine->height);
 	[encoder endEncoding];
 }
 
+// Encodes the frame halfway between prev (slot prev_slot) and cur (slot cur_slot) into engine->out
+static void fg_engine_interpolate(struct fg_engine *engine, id<MTLCommandBuffer> buffer,
+                                  id<MTLTexture> prev, int prev_slot, id<MTLTexture> cur,
+                                  int cur_slot, float delta)
+{
+	fg_engine_prepare(engine, buffer, prev, prev_slot, cur, cur_slot);
+	fg_engine_synth(engine, buffer, prev, cur, 0.5f, delta);
+}
+
 static struct fg_engine fg_engine;
 
-// Test entry: interpolate a and b into out synchronously. engine 1 own,
-// 2 metalfx, 0 auto. Returns the engine used, or 0 on failure.
-__attribute__((visibility("default"))) int np_framegen_interpolate_sync(id device, id a, id b,
+// Test entry: interpolate a and b at t into out synchronously. engine 1 own,
+// 2 metalfx, 0 auto; quality 0 performance, 1 balanced, 2 quality; ui and
+// fallback as the environment switches. Returns the engine used, or 0 on
+// failure. *fell_back reports whether the fast-motion fallback replaced the
+// result with the nearer real frame.
+__attribute__((visibility("default"))) int np_framegen_interpolate_opts(id device, id a, id b,
                                                                        id out, int engine_pref,
-                                                                       double *gpu_ms)
+                                                                       int quality, int ui,
+                                                                       int fallback, double t,
+                                                                       double *gpu_ms,
+                                                                       int *fell_back)
 {
 	struct fg_engine engine;
 	id<MTLTexture> ta = a, tb = b, tout = out;
 
-	if (!fg_engine_create(&engine, device, ta.width, ta.height, ta.pixelFormat, engine_pref))
+	if (fell_back != NULL)
+		*fell_back = 0;
+	if (!fg_engine_create(&engine, device, ta.width, ta.height, ta.pixelFormat, engine_pref, quality,
+	                      ui, fallback))
 		return 0;
 	if (engine_pref == 2 && engine.kind != 2) {
 		fg_engine_destroy(&engine);
@@ -728,11 +1055,13 @@ __attribute__((visibility("default"))) int np_framegen_interpolate_sync(id devic
 	id<MTLCommandQueue> queue = [(id<MTLDevice>)device newCommandQueue];
 	int kind = engine.kind;
 	double total = 0;
-	int runs = gpu_ms != NULL || kind == 2 ? 6 : 1;
+	int runs = gpu_ms != NULL ? 16 : kind == 2 ? 6 : 1;
+	id<MTLBuffer> stats = nil;
 	for (int i = 0; i < runs; i++) {
 		id<MTLCommandBuffer> buffer = [queue commandBuffer];
 		engine.luma_valid[0] = engine.luma_valid[1] = 0;
-		fg_engine_interpolate(&engine, buffer, ta, 0, tb, 1, 1.0f / 60.0f);
+		stats = fg_engine_prepare(&engine, buffer, ta, 0, tb, 1);
+		fg_engine_synth(&engine, buffer, ta, tb, (float)t, 1.0f / 60.0f);
 		id<MTLBlitCommandEncoder> blit = [buffer blitCommandEncoder];
 		[blit copyFromTexture:engine.out toTexture:tout];
 		[blit endEncoding];
@@ -740,14 +1069,25 @@ __attribute__((visibility("default"))) int np_framegen_interpolate_sync(id devic
 		[buffer waitUntilCompleted];
 		if (buffer.error != nil)
 			kind = 0;
-		if (i > 0 || runs == 1)
+		if (i >= runs / 2)
 			total += buffer.GPUEndTime - buffer.GPUStartTime;
 	}
 	if (gpu_ms != NULL)
-		*gpu_ms = total / (runs > 1 ? runs - 1 : 1) * 1000.0;
+		*gpu_ms = total / (double)(runs - runs / 2) * 1000.0;
+	if (fell_back != NULL)
+		*fell_back = fg_verdict(fg_verdict_args(&engine), stats);
 	[queue release];
 	fg_engine_destroy(&engine);
 	return kind;
+}
+
+// The original test entry: balanced quality, UI protection and the fallback on, t=1/2
+__attribute__((visibility("default"))) int np_framegen_interpolate_sync(id device, id a, id b,
+                                                                       id out, int engine_pref,
+                                                                       double *gpu_ms)
+{
+	return np_framegen_interpolate_opts(device, a, b, out, engine_pref, fg_quality_balanced, 1, 1, 0.5,
+	                                    gpu_ms, NULL);
 }
 
 // ---------------------------------------------------------------------------
@@ -893,12 +1233,14 @@ static void fg_configure(CAMetalLayer *game, NSUInteger width, NSUInteger height
 		ok = fg_hist[i] != nil;
 	}
 	if (ok)
-		ok = fg_engine_create(&fg_engine, fg_device, width, height, format, framegen_engine_pref);
+		ok = fg_engine_create(&fg_engine, fg_device, width, height, format, framegen_engine_pref,
+		                      framegen_quality, framegen_ui, framegen_fallback);
 	if (ok)
 		ok = fg_layer_create(game, width, height, format);
 
 	// Outside fg_lock: the present path waits on that lock.
-	double refresh_interval = fg_display_interval(width, height);
+	double refresh_interval = framegen_refresh_override > 0 ? 1.0 / framegen_refresh_override
+	                                                        : fg_display_interval(width, height);
 
 	os_unfair_lock_lock(&fg_lock);
 	if (atomic_load(&fg_generation) != generation) {
@@ -924,9 +1266,16 @@ static void fg_configure(CAMetalLayer *game, NSUInteger width, NSUInteger height
 		return;
 	}
 
-	shim_log("overlay_shim framegen: ready %lux%lu %s engine=%s refresh=%.0fHz in %.0f ms\n",
+	shim_log("overlay_shim framegen: ready %lux%lu %s engine=%s mode=%s quality=%s flow=%lux%lu "
+	        "levels=%d ui=%d fallback=%d refresh=%.0fHz in %.0f ms\n",
 	        (unsigned long)width, (unsigned long)height, format_name(format),
-	        fg_engine_name(fg_engine.kind), 1.0 / fg_refresh_interval, (fg_now() - start) * 1000.0);
+	        fg_engine_name(fg_engine.kind), fg_multiplier_name(framegen_multiplier),
+	        fg_quality_names[framegen_quality], (unsigned long)fg_engine.flow_ab[0].width,
+	        (unsigned long)fg_engine.flow_ab[0].height, fg_engine.levels, framegen_ui, framegen_fallback,
+	        1.0 / fg_refresh_interval, (fg_now() - start) * 1000.0);
+	if (fg_engine.kind == 2 && framegen_multiplier != fg_mult_2x)
+		shim_log("overlay_shim framegen: metalfx generates one frame per pair, mode %s runs as 2x\n",
+		        fg_multiplier_name(framegen_multiplier));
 }
 
 struct fg_job {
@@ -935,6 +1284,8 @@ struct fg_job {
 	double arrived; // game present time
 	double interval;
 	int interpolate;
+	int count; // generated frames for this pair
+	double step; // spacing of the presents; 0 = interval/(count+1)
 	int reset; // first pair after a history reset
 	int first; // unhide the overlay layer once the real copy is presented
 	unsigned generation;
@@ -978,11 +1329,12 @@ static void fg_log_stats(double now)
 			break;
 	}
 	shim_log("NP framegen stats: real=%.1f fps generated=%.1f fps gpu=%.2f ms avg %.2f ms max "
-	        "engine=%s mode=%d lead=%.1f ms skips:%s\n",
+	        "engine=%s mode=%s quality=%s ui=%d fallback=%d state=%d lead=%.1f ms skips:%s\n",
 	        fg_stat_real / span, fg_stat_generated / span,
 	        fg_stat_gpu_n > 0 ? fg_stat_gpu_ms / fg_stat_gpu_n : 0.0, fg_stat_gpu_max_ms,
-	        fg_engine_name(fg_engine_kind), atomic_load(&fg_mode), fg_lead * 1000.0,
-	        skips[0] != '\0' ? skips : " none");
+	        fg_engine_name(fg_engine_kind), fg_multiplier_name(framegen_multiplier),
+	        fg_quality_names[framegen_quality], framegen_ui, framegen_fallback, atomic_load(&fg_mode),
+	        fg_lead * 1000.0, skips[0] != '\0' ? skips : " none");
 	fg_stat_start = now;
 	fg_stat_real = fg_stat_generated = 0;
 	fg_stat_gpu_ms = fg_stat_gpu_max_ms = 0;
@@ -1029,13 +1381,19 @@ static void fg_run_job(struct fg_job *job)
 	fg_layer_sync_geometry((CAMetalLayer *)fg_game_layer);
 
 	int prev_slot = job->slot ^ 1;
+	int count = job->interpolate ? job->count : 0;
+	if (count < 1 && job->interpolate)
+		count = 1;
+	if (count > 1 && fg_engine.kind == 2)
+		count = 1; // MetalFX makes one frame per pair
+	double step = job->step > 0 ? job->step : job->interval / (double)(count + 1);
 	double lead = fg_lead;
 	if (lead < 0.003)
 		lead = 0.003;
-	if (lead > job->interval * 0.5)
-		lead = job->interval * 0.5;
+	if (lead > step)
+		lead = step;
 	double target_generated = job->arrived + lead;
-	double target_real = target_generated + job->interval * 0.5;
+	double target_real = target_generated + (double)count * step;
 	int failed = 0;
 
 	if (job->interpolate && fg_engine.kind == 2 &&
@@ -1057,37 +1415,56 @@ static void fg_run_job(struct fg_job *job)
 		fg_stat_skip(fg_skip_warmup);
 		target_real = job->arrived + lead;
 	} else if (job->interpolate) {
-		id<CAMetalDrawable> drawable = [fg_layer nextDrawable];
-		if (drawable == nil) {
-			fg_stat_skip(fg_skip_no_drawable);
-		} else {
-			id<MTLCommandBuffer> buffer = [fg_queue commandBuffer];
-			[buffer encodeWaitForEvent:fg_event value:job->value];
-			fg_engine.luma_valid[job->slot] = 0;
-			if (job->reset) {
-				fg_engine.luma_valid[prev_slot] = 0;
-				fg_engine.reset_pending = 1;
+		// Flow once for the pair on the first buffer, then one synthesis per
+		// generated frame; each frame gets its own drawable and present time
+		id<MTLBuffer> stats = nil;
+		for (int k = 1; k <= count; k++) {
+			id<CAMetalDrawable> drawable = [fg_layer nextDrawable];
+			if (drawable == nil) {
+				fg_stat_skip(fg_skip_no_drawable);
+				break;
 			}
-			fg_engine_interpolate(&fg_engine, buffer, fg_hist[prev_slot], prev_slot,
-			                      fg_hist[job->slot], job->slot, (float)job->interval);
+			id<MTLCommandBuffer> buffer = [fg_queue commandBuffer];
+			if (k == 1) {
+				[buffer encodeWaitForEvent:fg_event value:job->value];
+				fg_engine.luma_valid[job->slot] = 0;
+				if (job->reset) {
+					fg_engine.luma_valid[prev_slot] = 0;
+					fg_engine.reset_pending = 1;
+				}
+				stats = fg_engine_prepare(&fg_engine, buffer, fg_hist[prev_slot], prev_slot,
+				                          fg_hist[job->slot], job->slot);
+			}
+			fg_engine_synth(&fg_engine, buffer, fg_hist[prev_slot], fg_hist[job->slot],
+			                (float)k / (float)(count + 1), (float)job->interval);
 			id<MTLBlitCommandEncoder> blit = [buffer blitCommandEncoder];
 			[blit copyFromTexture:fg_engine.out toTexture:drawable.texture];
 			[blit endEncoding];
-			[buffer presentDrawable:drawable atTime:target_generated];
+			[buffer presentDrawable:drawable atTime:target_generated + (double)(k - 1) * step];
 			double started = fg_now();
+			int first_of_pair = k == 1;
+			struct fg_verdict_args verdict = fg_verdict_args(&fg_engine);
 			[buffer addCompletedHandler:^(id<MTLCommandBuffer> done) {
 				fg_note_gpu(done);
+				// The pair's verdict is in by now: the stats buffer was written on
+				// this queue before any of the pair's syntheses
+				int fell_back = fg_verdict(verdict, stats);
 				// Submission to GPU completion, in the CACurrentMediaTime domain
 				double latency = done.GPUEndTime - started + 0.001;
 				if (latency < 0.001 || latency > 0.25)
 					latency = 0.003;
 				os_unfair_lock_lock(&fg_lock);
-				fg_lead = fg_lead == 0 ? latency : fg_lead * 0.8 + latency * 0.2;
-				if (done.error == nil) {
+				if (first_of_pair)
+					fg_lead = fg_lead == 0 ? latency : fg_lead * 0.8 + latency * 0.2;
+				if (done.error != nil) {
+					fg_stat_skips[fg_skip_error]++;
+				} else if (fell_back) {
+					if (first_of_pair)
+						fg_stat_skips[fg_skip_fast_motion]++;
+				} else {
 					fg_stat_generated++;
 					atomic_fetch_add(&fg_total_generated, 1);
-				} else
-					fg_stat_skips[fg_skip_error]++;
+				}
 				os_unfair_lock_unlock(&fg_lock);
 			}];
 			[buffer commit];
@@ -1148,12 +1525,20 @@ static void fg_enqueue_job(struct fg_job job)
 static void framegen_init(void)
 {
 	const char *value = getenv("NOTPROTON_FRAMEGEN");
-	if (value == NULL || value[0] == '\0' || value[0] == '0')
+	if (value == NULL || value[0] == '\0' || value[0] == '0' || strcasecmp(value, "off") == 0)
 		return;
 
-	framegen_multiplier = atoi(value);
-	if (framegen_multiplier < 1)
+	if (strcasecmp(value, "adaptive") == 0)
+		framegen_multiplier = fg_mult_adaptive;
+	else if (strcasecmp(value, "on") == 0 || atoi(value) == 1 || atoi(value) == 2)
+		framegen_multiplier = fg_mult_2x;
+	else if (atoi(value) >= 3)
+		framegen_multiplier = fg_mult_3x;
+	else {
+		shim_log("overlay_shim framegen: NOTPROTON_FRAMEGEN=%s not understood (0|1|2|3|adaptive), off\n",
+		        value);
 		return;
+	}
 	framegen_enabled = 1;
 
 	const char *engine = getenv("NOTPROTON_FRAMEGEN_ENGINE");
@@ -1161,6 +1546,22 @@ static void framegen_init(void)
 		framegen_engine_pref = 1;
 	else if (engine != NULL && strcmp(engine, "metalfx") == 0)
 		framegen_engine_pref = 2;
+
+	const char *quality = getenv("NOTPROTON_FRAMEGEN_QUALITY");
+	framegen_quality = fg_quality_balanced;
+	if (quality != NULL && strcasecmp(quality, "performance") == 0)
+		framegen_quality = fg_quality_performance;
+	else if (quality != NULL && strcasecmp(quality, "quality") == 0)
+		framegen_quality = fg_quality_quality;
+
+	const char *ui = getenv("NOTPROTON_FRAMEGEN_UI");
+	framegen_ui = ui == NULL || ui[0] == '\0' || ui[0] != '0';
+	const char *fallback = getenv("NOTPROTON_FRAMEGEN_FALLBACK");
+	framegen_fallback = fallback == NULL || fallback[0] == '\0' || fallback[0] != '0';
+	const char *refresh = getenv("NOTPROTON_FRAMEGEN_REFRESH_HZ");
+	framegen_refresh_override = refresh != NULL ? atof(refresh) : 0;
+	if (framegen_refresh_override < 1 || framegen_refresh_override > 1000)
+		framegen_refresh_override = 0;
 
 	// Experimental, so the once-a-second stats are on by default: the Metal HUD only counts
 	// the game's own presents and cannot show what generation adds. OVERLAY_SHIM_LOG=0 mutes.
@@ -1171,13 +1572,12 @@ static void framegen_init(void)
 	        DISPATCH_QUEUE_SERIAL, QOS_CLASS_USER_INTERACTIVE, 0);
 	fg_worker = dispatch_queue_create("com.notproton.framegen", attr);
 
-	shim_log("overlay_shim framegen: enabled x%d engine=%s stats=%s\n",
-	        framegen_multiplier > 2 ? 2 : framegen_multiplier,
+	shim_log("overlay_shim framegen: enabled mode=%s quality=%s ui=%d fallback=%d engine=%s stats=%s%s\n",
+	        fg_multiplier_name(framegen_multiplier), fg_quality_names[framegen_quality], framegen_ui,
+	        framegen_fallback,
 	        framegen_engine_pref == 1 ? "own" : framegen_engine_pref == 2 ? "metalfx" : "auto",
-	        framegen_stats_log ? "on" : "off");
-	if (framegen_multiplier > 2)
-		shim_log("overlay_shim framegen: multiplier %d not available yet, generating one frame\n",
-		        framegen_multiplier);
+	        framegen_stats_log ? "on" : "off",
+	        framegen_refresh_override > 0 ? " (refresh overridden)" : "");
 }
 
 static struct fg_pending *fg_pending_find(id buffer, int create)
@@ -1347,8 +1747,11 @@ static int fg_decide(id drawable, int *interpolate)
 
 	// Near the refresh rate already there is nothing to add; generation starts
 	// below ~77% of it and stops above ~87%, so a few quick frames do not flap.
-	int fast = interval == 0 || interval < fg_refresh_interval * 1.15;
-	int slow = interval > fg_refresh_interval * 1.3;
+	// 3x needs two free slots per real frame, so its thresholds sit at half the
+	// refresh rate; adaptive engages like 2x and adds frames as they fit.
+	double needed = fg_refresh_interval * (framegen_multiplier == fg_mult_3x ? 2.0 : 1.0);
+	int fast = interval == 0 || interval < needed * 1.15;
+	int slow = interval > needed * 1.3;
 	if (fast) {
 		fg_slow_frames = 0;
 		if (mode == fg_mode_active) {
@@ -1430,6 +1833,16 @@ static void fg_launch(int interpolate)
 	job.arrived = fg_blit_time;
 	job.interval = fg_interval;
 	job.interpolate = interpolate && fg_hist_valid >= 1;
+	job.count = 1;
+	job.step = 0;
+	if (framegen_multiplier == fg_mult_3x) {
+		job.count = 2;
+	} else if (framegen_multiplier == fg_mult_adaptive && fg_refresh_interval > 0) {
+		// One generated frame per refresh slot between this real frame and the next
+		int slots = (int)(fg_interval / fg_refresh_interval + 0.5) - 1;
+		job.count = slots < 1 ? 1 : slots > fg_adaptive_max ? fg_adaptive_max : slots;
+		job.step = fg_refresh_interval;
+	}
 	job.reset = fg_hist_valid < 2;
 	job.first = fg_unhide_pending;
 	fg_unhide_pending = 0;
