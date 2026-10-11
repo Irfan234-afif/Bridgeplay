@@ -107,10 +107,12 @@ enum RunnerInstaller {
     }
 
     static func removePrefixTemplates(
-        keeping builds: Set<String>, libraries: [SteamLibrary], reportBusy: Bool = true
+        keeping builds: Set<String>, libraries: [SteamLibrary], reportBusy: Bool = true,
+        removingFolder: Bool = false
     ) -> [StepFailure] {
         var failures: [StepFailure] = []
         for library in libraries {
+            let earlierFailures = failures.count
             let kept = Set(builds.flatMap {
                 SupportPaths.prefixTemplates(forBuild: $0, in: library).map(\.lastPathComponent)
             })
@@ -159,6 +161,9 @@ enum RunnerInstaller {
                             detail: "Could not remove prefix template \(folder.appending(path: name).path(percentEncoded: false)): \(error.localizedDescription) Refresh to retry."
                         ))
                     }
+                }
+                if removingFolder, builds.isEmpty, failures.count == earlierFailures {
+                    unlinkat(parent, SupportPaths.prefixTemplateFolder, AT_REMOVEDIR)
                 }
             } catch {
                 failures.append(StepFailure(

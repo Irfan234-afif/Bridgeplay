@@ -119,6 +119,7 @@ jobs:
           make -s routecheck
           make -s bridgecheck
           make -s gamedrivecheck
+          make -s launchercheck
           make -s seedcheck
           make -s gamefixescheck
 

@@ -615,10 +615,10 @@ final class SystemStatus {
             defer { close(lock) }
             let result = try await Uninstall.run { progress($0.label) }
 
-            return result.restoredValveSignature
-                ? "NotProton has been removed."
-                : "NotProton has been removed. Steam needs to be redownloaded. "
-                    + "Please run Repair Steam again once you are online."
+            return result.steamNeedsRedownload
+                ? "NotProton has been removed. Steam could not be restored. "
+                    + "Reinstall Steam from steampowered.com before using it again."
+                : "NotProton has been removed."
         }
     }
 
