@@ -753,21 +753,38 @@ __attribute__((visibility("default"))) int np_framegen_interpolate_sync(id devic
 // ---------------------------------------------------------------------------
 // Overlay layer and worker
 
-static double fg_display_interval(void)
+// The screen the game is on, not the main screen: with an external display attached
+// mainScreen can be a 60 Hz monitor while the game runs on a 120 Hz ProMotion panel. The
+// screen whose backing size matches the drawable wins; else the fastest screen.
+static double fg_display_interval(NSUInteger width, NSUInteger height)
 {
-	typedef id (*screen_fn)(id, SEL);
+	typedef id (*obj_fn)(id, SEL);
 	typedef NSInteger (*fps_fn)(id, SEL);
+	typedef CGFloat (*scale_fn)(id, SEL);
+	typedef NSRect (*rect_fn)(id, SEL);
 
+	NSInteger matched = 0, fastest = 0;
 	Class screen_class = objc_getClass("NSScreen");
 	if (screen_class != Nil) {
-		id screen = ((screen_fn)objc_msgSend)((id)screen_class, sel_registerName("mainScreen"));
+		id screens = ((obj_fn)objc_msgSend)((id)screen_class, sel_registerName("screens"));
 		SEL fps_sel = sel_registerName("maximumFramesPerSecond");
-		if (screen != nil && [screen respondsToSelector:fps_sel]) {
+		for (id screen in (NSArray *)screens) {
+			if (![screen respondsToSelector:fps_sel])
+				continue;
 			NSInteger fps = ((fps_fn)objc_msgSend)(screen, fps_sel);
-			if (fps > 0)
-				return 1.0 / (double)fps;
+			if (fps > fastest)
+				fastest = fps;
+			CGFloat scale = ((scale_fn)objc_msgSend)(screen, sel_registerName("backingScaleFactor"));
+			NSRect frame = ((rect_fn)objc_msgSend)(screen, sel_registerName("frame"));
+			if (fps > 0 && (NSUInteger)(frame.size.width * scale + 0.5) == width &&
+			    (NSUInteger)(frame.size.height * scale + 0.5) == height)
+				matched = fps;
 		}
 	}
+	if (matched > 0)
+		return 1.0 / (double)matched;
+	if (fastest > 0)
+		return 1.0 / (double)fastest;
 
 	CGDisplayModeRef mode = CGDisplayCopyDisplayMode(CGMainDisplayID());
 	double rate = mode != NULL ? CGDisplayModeGetRefreshRate(mode) : 0;
@@ -882,7 +899,7 @@ static void fg_configure(CAMetalLayer *game, NSUInteger width, NSUInteger height
 	fg_hist_valid = 0;
 	fg_hist_next = 0;
 	fg_engine_kind = fg_engine.kind;
-	fg_refresh_interval = fg_display_interval();
+	fg_refresh_interval = fg_display_interval(width, height);
 	fg_slow_frames = 0;
 	atomic_store(&fg_mode, ok ? fg_mode_passthrough : fg_mode_idle);
 	os_unfair_lock_unlock(&fg_lock);
@@ -1132,8 +1149,10 @@ static void framegen_init(void)
 	else if (engine != NULL && strcmp(engine, "metalfx") == 0)
 		framegen_engine_pref = 2;
 
+	// Experimental, so the once-a-second stats are on by default: the Metal HUD only counts
+	// the game's own presents and cannot show what generation adds. OVERLAY_SHIM_LOG=0 mutes.
 	const char *log = getenv("OVERLAY_SHIM_LOG");
-	framegen_stats_log = log != NULL && log[0] != '\0' && log[0] != '0';
+	framegen_stats_log = log == NULL || (log[0] != '\0' && log[0] != '0');
 
 	dispatch_queue_attr_t attr = dispatch_queue_attr_make_with_qos_class(
 	        DISPATCH_QUEUE_SERIAL, QOS_CLASS_USER_INTERACTIVE, 0);
