@@ -331,6 +331,7 @@ panel-behavior:
 	node $(PANEL_TESTS)/launch-options.js $(OUT_DIR)/panel-emit && \
 	node $(PANEL_TESTS)/shell.js $(OUT_DIR)/panel-emit && \
 	node $(PANEL_TESTS)/migration.js $(OUT_DIR)/panel-emit && \
+	node $(PANEL_TESTS)/effective.js $(OUT_DIR)/panel-emit && \
 	echo "==> panel behavior: renders as expected, no stale arguments"
 
 CX_ROOT ?= /Applications/CrossOver Preview.app
@@ -384,7 +385,7 @@ OVERLAY_SHIM_TEST_FLAGS := -mmacosx-version-min=$(MIN_VER) -O2 -Wall -Wextra \
 
 overlay-shim: $(OVERLAY_SHIM)
 
-$(OVERLAY_SHIM): $(OVERLAY_SHIM_SRC)
+$(OVERLAY_SHIM): $(OVERLAY_SHIM_SRC) overlay-shim/framegen.m
 	@mkdir -p $(OUT_DIR)
 	$(CC) -arch arm64 $(OVERLAY_SHIM_FLAGS) -o $(OVERLAY_SHIM_ARM) $<
 	$(CC) -arch x86_64 $(OVERLAY_SHIM_FLAGS) -o $(OVERLAY_SHIM_X86) $<
@@ -407,7 +408,7 @@ overlay-shim-tests: $(OVERLAY_SHIM)
 		$(call SKIP,overlay-shim-tests,$(OVERLAY_SHIM_TESTS)); exit 0; fi; \
 	mkdir -p $(OUT_DIR); \
 	fail=0; ran=0; skipped=0; \
-	for t in device bridge delivery; do \
+	for t in device bridge delivery framegen; do \
 		for a in arm64 x86_64; do \
 			$(CC) -arch $$a $(OVERLAY_SHIM_TEST_FLAGS) -o $(OUT_DIR)/$$t.$$a \
 				$(OVERLAY_SHIM_TESTS)/$$t.m || exit 1; \

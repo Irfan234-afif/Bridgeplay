@@ -106,7 +106,7 @@ launch() {
 			graphics_log "backend=$backend ($backend_from)"
 			compose_dll_overrides
 			eval "$bridge_line"
-			for v in backend WINEDLLOVERRIDES WINEMSYNC msync_from NOTPROTON_RETINA CX_GRAPHICS_BACKEND \
+			for v in backend WINEDLLOVERRIDES WINEMSYNC msync_from NOTPROTON_RETINA NOTPROTON_FRAMEGEN CX_GRAPHICS_BACKEND \
 				DXVK_HUD VKD3D_CONFIG WINEDEBUG MTL_HUD_ENABLED gamefix_args; do
 				eval "printf \"%s=%s\\n\" \$v \"\${$v-<unset>}\""
 			done
@@ -166,7 +166,7 @@ default_conf '# shipped fix' '' '  DXVK_HUD=fps  ' "VKD3D_CONFIG=dxr$(printf '\r
 	'WINEDEBUG=-all' 'PATH=/evil' 'DYLD_INSERT_LIBRARIES=/evil.dylib' 'lower=1' 'no equals sign' \
 	"DXMT_A=\$(touch $case_dir/pwned)" 'DXMT_B=`touch pwned`' 'DXMT_C="quoted"' "DXMT_D='single'" \
 	'BACKEND=vulkan' 'MSYNC=2' 'RETINA=yes' 'DLLOVERRIDES=dxgi=native' 'DLLOVERRIDES=;=n' \
-	'DXMT_=1' 'MTL_HUD_ENABLED=1'
+	'DXMT_=1' 'MTL_HUD_ENABLED=1' 'FRAMEGEN=2'
 launch waitforexitandrun "$case_dir/game/game.exe"
 is "a padded value is trimmed" "fps" "$(got DXVK_HUD)"
 is "a CRLF line ends cleanly" "dxr" "$(got VKD3D_CONFIG)"
@@ -494,13 +494,22 @@ is "RETINA maps to NOTPROTON_RETINA" "1" "$(got NOTPROTON_RETINA)"
 launch waitforexitandrun "$case_dir/game/game.exe" NOTPROTON_RETINA=0
 is "the High Resolution launch option wins" "0" "$(got NOTPROTON_RETINA)"
 
+echo "== FRAMEGEN"
+new_case
+full_engine
+user_conf 'FRAMEGEN=1'
+launch waitforexitandrun "$case_dir/game/game.exe"
+is "FRAMEGEN maps to NOTPROTON_FRAMEGEN" "1" "$(got NOTPROTON_FRAMEGEN)"
+launch waitforexitandrun "$case_dir/game/game.exe" NOTPROTON_FRAMEGEN=0
+is "the frame generation launch option wins" "0" "$(got NOTPROTON_FRAMEGEN)"
+
 echo "== the launcher receives the allow-listed variables"
 set --
 out=$(env -i PATH="$PATH" forward="$forward" VKD3D_CONFIG=dxr MVK_CONFIG_LOG_LEVEL=1 \
 	STAGING_SHARED_MEMORY=1 WINE_CPU_TOPOLOGY=4:0,1,2,3 WINE_LARGE_ADDRESS_AWARE=1 \
-	DXVK_HUD=fps NOTPROTON_UNRELATED=1 sh -c 'set --; eval "$forward"; printf "%s\n" "$@"' | grep -v '^--env$' | sort | tr '\n' ' ')
+	DXVK_HUD=fps NOTPROTON_FRAMEGEN=1 NOTPROTON_UNRELATED=1 sh -c 'set --; eval "$forward"; printf "%s\n" "$@"' | grep -v '^--env$' | sort | tr '\n' ' ')
 is "VKD3D_, MVK_, STAGING_ and WINE_ topology variables are forwarded" \
-	"DXVK_HUD=fps MVK_CONFIG_LOG_LEVEL=1 STAGING_SHARED_MEMORY=1 VKD3D_CONFIG=dxr WINE_CPU_TOPOLOGY=4:0,1,2,3 WINE_LARGE_ADDRESS_AWARE=1 " "$out"
+	"DXVK_HUD=fps MVK_CONFIG_LOG_LEVEL=1 NOTPROTON_FRAMEGEN=1 STAGING_SHARED_MEMORY=1 VKD3D_CONFIG=dxr WINE_CPU_TOPOLOGY=4:0,1,2,3 WINE_LARGE_ADDRESS_AWARE=1 " "$out"
 
 echo "== the wineserver directory self-heal"
 heal=$(sed -n '/^heal_wine_tmp() {$/,/^}$/p' "$SRC")

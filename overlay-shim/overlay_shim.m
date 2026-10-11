@@ -242,6 +242,9 @@ static int stage_claimed(Class seen, Class *held, const char *stage)
 	return 1;
 }
 
+// Frame generation (NOTPROTON_FRAMEGEN=1), one translation unit with the shim
+#include "framegen.m"
+
 static void encoder_mark(id encoder, NSUInteger format)
 {
 	os_unfair_lock_lock(&encoder_lock);
@@ -461,6 +464,7 @@ static id hook_render_encoder(id self, SEL selector, MTLRenderPassDescriptor *de
 	NSUInteger format = attachment.pixelFormat;
 
 	encoder_mark(encoder, format);
+	framegen_note_render_pass(self, attachment);
 
 	if (!overlay_pass)
 		return encoder;
@@ -519,7 +523,8 @@ static void hook_signal_drawable(id self, SEL selector, id drawable)
 
 	signalled_drawable = nil;
 
-	if (overlay_text_end == NULL || drawable == nil)
+	// Without the overlay the bridge has no reader, unless framegen wants the frame
+	if ((overlay_text_end == NULL && !framegen_enabled) || drawable == nil)
 		return;
 
 	id device = object_device(self);
@@ -580,6 +585,8 @@ static void hook_drawable_present(id self, SEL selector)
 {
 	if (present_composited(self, 0.0, 0))
 		return;
+	if (framegen_divert_plain_present(self, 0))
+		return;
 
 	next_drawable_present(self, selector);
 }
@@ -587,6 +594,8 @@ static void hook_drawable_present(id self, SEL selector)
 static void hook_drawable_present_after(id self, SEL selector, CFTimeInterval duration)
 {
 	if (present_composited(self, duration, 1))
+		return;
+	if (framegen_divert_plain_present(self, duration))
 		return;
 
 	next_drawable_present_after(self, selector, duration);
@@ -626,6 +635,8 @@ static void ensure_command_buffer_hooks(id buffer)
 	shim_log("overlay_shim ensure_command_buffer_hooks: %s hooks=%d overlay_commit=%s\n",
 	        class_getName(command_buffer_class), hooked,
 	        class_has_method(command_buffer_class, "steamoverlay_commit") ? "present" : "missing");
+
+	framegen_install_command_buffer_hooks(command_buffer_class);
 }
 
 static void ensure_queue_hooks(id queue)
@@ -920,6 +931,12 @@ static id hook_next_drawable(id layer, SEL selector)
 		        class_getName(object_getClass(layer)), drawable != nil ? "yes" : "no");
 	}
 
+	if (framegen_enabled) {
+		// Framegen needs the drawable present hooks on every path, not only Metal 4
+		ensure_drawable_hooks(drawable);
+		framegen_note_drawable(layer, drawable);
+	}
+
 	return drawable;
 }
 
@@ -951,12 +968,14 @@ __attribute__((constructor)) static void overlay_shim_load(void)
 	}
 
 	_dyld_register_func_for_add_image(image_added);
+	framegen_init();
 
 	int hooked = interpose(layer, "setPixelFormat:", (IMP)hook_set_pixel_format,
 	                       (IMP *)&next_set_pixel_format);
 	hooked += interpose(layer, "setColorspace:", (IMP)hook_set_colorspace,
 	                    (IMP *)&next_set_colorspace);
 	hooked += interpose(layer, "setDevice:", (IMP)hook_set_device, (IMP *)&next_set_device);
+	framegen_install_layer_hooks(layer);
 
 	shim_log("overlay_shim_load: pid=%d exe=%s layer_hooks=%d overlay=%s\n", getpid(),
 	        getprogname(), hooked, overlay_text_end != NULL ? "present" : "absent");

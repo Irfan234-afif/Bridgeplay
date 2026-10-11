@@ -26,6 +26,7 @@ logged, when:
 | `DLLOVERRIDES` | Wine syntax, e.g. `dinput8=n,b;xinput1_3=n` | Added to `WINEDLLOVERRIDES` after the backend's entries and before the launch options' |
 | `MSYNC` | `0`, `1` | `1` turns msync on when the engine supports it; `0` turns it off |
 | `RETINA` | `0`, `1` | Same as `NOTPROTON_RETINA` (High Resolution) |
+| `FRAMEGEN` | `0`, `1` | Same as `NOTPROTON_FRAMEGEN=1`: experimental MetalFX frame interpolation (2x) in overlay-shim, adds up to half a frame of latency |
 | `NVAPI` | `0`, `1` | `1` turns on Apple's `nvapi64` on an engine with a linked Game Porting Toolkit, for `d3dmetal` only. Off by default, since an nvapi that answers sends some games down NVIDIA-only paths |
 | `DXMT_*`, `DXVK_*`, `MVK_*`, `VKD3D_*`, `D3DM_*`, `STAGING_*` | any | Exported as is |
 | `MTL_HUD_ENABLED`, `WINEDEBUG`, `WINE_LARGE_ADDRESS_AWARE`, `WINE_CPU_TOPOLOGY` | any | Exported as is |

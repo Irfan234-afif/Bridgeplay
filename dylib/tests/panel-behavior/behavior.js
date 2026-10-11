@@ -21,7 +21,7 @@ for (const form of Object.keys(FORMS)) {
        'a shortcut renders the panel before a tool name reaches the page');
 
   let r = nodes('');
-  t.ok(toggles(r).length === 6 && sections(r).length === 3, 'automatic shows six toggles in three sections');
+  t.ok(toggles(r).length === 7 && sections(r).length === 4, 'automatic shows seven toggles in four sections');
   t.ok(r.filter(x => x.type === 'Dropdown').length === 2, 'two dropdowns');
   t.ok(!('label' in r.find(x => x.type === 'Dropdown').props), 'the backend dropdown carries no label column');
 
@@ -79,7 +79,7 @@ for (const form of Object.keys(FORMS)) {
   const root = P({ details: details('') });
   t.ok(root.props.className === 'MSCXPanel', 'the panel root carries its own class');
   const classes = nodes('').filter(x => x.type === 'Toggle').map(x => x.props.className);
-  t.ok(classes.length === 6 && classes.every(c => c === 'MSCXRow'), 'every checkbox carries the row class');
+  t.ok(classes.length === 7 && classes.every(c => c === 'MSCXRow'), 'every checkbox carries the row class');
   const raw = o => nodes(o).find(x => x.props.label === 'Let games read controllers directly');
   t.ok(sections(nodes('')).includes('Controllers') && raw('').props.checked === false,
        'controller hiding is on unless the game says otherwise');
@@ -117,6 +117,25 @@ for (const form of Object.keys(FORMS)) {
   written.length = 0;
   row('', 'Let games read controllers directly').props.onChange(false);
   t.ok(last().trim() === 'NOTPROTON_RAW_CONTROLLERS=0 %command%', `opting out of raw controllers writes 0 (${last()})`);
+  delete globalThis.MSCXFx;
+
+  // Frame generation: shown for every backend, one row.
+  const fg = (o) => nodes(o).find(x => x.props.label === 'MetalFX frame interpolation (2x)');
+  for (const b of ['', 'd3dmetal', 'dxmt', 'dxvk', 'wined3d']) {
+    t.ok(fg(b ? 'CX_GRAPHICS_BACKEND=' + b : '') !== undefined, `${b || 'automatic'} shows the frame generation row`);
+  }
+  t.ok(nodes('').some(x => x.type === 'Section' && x.props.label === 'Frame Generation (Experimental. Adds input lag)'),
+       'the frame generation section warns about latency');
+  t.ok(fg('').props.checked === false, 'frame generation is off by default');
+  written.length = 0;
+  fg('').props.onChange(true);
+  t.ok(last().trim() === 'NOTPROTON_FRAMEGEN=1 %command%', `the frame generation row writes its flag (${last()})`);
+  t.ok(fg('NOTPROTON_FRAMEGEN=1').props.checked === true, 'the frame generation row reads its flag');
+  written.length = 0;
+  fg('NOTPROTON_FRAMEGEN=1 WINEMSYNC=1').props.onChange(false);
+  t.ok(last().trim() === 'WINEMSYNC=1 %command%', `turning frame generation off removes its flag (${last()})`);
+  globalThis.MSCXFx = { g: { NOTPROTON_FRAMEGEN: '1' }, a: {}, e: {}, d: {} };
+  t.ok(fg('').props.checked === true, 'a global conf value reads frame generation as on');
   delete globalThis.MSCXFx;
 
   const css = nodes('').filter(x => x.type === 'style');

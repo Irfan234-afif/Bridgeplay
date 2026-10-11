@@ -256,7 +256,7 @@ gamefix_reason() {
   case "$1" in
     BACKEND)
       case "$2" in dxmt|dxvk|wined3d|d3dmetal) ;; *) echo "not dxmt, dxvk, wined3d or d3dmetal" ;; esac ;;
-    MSYNC|RETINA|NVAPI)
+    MSYNC|RETINA|NVAPI|FRAMEGEN)
       case "$2" in 0|1) ;; *) echo "not 0 or 1" ;; esac ;;
     DLLOVERRIDES)
       valid_dll_overrides "$2" || echo "not Wine override syntax" ;;
@@ -340,6 +340,7 @@ load_gamefixes() {
           gamefix_log "ARGS not applied, $verb is not the game launch"
         fi ;;
       RETINA) gamefix_apply_env NOTPROTON_RETINA "$value" "$from" ;;
+      FRAMEGEN) gamefix_apply_env NOTPROTON_FRAMEGEN "$value" "$from" ;;
       *) gamefix_apply_env "$key" "$value" "$from" ;;
     esac
   done
@@ -1973,6 +1974,10 @@ if [ -n "\$STEAM_DYLD_INSERT_LIBRARIES" ]; then
   else
     export DYLD_INSERT_LIBRARIES="\$STEAM_DYLD_INSERT_LIBRARIES"
   fi
+elif [ -f "\$shim" ] && [ "\${NOTPROTON_FRAMEGEN:-0}" != 0 ]; then
+  # Frame generation lives in the shim, so it loads without the Steam overlay too.
+  export DYLD_INSERT_LIBRARIES="\$shim"
+  export NOTPROTON_OVERLAY_SHIM="\$shim"
 fi
 [ -n "\$NOTPROTON_GAME_CWD" ] && cd "\$NOTPROTON_GAME_CWD"
 "$WINELOADER" "\$@"
@@ -2109,7 +2114,7 @@ else
   echo "=== client staged no overlay renderer, overlay disabled ===" >> "$log" 2>&1 || true
 fi
 set -- --args "$shim_exe" "$@"
-for name in $(env | sed -nE 's/^(CX_APPLEGPTK_LIBD3DSHARED_PATH|SDL_GAMECONTROLLERCONFIG(_FILE)?|SDL_JOYSTICK_MFI|WINE_LARGE_ADDRESS_AWARE|WINE_CPU_TOPOLOGY|Steam[A-Za-z0-9]*|(CX_GRAPHICS|D3DM_|DXMT_|DXVK_|MVK_|VKD3D_|STAGING_|MTL_|ROSETTA_)[A-Z0-9_]*)=.*/\1/p'); do
+for name in $(env | sed -nE 's/^(CX_APPLEGPTK_LIBD3DSHARED_PATH|SDL_GAMECONTROLLERCONFIG(_FILE)?|SDL_JOYSTICK_MFI|WINE_LARGE_ADDRESS_AWARE|WINE_CPU_TOPOLOGY|Steam[A-Za-z0-9]*|(CX_GRAPHICS|D3DM_|DXMT_|DXVK_|MVK_|VKD3D_|STAGING_|MTL_|ROSETTA_)[A-Z0-9_]*|NOTPROTON_FRAMEGEN)=.*/\1/p'); do
   eval "value=\$$name"
   # shellcheck disable=SC2154 # eval assigns value on the line above
   set -- --env "$name=$value" "$@"
