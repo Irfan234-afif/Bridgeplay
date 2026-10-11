@@ -50,8 +50,9 @@ static CFTypeRef np_IOHIDDeviceGetProperty(IOHIDDeviceRef device, CFStringRef ke
     if (!is_bluetooth_gamesir(device))
         return IOHIDDeviceGetProperty(device, key);
     // Get rule: the caller does not release, so the spoofed values are made once.
-    static CFNumberRef vendor, product, page, usage;
+    static CFNumberRef vendor, product, page, usage, size;
     if (!vendor) {
+        size = make_number(XB_REPORT_LEN);
         vendor = make_number(XB_VENDOR);
         product = make_number(XB_PRODUCT);
         page = make_number(kHIDPage_GenericDesktop);
@@ -63,6 +64,9 @@ static CFTypeRef np_IOHIDDeviceGetProperty(IOHIDDeviceRef device, CFStringRef ke
     if (CFEqual(key, CFSTR(kIOHIDProductIDKey))) return product;
     if (CFEqual(key, CFSTR(kIOHIDPrimaryUsagePageKey))) return page;
     if (CFEqual(key, CFSTR(kIOHIDPrimaryUsageKey))) return usage;
+    // Callers size their report buffer from this; the pad's own 11 would cut the
+    // translated report off before the hat and the buttons.
+    if (CFEqual(key, CFSTR(kIOHIDMaxInputReportSizeKey))) return size;
     return IOHIDDeviceGetProperty(device, key);
 }
 INTERPOSE(np_IOHIDDeviceGetProperty, IOHIDDeviceGetProperty)
