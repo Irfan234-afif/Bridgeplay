@@ -225,6 +225,7 @@ gamefix_backend=""
 gamefix_dlloverrides=""
 gamefix_msync=""
 gamefix_nvapi=""
+gamefix_dlss_fg=""
 gamefix_args=""
 
 gamefix_log() {
@@ -256,7 +257,7 @@ gamefix_reason() {
   case "$1" in
     BACKEND)
       case "$2" in dxmt|dxvk|wined3d|d3dmetal) ;; *) echo "not dxmt, dxvk, wined3d or d3dmetal" ;; esac ;;
-    MSYNC|RETINA|NVAPI|FRAMEGEN_UI|FRAMEGEN_FALLBACK|STEAMDECK)
+    MSYNC|RETINA|NVAPI|DLSS_FG|FRAMEGEN_UI|FRAMEGEN_FALLBACK|STEAMDECK)
       case "$2" in 0|1) ;; *) echo "not 0 or 1" ;; esac ;;
     FRAMEGEN)
       # 1 is the 2x of the first release.
@@ -339,6 +340,7 @@ load_gamefixes() {
         gamefix_log "DLLOVERRIDES=$value from the $from conf, launch options still win per DLL" ;;
       MSYNC) gamefix_msync=$value; gamefix_log "MSYNC=$value from the $from conf" ;;
       NVAPI) gamefix_nvapi=$value; gamefix_log "NVAPI=$value from the $from conf" ;;
+      DLSS_FG) gamefix_dlss_fg=$value; gamefix_log "DLSS_FG=$value from the $from conf" ;;
       ARGS)
         if [ "$verb" = waitforexitandrun ]; then
           gamefix_args=$value
@@ -699,6 +701,13 @@ activate_backend() {
       # Streamline loads an NGX core only when it is NVIDIA-signed; the engine's crypt32 and
       # wintrust answer for Apple's bridge from a signed Streamline module (ngx-signer-patch/).
       export NOTPROTON_NGX_SIGNER=1
+      # DLSS frame generation wants hardware GPU scheduling; winecx's win32u reports it on
+      # only for CX_ACTIVE_GRAPHICS_BACKEND=d3dmetal (CW HACK 24905). Opt-in: frank Whisky
+      # #231 saw MetalFX frame interpolation on an M5 with D3DMetal 4.0b2 hang WindowServer.
+      if [ "$gamefix_dlss_fg" = 1 ]; then
+        export CX_ACTIVE_GRAPHICS_BACKEND=d3dmetal
+        graphics_log "DLSS_FG=1: hardware GPU scheduling reported on for DLSS frame generation"
+      fi
       graphics_log "NVAPI=1: $nv_dlls on, adapter $D3DM_VENDOR_ID:$D3DM_DEVICE_ID ($D3DM_DEVICE_DESCRIPTION)"
     else
       [ "$gamefix_nvapi" != 1 ] || graphics_log "NVAPI=1 not applied, $backend is not d3dmetal"
@@ -2138,7 +2147,7 @@ else
   echo "=== client staged no overlay renderer, overlay disabled ===" >> "$log" 2>&1 || true
 fi
 set -- --args "$shim_exe" "$@"
-for name in $(env | sed -nE 's/^(CX_APPLEGPTK_LIBD3DSHARED_PATH|SDL_GAMECONTROLLERCONFIG(_FILE)?|SDL_JOYSTICK_MFI|WINE_LARGE_ADDRESS_AWARE|WINE_CPU_TOPOLOGY|Steam[A-Za-z0-9]*|(CX_GRAPHICS|D3DM_|DXMT_|DXVK_|MVK_|VKD3D_|STAGING_|MTL_|ROSETTA_)[A-Z0-9_]*|NOTPROTON_FRAMEGEN(_[A-Z]+)?|NOTPROTON_NGX_SIGNER)=.*/\1/p'); do
+for name in $(env | sed -nE 's/^(CX_APPLEGPTK_LIBD3DSHARED_PATH|SDL_GAMECONTROLLERCONFIG(_FILE)?|SDL_JOYSTICK_MFI|WINE_LARGE_ADDRESS_AWARE|WINE_CPU_TOPOLOGY|Steam[A-Za-z0-9]*|(CX_GRAPHICS|D3DM_|DXMT_|DXVK_|MVK_|VKD3D_|STAGING_|MTL_|ROSETTA_)[A-Z0-9_]*|NOTPROTON_FRAMEGEN(_[A-Z]+)?|NOTPROTON_NGX_SIGNER|CX_ACTIVE_GRAPHICS_BACKEND)=.*/\1/p'); do
   eval "value=\$$name"
   # shellcheck disable=SC2154 # eval assigns value on the line above
   set -- --env "$name=$value" "$@"

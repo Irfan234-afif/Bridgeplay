@@ -99,7 +99,7 @@ launch() {
 		STEAM_COMPAT_DATA_PATH="$case_dir/data" WINEPREFIX="$case_dir/data/pfx" \
 		sh -ec '
 			eval "$functions"
-			gamefix_keys="" gamefix_backend="" gamefix_dlloverrides="" gamefix_msync="" gamefix_nvapi="" gamefix_args=""
+			gamefix_keys="" gamefix_backend="" gamefix_dlloverrides="" gamefix_msync="" gamefix_nvapi="" gamefix_dlss_fg="" gamefix_args=""
 			backend_root="$CX_ROOT/lib/notproton-backends"
 			load_gamefixes || true
 			resolve_msync
@@ -112,7 +112,7 @@ launch() {
 			eval "$bridge_line"
 			for v in backend WINEDLLOVERRIDES WINEMSYNC msync_from NOTPROTON_RETINA NOTPROTON_FRAMEGEN \
 				NOTPROTON_FRAMEGEN_QUALITY NOTPROTON_FRAMEGEN_UI NOTPROTON_FRAMEGEN_FALLBACK NOTPROTON_FRAMEGEN_ENGINE CX_GRAPHICS_BACKEND \
-				DXVK_HUD VKD3D_CONFIG WINEDEBUG MTL_HUD_ENABLED D3DM_VENDOR_ID D3DM_DEVICE_ID D3DM_DEVICE_DESCRIPTION gamefix_args; do
+				DXVK_HUD VKD3D_CONFIG WINEDEBUG MTL_HUD_ENABLED D3DM_VENDOR_ID D3DM_DEVICE_ID D3DM_DEVICE_DESCRIPTION NOTPROTON_NGX_SIGNER CX_ACTIVE_GRAPHICS_BACKEND gamefix_args; do
 				eval "printf \"%s=%s\\n\" \$v \"\${$v-<unset>}\""
 			done
 		' launch "$target" > "$case_dir/out" 2>&1 || echo "launch exited $?" >> "$case_dir/out"
@@ -384,6 +384,11 @@ is "and D3DMetal reports an NVIDIA adapter" "0x10de 0x2684 NVIDIA GeForce RTX 40
 user_conf 'NVAPI=1' 'D3DM_DEVICE_ID=0x2704'
 launch waitforexitandrun "$case_dir/game/game.exe"
 is "a conf's D3DM_DEVICE_ID wins over the default" "0x10de 0x2704" "$(got D3DM_VENDOR_ID) $(got D3DM_DEVICE_ID)"
+is "NVAPI=1 lets Streamline load Apple's NGX bridge" "1" "$(got NOTPROTON_NGX_SIGNER)"
+is "and leaves hardware scheduling alone" "<unset>" "$(got CX_ACTIVE_GRAPHICS_BACKEND)"
+user_conf 'NVAPI=1' 'DLSS_FG=1'
+launch waitforexitandrun "$case_dir/game/game.exe"
+is "DLSS_FG=1 reports hardware scheduling for DLSS frame generation" "d3dmetal" "$(got CX_ACTIVE_GRAPHICS_BACKEND)"
 user_conf 'NVAPI=1' 'BACKEND=dxmt'
 launch waitforexitandrun "$case_dir/game/game.exe"
 is "but not for dxmt" "d3d10core,d3d11,dxgi=n,b;d3d10,d3d12=b;nvapi64,nvngx=d;$trio" "$(got WINEDLLOVERRIDES)"
