@@ -41,6 +41,8 @@ settings() {
 		'[HKEY_CURRENT_USER\Software\Wine\WineDbg]' '"ShowCrashDialog"=dword:00000000' '' \
 		'[HKEY_CURRENT_USER\Software\Wine\Mac Driver]' "$1" '' \
 		'[HKEY_LOCAL_MACHINE\Software\Classes\steam]' '"URL Protocol"=""' '' \
+		'[HKEY_LOCAL_MACHINE\Software\NVIDIA Corporation\Global\NGXCore]' \
+		'"FullPath"="C:\\Windows\\System32"' '' \
 		'[HKEY_LOCAL_MACHINE\Software\Classes\steam\shell\open\command]' \
 		'@="\"C:\\Program Files (x86)\\Steam\\steam.exe\" \"%1\""' ''
 }
