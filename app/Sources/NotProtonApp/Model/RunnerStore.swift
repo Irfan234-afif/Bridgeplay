@@ -162,12 +162,13 @@ enum CompatToolList {
             )
             try atomicReplace(file, with: Data(text.utf8), step: String(localized: "Update compatibility tools"))
         }
-        prune(keeping: Set(builds.map(\.id)), runners: runners, bridge: bridge, compatTools: compatTools)
+        prune(keeping: Set(builds.map(\.id)), tools: Set(tools.map(\.name)),
+              runners: runners, bridge: bridge, compatTools: compatTools)
         return changed
     }
 
     private static func prune(
-        keeping ids: Set<String>, runners: URL, bridge: URL, compatTools: URL
+        keeping ids: Set<String>, tools: Set<String>, runners: URL, bridge: URL, compatTools: URL
     ) {
         let legacyInUse = legacyLayoutInUse(compatTools: compatTools)
         NtdllPatcher.pruneBuilds(keeping: ids, in: bridge, keepingLegacy: legacyInUse)
@@ -175,6 +176,11 @@ enum CompatToolList {
         let legacy = runners.appending(path: "current").path(percentEncoded: false)
         if (try? FileManager.default.destinationOfSymbolicLink(atPath: legacy)) != nil {
             try? FileManager.default.removeItem(atPath: legacy)
+        }
+        // A tool whose build is gone (Remove Copy, a dropped engine) would stay in Steam's list
+        // and fail on launch, so every NotProton tool the list no longer names goes too.
+        for tool in SupportPaths.Steam.notprotonTools(in: compatTools) where !tools.contains(tool.lastPathComponent) {
+            try? FileManager.default.removeItem(at: tool)
         }
     }
 

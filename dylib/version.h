@@ -2,6 +2,6 @@
 #ifndef NOTPROTON_VERSION_H
 #define NOTPROTON_VERSION_H
 
-#define NOTPROTON_VERSION "1.1.7-winehq.1-ray.18"
+#define NOTPROTON_VERSION "1.1.7-winehq.1-ray.19"
 
 #endif // NOTPROTON_VERSION_H

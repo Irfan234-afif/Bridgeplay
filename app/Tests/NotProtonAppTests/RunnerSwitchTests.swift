@@ -210,6 +210,25 @@ struct RunnerPrepareTests {
             atPath: file.deletingLastPathComponent().path(percentEncoded: false)))
     }
 
+    @Test("A tool whose build is gone leaves Steam's compatibility tools; the others and foreign tools stay")
+    func staleToolIsPruned() throws {
+        let runners = try makeRunners(cloning: [Self.rosetta])
+        defer { try? FileManager.default.removeItem(at: runners) }
+        let fm = FileManager.default
+        let compat = runners.appending(path: "compatibilitytools.d")
+        for name in ["notproton-gone", "GE-Proton"] {
+            try fm.createDirectory(at: compat.appending(path: name), withIntermediateDirectories: true)
+            try Data("#!/bin/sh\n".utf8).write(to: compat.appending(path: "\(name)/run"))
+        }
+
+        try sync(runners)
+
+        let kept = try #require(toolList(runners)).split(separator: "\n").compactMap { $0.split(separator: "\t").first }
+        #expect(!kept.isEmpty)
+        #expect(!fm.fileExists(atPath: compat.appending(path: "notproton-gone").path(percentEncoded: false)))
+        #expect(fm.fileExists(atPath: compat.appending(path: "GE-Proton").path(percentEncoded: false)))
+    }
+
     private func sync(_ runners: URL) throws {
         try CompatToolList.sync(
             runners: runners, bridge: runners.appending(path: "bridge"), file: runners.appending(path: "tools"),
