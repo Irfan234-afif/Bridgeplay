@@ -278,7 +278,7 @@ struct FreeEngineTests {
            ProcessInfo.processInfo.environment["NOTPROTON_OFFLINE"] == "1" { return }
         let archive = try await PinnedDownload.obtain(
             file: dxmt.archive, sha256: dxmt.sha256, bases: dxmt.bases,
-            into: FreeEngine.downloads, step: FreeEngine.step, source: "GitHub"
+            into: FreeEngine.downloads, step: FreeEngine.step, from: "GitHub"
         )
         #expect(Digest.sha256IfPresent(archive) == dxmt.sha256)
 

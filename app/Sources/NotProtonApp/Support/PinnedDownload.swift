@@ -10,8 +10,8 @@ enum PinnedDownload {
 
         var label: String {
             switch self {
-            case .reusing: "Preparing"
-            case .fetching(let host): "Downloading from \(host)"
+            case .reusing: String(localized: "Preparing")
+            case .fetching(let host): String(localized: "Downloading from \(host)")
             }
         }
     }
@@ -22,7 +22,7 @@ enum PinnedDownload {
         bases: [URL],
         into downloads: URL,
         step: String,
-        source: String = "Valve",
+        from source: String = "Valve",
         report: @Sendable (Progress) -> Void = { _ in }
     ) async throws -> URL {
         let archive = downloads.appending(path: file)
@@ -66,7 +66,7 @@ enum PinnedDownload {
         }
 
         AppLog.note("\(file) refused by all \(bases.count) hosts: \(refusals.joined(separator: ". "))")
-        throw StepFailure(step: step, detail: reason(kinds, source: source))
+        throw StepFailure(step: step, detail: reason(kinds, from: source))
     }
 
     private enum Refusal {
@@ -75,14 +75,13 @@ enum PinnedDownload {
         case answered
     }
 
-    private static func reason(_ kinds: Set<Refusal>, source: String) -> String {
+    private static func reason(_ kinds: Set<Refusal>, from source: String) -> String {
         if kinds == [.mismatch] {
-            return "Something is wrong with the downloaded files. Please check for a NotProton update."
+            return String(localized: "Something is wrong with the downloaded files. Please check for a NotProton update.")
         }
         if kinds == [.unreachable] {
-            return "NotProton could not reach \(source)'s servers. Please check your internet "
-                + "connection and try again."
+            return String(localized: "NotProton could not reach \(source)'s servers. Please check your internet connection and try again.")
         }
-        return "NotProton could not download the files it needs from \(source). Please try again later."
+        return String(localized: "NotProton could not download the files it needs from \(source). Please try again later.")
     }
 }

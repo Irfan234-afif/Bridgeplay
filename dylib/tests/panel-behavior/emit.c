@@ -41,6 +41,14 @@ int main(int argc, char **argv) {
         free(out);
         return 0;
     }
-    fputs("usage: emit component|statement|migration|transform <chunk> <fallback tool>\n", stderr);
+    if (argc == 2 && strcmp(argv[1], "compat-hint") == 0) {
+        fputs(NP_COMPAT_HINT, stdout);
+        return 0;
+    }
+    if (argc == 2 && strcmp(argv[1], "image-files-label") == 0) {
+        fputs(NP_IMAGE_FILES_LABEL, stdout);
+        return 0;
+    }
+    fputs("usage: emit component|statement|migration|transform <chunk> <fallback tool>|compat-hint|image-files-label\n", stderr);
     return 2;
 }

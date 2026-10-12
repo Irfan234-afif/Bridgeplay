@@ -510,7 +510,7 @@ struct FreeEngineWinecxTests {
         let dxmt = FreeEngine.dxmt
         let renderer = try await PinnedDownload.obtain(
             file: dxmt.archive, sha256: dxmt.sha256, bases: dxmt.bases,
-            into: FreeEngine.downloads, step: FreeEngineWinecx.step, source: "GitHub"
+            into: FreeEngine.downloads, step: FreeEngineWinecx.step, from: "GitHub"
         )
         let fm = FileManager.default
         let base = try makeDirectory("real")

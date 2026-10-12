@@ -236,17 +236,17 @@ enum FreeEngine {
     ) async throws -> CrossOverInstall {
         let archive = try await PinnedDownload.obtain(
             file: release.archive, sha256: release.sha256, bases: release.bases,
-            into: downloads, step: step, source: "GitHub",
+            into: downloads, step: step, from: "GitHub",
             report: { report(.downloading($0)) }
         )
         let renderer = try await PinnedDownload.obtain(
             file: release.renderer.archive, sha256: release.renderer.sha256, bases: release.renderer.bases,
-            into: downloads, step: step, source: "GitHub",
+            into: downloads, step: step, from: "GitHub",
             report: { report(.downloading($0)) }
         )
         let dxvk = try await PinnedDownload.obtain(
             file: release.dxvk.archive, sha256: release.dxvk.sha256, bases: release.dxvk.bases,
-            into: downloads, step: step, source: "GitHub",
+            into: downloads, step: step, from: "GitHub",
             report: { report(.downloading($0)) }
         )
         report(.unpacking)

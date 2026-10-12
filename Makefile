@@ -1,6 +1,7 @@
 CC       := clang
 ARCH     := arm64
 MIN_VER  := 15.0
+GLASS_SDK := 26.0
 AVAIL    := -Werror=unguarded-availability-new
 
 CFLAGS   := -arch $(ARCH) -mmacosx-version-min=$(MIN_VER) $(AVAIL) \
@@ -136,7 +137,13 @@ launchercheck:
 
 .PHONY: mincheck
 mincheck:
-	@sh dylib/tests/mincheck.sh "$(APP_BUNDLE)" "$(MIN_VER)"
+	@sh dylib/tests/mincheck.sh "$(APP_BUNDLE)" "$(MIN_VER)" "$(GLASS_SDK)"
+
+.PHONY: l10ncheck
+l10ncheck:
+	@bin=$$(swift build --package-path app -c release --show-bin-path); \
+	python3 dylib/tests/l10ncheck.py app/Sources/NotProtonApp/Resources/Localization/Localizable.xcstrings \
+		"$$bin/../../Intermediates.noindex/NotProtonApp.build/$$(basename "$$bin")" zh-Hans
 
 # runcheck owns compat_run.sh, whose warnings wait for a change that can move
 # the embedded __text baseline
@@ -337,6 +344,7 @@ panel-behavior:
 	node $(PANEL_TESTS)/shell.js $(OUT_DIR)/panel-emit && \
 	node $(PANEL_TESTS)/migration.js $(OUT_DIR)/panel-emit && \
 	node $(PANEL_TESTS)/effective.js $(OUT_DIR)/panel-emit && \
+	node $(PANEL_TESTS)/localization.js $(OUT_DIR)/panel-emit && \
 	echo "==> panel behavior: renders as expected, no stale arguments"
 
 CX_ROOT ?= /Applications/CrossOver Preview.app
@@ -609,7 +617,12 @@ app: app-payload $(ICON_CAR)
 		"$(APP_BUNDLE)/Contents/Frameworks/Sparkle.framework"
 	install_name_tool -add_rpath @executable_path/../Frameworks \
 		"$(APP_BUNDLE)/Contents/MacOS/NotProtonApp"
+	xcrun vtool -set-build-version macos $(MIN_VER) "$$(xcrun --sdk macosx --show-sdk-version)" \
+		-replace -output "$(APP_BUNDLE)/Contents/MacOS/NotProtonApp" \
+		"$(APP_BUNDLE)/Contents/MacOS/NotProtonApp"
 	cp -R "$$(swift build --package-path app -c release --show-bin-path)/NotProtonApp_NotProtonApp.bundle" \
+		"$(APP_BUNDLE)/Contents/Resources/"
+	cp -R "$(APP_BUNDLE)/Contents/Resources/NotProtonApp_NotProtonApp.bundle/Contents/Resources/"*.lproj \
 		"$(APP_BUNDLE)/Contents/Resources/"
 	cp "$(ICON_DIR)/Assets.car" "$(ICON_DIR)/NotProton.icns" \
 		"$(APP_BUNDLE)/Contents/Resources/"
