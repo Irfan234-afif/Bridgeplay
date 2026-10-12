@@ -216,10 +216,27 @@ struct FreeEngineWinecxTests {
     func ngxSigner(id: String) throws {
         let release = try #require(FreeEngineWinecx.release(build: id))
         let expected: Set<String> = release.build == "winecx-11.17"
-            ? ["lib/wine/x86_64-windows/crypt32.dll", "lib/wine/x86_64-windows/wintrust.dll"] : []
-        #expect(Set(release.signer.map(\.path)) == expected)
+            ? ["lib/wine/x86_64-windows/crypt32.dll", "lib/wine/x86_64-windows/wintrust.dll",
+               "lib/notproton-backends/nvapi-shim/x86_64-windows/nvapi64.dll",
+               "lib/wine/x86_64-unix/win32u.so", "lib/wine/x86_64-windows/wined3d.dll"] : []
+        #expect(Set(release.nvidia.map(\.path)) == expected)
         let table = FreeEngineWinecx.expectedFiles(release)
-        for file in release.signer {
+        for file in release.nvidia {
+            let bundled = try #require(Bundle.module.url(forResource: file.resource, withExtension: file.ext))
+            #expect(Digest.sha256IfPresent(bundled) == file.sha256, "\(file.resource)")
+            #expect(table[file.path] == file.sha256, "\(file.path)")
+        }
+    }
+
+    // winecoreaudio-patch: 11.17 ships a winecoreaudio.so with half-period output pulls.
+    @Test("The patched winecoreaudio ships with the app and is pinned for 11.17",
+          arguments: FreeEngineWinecx.releases.map(\.build))
+    func audio(id: String) throws {
+        let release = try #require(FreeEngineWinecx.release(build: id))
+        let expected: Set<String> = release.build == "winecx-11.17" ? ["lib/wine/x86_64-unix/winecoreaudio.so"] : []
+        #expect(Set(release.audio.map(\.path)) == expected)
+        let table = FreeEngineWinecx.expectedFiles(release)
+        for file in release.audio {
             let bundled = try #require(Bundle.module.url(forResource: file.resource, withExtension: file.ext))
             #expect(Digest.sha256IfPresent(bundled) == file.sha256, "\(file.resource)")
             #expect(table[file.path] == file.sha256, "\(file.path)")

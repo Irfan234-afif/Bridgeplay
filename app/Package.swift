@@ -55,6 +55,10 @@ let package = Package(
                 .copy("Resources/ws2_32-winecx-11.17.dll"),
                 .copy("Resources/crypt32-winecx-11.17.dll"),
                 .copy("Resources/wintrust-winecx-11.17.dll"),
+                .copy("Resources/nvapi64-shim.dll"),
+                .copy("Resources/win32u-winecx-11.17.so"),
+                .copy("Resources/wined3d-winecx-11.17.dll"),
+                .copy("Resources/winecoreaudio-winecx-11.17.so"),
                 .copy("Resources/libSDL2-2.0.0.dylib"),
             ],
             swiftSettings: [.swiftLanguageMode(.v6)]

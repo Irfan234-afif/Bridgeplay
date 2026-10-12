@@ -59,11 +59,15 @@ struct WinecxRelease: Sendable {
     // link-local addresses macOS lists first, as Windows never returns them
     // (ws2_32-patch/). Empty where the runtime's own ws2_32 is kept.
     let network: [WinecxBundledFile]
-    // crypt32 and wintrust rebuilt so, with NOTPROTON_NGX_SIGNER set, a signature check of
-    // the system32 NGX core (Apple's unsigned MetalFX bridge) is answered from an
-    // NVIDIA-signed Streamline module next to the game, which lets Streamline load it
-    // (ngx-signer-patch/). Empty where the runtime's own are kept.
-    let signer: [WinecxBundledFile]
+    // What the NVIDIA identity D3DMetal is given needs from the engine (NVAPI=1): crypt32 and
+    // wintrust that let Streamline load Apple's unsigned NGX bridge (ngx-signer-patch/), a
+    // native nvapi64 reporting a current driver (nvapi-shim/), and a win32u whose display
+    // class DriverVersion says the same (win32u-patch/). Empty where none of it ships.
+    let nvidia: [WinecxBundledFile]
+    // winecoreaudio.so rebuilt so an output stream asks CoreAudio for half a period per
+    // pull, not a whole one, which Wine padded with silence and was heard as crackling
+    // (winecoreaudio-patch/). Empty where the runtime's own is kept.
+    let audio: [WinecxBundledFile]
     // The runner build this release unpacks to, keyed by its pinned loader, and the ntdll
     // detours for it (NtdllPatcher.byBuild).
     let runner: RunnerBuild
@@ -160,13 +164,35 @@ enum FreeEngineWinecx {
         ],
         // crypt32.dll, wintrust.dll: winecx e0aa380's PE halves with
         // ngx-signer-patch/winecx-ngx-signer.patch.
-        signer: [
+        nvidia: [
             WinecxBundledFile(resource: "crypt32-winecx-11.17", ext: "dll",
                               path: "lib/wine/x86_64-windows/crypt32.dll",
                               sha256: "19330827fc085603c2a73b859b801980f494a942ae470398634fbb6e1d62ada9"),
             WinecxBundledFile(resource: "wintrust-winecx-11.17", ext: "dll",
                               path: "lib/wine/x86_64-windows/wintrust.dll",
                               sha256: "6ae3a8723bae11e5ff9ad6e23d1f1325740b1892d01b78abdeb1b77ac8bb6da8"),
+            // nvapi-shim/: a native nvapi64 that reports a newer NVIDIA driver than
+            // Apple's 561.09 and passes everything else to Apple's nvapi.dll.
+            WinecxBundledFile(resource: "nvapi64-shim", ext: "dll",
+                              path: "lib/notproton-backends/nvapi-shim/x86_64-windows/nvapi64.dll",
+                              sha256: "a80aea6347a8b1e72542e458f410d37fdedb39e194c0fcee45a5ae6cd7f571be"),
+            // win32u.so: runtime 4.7.3's, with NVIDIA's DriverVersion 35.0.15.9541 (595.41) by
+            // win32u-patch/patch-driver-version.sh, signed ad hoc.
+            WinecxBundledFile(resource: "win32u-winecx-11.17", ext: "so",
+                              path: "lib/wine/x86_64-unix/win32u.so",
+                              sha256: "b012382d09b2ff1b3c0750d93867f72dd04a7c902bc4179be406b6c558ab162d"),
+            // wined3d.dll: winecx e0aa380's PE half with wined3d-patch/winecx-driver-version.patch
+            // (NOTPROTON_DRIVER_VERSION replaces the GeForce 8 era driver version d3d9 reports).
+            WinecxBundledFile(resource: "wined3d-winecx-11.17", ext: "dll",
+                              path: "lib/wine/x86_64-windows/wined3d.dll",
+                              sha256: "9298c83d927b3b80d0fa36f52bb5f2ecd60ec4daffff3c93d9b080293e59dfe9"),
+        ],
+        // winecoreaudio.so: winecx e0aa380 with winecoreaudio-patch/winecx-render-buffer.patch,
+        // signed ad hoc under the runtime's identifier.
+        audio: [
+            WinecxBundledFile(resource: "winecoreaudio-winecx-11.17", ext: "so",
+                              path: "lib/wine/x86_64-unix/winecoreaudio.so",
+                              sha256: "3bef8bfcee8bc02947ffca07794ec9cb74c7d15f2d88d00f7924f5e50727b8c3"),
         ],
         runner: RunnerBuild(
             bundleVersion: "winecx-11.17",
@@ -255,7 +281,8 @@ enum FreeEngineWinecx {
             sdl,
         ],
         network: [],
-        signer: [],
+        nvidia: [],
+        audio: [],
         // The hash-pinned loader is what makes it free, so a CrossOver install can never be
         // taken for it.
         runner: RunnerBuild(
@@ -348,7 +375,7 @@ enum FreeEngineWinecx {
     // checks them, since they are either Wine's own or links into a Game Porting Toolkit.
     static func expectedFiles(_ release: WinecxRelease = current) -> [String: String] {
         var table: [String: String] = [FreeEngine.macDriverPath: release.macDriver]
-        for file in release.gamepad + release.network + release.signer { table[file.path] = file.sha256 }
+        for file in release.gamepad + release.network + release.nvidia + release.audio { table[file.path] = file.sha256 }
         for file in release.backends { table["\(backendsPath)/\(file.destination)"] = file.sha256 }
         for path in release.renderer.files.keys {
             table[release.renderer.installPath(of: path)] = release.renderer.installedHash(of: path)
@@ -437,7 +464,7 @@ enum FreeEngineWinecx {
         try fm.createDirectory(at: root.deletingLastPathComponent(), withIntermediateDirectories: true)
         try fm.moveItem(at: wine, to: root)
         try FreeEngine.installMacDriver(root: root, build: release.build, sha256: release.macDriver, step: step)
-        try installBundled(release.gamepad + release.network + release.signer, root: root)
+        try installBundled(release.gamepad + release.network + release.nvidia + release.audio, root: root)
 
         let libraries = wine.deletingLastPathComponent()
         for file in release.backends {

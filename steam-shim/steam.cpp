@@ -1479,6 +1479,12 @@ run:
         si.hStdInput = GetStdHandle(STD_INPUT_HANDLE);
         si.hStdOutput = GetStdHandle(STD_OUTPUT_HANDLE);
         si.hStdError = GetStdHandle(STD_ERROR_HANDLE);
+        /* Steam on Windows starts games without a stdout. Source 2 takes any stdout as
+         * a console build (tier0 Plat_IsConsoleApplication: GetFileType(stdout) != 0)
+         * and then skips NGX, so Deadlock never offers DLSS. The STDOUT_NULL gamefix
+         * starts the game the Windows way. */
+        if (GetEnvironmentVariableW(L"NOTPROTON_STDOUT_NULL", NULL, 0))
+            si.hStdOutput = NULL;
 
         if (!CreateProcessW(NULL, cmdline, NULL, NULL, TRUE, flags, NULL, NULL, &si, &pi))
         {

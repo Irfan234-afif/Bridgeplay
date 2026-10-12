@@ -159,6 +159,11 @@ typedef void (*drawable_present_after_fn)(id, SEL, CFTimeInterval);
 static set_pixel_format_fn next_set_pixel_format;
 static set_colorspace_fn next_set_colorspace;
 static set_device_fn next_set_device;
+static void (*next_set_display_sync)(id, SEL, BOOL);
+// NOTPROTON_VSYNC=1 (gamefix VSYNC): the layer always waits for the display, whatever the
+// game asks D3DMetal for. The driver-level vsync of Windows, for games that lock their own
+// vsync off while frame generation is on and tear past the refresh rate.
+static int force_vsync;
 static new_pipeline_fn next_new_pipeline;
 static new_queue_fn next_new_queue;
 static new_queue_count_fn next_new_queue_count;
@@ -417,6 +422,18 @@ static void hook_set_colorspace(id layer, SEL selector, CGColorSpaceRef colorspa
 	}
 
 	next_set_colorspace(layer, selector, colorspace);
+}
+
+static void hook_set_display_sync(id layer, SEL selector, BOOL enabled)
+{
+	static int last = -1;
+
+	if ((int)enabled != last) {
+		last = enabled;
+		shim_log("overlay_shim hook_set_display_sync: game asks %d, layer gets %d\n", enabled,
+		        enabled || force_vsync);
+	}
+	next_set_display_sync(layer, selector, enabled || force_vsync);
 }
 
 static void hook_set_device(id layer, SEL selector, id device)
@@ -992,6 +1009,11 @@ __attribute__((constructor)) static void overlay_shim_load(void)
 	hooked += interpose(layer, "setColorspace:", (IMP)hook_set_colorspace,
 	                    (IMP *)&next_set_colorspace);
 	hooked += interpose(layer, "setDevice:", (IMP)hook_set_device, (IMP *)&next_set_device);
+	const char *vsync = getenv("NOTPROTON_VSYNC");
+	force_vsync = vsync != NULL && strcmp(vsync, "1") == 0;
+	if (force_vsync)
+		hooked += interpose(layer, "setDisplaySyncEnabled:", (IMP)hook_set_display_sync,
+		                    (IMP *)&next_set_display_sync);
 	framegen_install_layer_hooks(layer);
 
 	shim_log("overlay_shim_load: pid=%d exe=%s layer_hooks=%d overlay=%s\n", getpid(),

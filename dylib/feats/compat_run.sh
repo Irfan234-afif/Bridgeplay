@@ -257,7 +257,7 @@ gamefix_reason() {
   case "$1" in
     BACKEND)
       case "$2" in dxmt|dxvk|wined3d|d3dmetal) ;; *) echo "not dxmt, dxvk, wined3d or d3dmetal" ;; esac ;;
-    MSYNC|RETINA|NVAPI|DLSS_FG|FRAMEGEN_UI|FRAMEGEN_FALLBACK|STEAMDECK)
+    MSYNC|RETINA|NVAPI|DLSS_FG|STDOUT_NULL|VSYNC|FRAMEGEN_UI|FRAMEGEN_FALLBACK|STEAMDECK)
       case "$2" in 0|1) ;; *) echo "not 0 or 1" ;; esac ;;
     FRAMEGEN)
       # 1 is the 2x of the first release.
@@ -341,6 +341,8 @@ load_gamefixes() {
       MSYNC) gamefix_msync=$value; gamefix_log "MSYNC=$value from the $from conf" ;;
       NVAPI) gamefix_nvapi=$value; gamefix_log "NVAPI=$value from the $from conf" ;;
       DLSS_FG) gamefix_dlss_fg=$value; gamefix_log "DLSS_FG=$value from the $from conf" ;;
+      STDOUT_NULL) gamefix_apply_env NOTPROTON_STDOUT_NULL "$value" "$from" ;;
+      VSYNC) gamefix_apply_env NOTPROTON_VSYNC "$value" "$from" ;;
       ARGS)
         if [ "$verb" = waitforexitandrun ]; then
           gamefix_args=$value
@@ -417,7 +419,8 @@ managed_dlls() {
     printf '%s\n' dxgi d3d11 d3d10core
     ! d3dmetal_engine || printf '%s\n' d3d10 d3d12
     for dir in "$backend_root"/*/x86_64-windows "$backend_root"/*/i386-windows; do
-      case "$dir" in "$backend_root"/wine-stock/*) continue ;; esac
+      # nvapi-shim is not a Direct3D backend; its nvapi64 is handled with NVAPI below.
+      case "$dir" in "$backend_root"/wine-stock/*|"$backend_root"/nvapi-shim/*) continue ;; esac
       [ ! -d "$dir" ] || backend_dlls "$dir"
     done
   } | sort -u
@@ -622,7 +625,7 @@ restore_stock_dll() {
   [ -f "$stock" ] && [ ! -L "$stock" ] || return 0
   ! cmp -s "$stock" "$3" || return 0
   for theirs in "$backend_root"/*/"$1"/*.[dD][lL][lL]; do
-    case "$theirs" in "$backend_root"/wine-stock/*) continue ;; esac
+    case "$theirs" in "$backend_root"/wine-stock/*|"$backend_root"/nvapi-shim/*) continue ;; esac
     [ -f "$theirs" ] || continue
     base=${theirs##*/}
     [ "$(printf '%s' "${base%.*}" | tr '[:upper:]' '[:lower:]')" = "$2" ] || continue
@@ -693,7 +696,20 @@ activate_backend() {
     nv_dlls=nvapi64
     [ ! -e "$CX_ROOT/lib/wine/x86_64-windows/nvngx.dll" ] || nv_dlls="nvapi64,nvngx"
     if [ "$gamefix_nvapi" = 1 ] && [ "$backend" = d3dmetal ]; then
-      backend_overrides="${backend_overrides:+$backend_overrides;}$nv_dlls=b"
+      # Apple's nvapi reports driver 561.09, which some games call out of date (Deadlock)
+      # and hide DLSS for. nvapi-shim/ goes in front as a native nvapi64 and reports a newer
+      # driver (NOTPROTON_NVAPI_DRIVER), passing everything else to Apple's nvapi.dll.
+      # The shim reaches Apple's nvapi by its internal name nvapi.dll, which Wine only maps to
+      # the lib/wine builtin when a builtin-marked placeholder of that name is in system32.
+      if stage_backend_file "$CX_ROOT/lib/wine/x86_64-windows/nvapi.dll" \
+          "$WINEPREFIX/drive_c/windows/system32/nvapi.dll" \
+        && stage_backend_file "$backend_root/nvapi-shim/x86_64-windows/nvapi64.dll" \
+          "$WINEPREFIX/drive_c/windows/system32/nvapi64.dll"; then
+        backend_overrides="${backend_overrides:+$backend_overrides;}nvapi64=n,b"
+        nv_dlls=${nv_dlls#nvapi64}
+        nv_dlls=${nv_dlls#,}
+      fi
+      [ -z "$nv_dlls" ] || backend_overrides="${backend_overrides:+$backend_overrides;}$nv_dlls=b"
       # D3DMetal reports an AMD adapter (0x1002) on its own, and games only offer DLSS on an
       # NVIDIA one. A D3DM_* value from a conf or the launch options wins.
       export D3DM_VENDOR_ID="${D3DM_VENDOR_ID:-0x10de}" D3DM_DEVICE_ID="${D3DM_DEVICE_ID:-0x2684}"
@@ -701,6 +717,9 @@ activate_backend() {
       # Streamline loads an NGX core only when it is NVIDIA-signed; the engine's crypt32 and
       # wintrust answer for Apple's bridge from a signed Streamline module (ngx-signer-patch/).
       export NOTPROTON_NGX_SIGNER=1
+      # wined3d (wined3d-patch/) reports this instead of its table's GeForce 8 era 31.0.13.4052,
+      # which games read through d3d9 (Deadlock: driver warning, no async shader creation).
+      export NOTPROTON_DRIVER_VERSION="${NOTPROTON_DRIVER_VERSION:-32.0.15.9541}"
       # DLSS frame generation wants hardware GPU scheduling; winecx's win32u reports it on
       # only for CX_ACTIVE_GRAPHICS_BACKEND=d3dmetal (CW HACK 24905). Opt-in: frank Whisky
       # #231 saw MetalFX frame interpolation on an M5 with D3DMetal 4.0b2 hang WindowServer.
@@ -2147,7 +2166,7 @@ else
   echo "=== client staged no overlay renderer, overlay disabled ===" >> "$log" 2>&1 || true
 fi
 set -- --args "$shim_exe" "$@"
-for name in $(env | sed -nE 's/^(CX_APPLEGPTK_LIBD3DSHARED_PATH|SDL_GAMECONTROLLERCONFIG(_FILE)?|SDL_JOYSTICK_MFI|WINE_LARGE_ADDRESS_AWARE|WINE_CPU_TOPOLOGY|Steam[A-Za-z0-9]*|(CX_GRAPHICS|D3DM_|DXMT_|DXVK_|MVK_|VKD3D_|STAGING_|MTL_|ROSETTA_)[A-Z0-9_]*|NOTPROTON_FRAMEGEN(_[A-Z]+)?|NOTPROTON_NGX_SIGNER|CX_ACTIVE_GRAPHICS_BACKEND)=.*/\1/p'); do
+for name in $(env | sed -nE 's/^(CX_APPLEGPTK_LIBD3DSHARED_PATH|SDL_GAMECONTROLLERCONFIG(_FILE)?|SDL_JOYSTICK_MFI|WINE_LARGE_ADDRESS_AWARE|WINE_CPU_TOPOLOGY|Steam[A-Za-z0-9]*|(CX_GRAPHICS|D3DM_|DXMT_|DXVK_|MVK_|VKD3D_|STAGING_|MTL_|ROSETTA_)[A-Z0-9_]*|NOTPROTON_FRAMEGEN(_[A-Z]+)?|NOTPROTON_NGX_SIGNER|NOTPROTON_NVAPI_DRIVER|NOTPROTON_DRIVER_VERSION|NOTPROTON_STDOUT_NULL|NOTPROTON_VSYNC|CX_ACTIVE_GRAPHICS_BACKEND)=.*/\1/p'); do
   eval "value=\$$name"
   # shellcheck disable=SC2154 # eval assigns value on the line above
   set -- --env "$name=$value" "$@"

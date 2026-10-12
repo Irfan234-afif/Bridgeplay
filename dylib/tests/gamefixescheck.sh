@@ -67,6 +67,7 @@ engine() {
 				done
 				printf 'apple nvapi64\n' > "$case_dir/gptk/nvapi64.dll"
 				ln -s "$case_dir/gptk/nvapi64.dll" "$case_dir/engine/lib/wine/x86_64-windows/nvapi64.dll"
+				ln -s "$case_dir/gptk/nvapi64.dll" "$case_dir/engine/lib/wine/x86_64-windows/nvapi.dll"
 				printf 'apple nvngx-on-metalfx\n' > "$case_dir/gptk/nvngx-on-metalfx.dll"
 				ln -s "$case_dir/gptk/nvngx-on-metalfx.dll" "$case_dir/engine/lib/wine/x86_64-windows/nvngx.dll" ;;
 			msync) : > "$case_dir/engine/.notproton-msync" ;;
@@ -112,7 +113,7 @@ launch() {
 			eval "$bridge_line"
 			for v in backend WINEDLLOVERRIDES WINEMSYNC msync_from NOTPROTON_RETINA NOTPROTON_FRAMEGEN \
 				NOTPROTON_FRAMEGEN_QUALITY NOTPROTON_FRAMEGEN_UI NOTPROTON_FRAMEGEN_FALLBACK NOTPROTON_FRAMEGEN_ENGINE CX_GRAPHICS_BACKEND \
-				DXVK_HUD VKD3D_CONFIG WINEDEBUG MTL_HUD_ENABLED D3DM_VENDOR_ID D3DM_DEVICE_ID D3DM_DEVICE_DESCRIPTION NOTPROTON_NGX_SIGNER CX_ACTIVE_GRAPHICS_BACKEND gamefix_args; do
+				DXVK_HUD VKD3D_CONFIG WINEDEBUG MTL_HUD_ENABLED D3DM_VENDOR_ID D3DM_DEVICE_ID D3DM_DEVICE_DESCRIPTION NOTPROTON_NGX_SIGNER NOTPROTON_DRIVER_VERSION CX_ACTIVE_GRAPHICS_BACKEND NOTPROTON_VSYNC gamefix_args; do
 				eval "printf \"%s=%s\\n\" \$v \"\${$v-<unset>}\""
 			done
 		' launch "$target" > "$case_dir/out" 2>&1 || echo "launch exited $?" >> "$case_dir/out"
@@ -385,10 +386,14 @@ user_conf 'NVAPI=1' 'D3DM_DEVICE_ID=0x2704'
 launch waitforexitandrun "$case_dir/game/game.exe"
 is "a conf's D3DM_DEVICE_ID wins over the default" "0x10de 0x2704" "$(got D3DM_VENDOR_ID) $(got D3DM_DEVICE_ID)"
 is "NVAPI=1 lets Streamline load Apple's NGX bridge" "1" "$(got NOTPROTON_NGX_SIGNER)"
+is "and wined3d reports a current NVIDIA driver" "32.0.15.9541" "$(got NOTPROTON_DRIVER_VERSION)"
 is "and leaves hardware scheduling alone" "<unset>" "$(got CX_ACTIVE_GRAPHICS_BACKEND)"
 user_conf 'NVAPI=1' 'DLSS_FG=1'
 launch waitforexitandrun "$case_dir/game/game.exe"
 is "DLSS_FG=1 reports hardware scheduling for DLSS frame generation" "d3dmetal" "$(got CX_ACTIVE_GRAPHICS_BACKEND)"
+user_conf 'VSYNC=1'
+launch waitforexitandrun "$case_dir/game/game.exe"
+is "VSYNC=1 asks the overlay shim to keep the layer on display sync" "1" "$(got NOTPROTON_VSYNC)"
 user_conf 'NVAPI=1' 'BACKEND=dxmt'
 launch waitforexitandrun "$case_dir/game/game.exe"
 is "but not for dxmt" "d3d10core,d3d11,dxgi=n,b;d3d10,d3d12=b;nvapi64,nvngx=d;$trio" "$(got WINEDLLOVERRIDES)"
@@ -397,6 +402,16 @@ has "and says so" "NVAPI=1 not applied, dxmt is not d3dmetal" "$case_dir/log"
 user_conf 'NVAPI=yes'
 launch waitforexitandrun "$case_dir/game/game.exe"
 has "NVAPI must be 0 or 1" "rejected NVAPI: not 0 or 1" "$case_dir/log"
+new_case
+engine d3dmetal-linked nvapi-shim/x86_64-windows/nvapi64.dll
+user_conf 'NVAPI=1'
+launch waitforexitandrun "$case_dir/game/game.exe"
+is "with the nvapi shim, nvapi64 is native in front of Apple's" "d3d10,d3d10core,d3d11,d3d12,dxgi=b;nvapi64=n,b;nvngx=b;$trio" "$(got WINEDLLOVERRIDES)"
+is "and the shim is staged into system32" "backend nvapi-shim/x86_64-windows/nvapi64.dll" "$(sys system32 nvapi64)"
+is "beside Apple's nvapi as the nvapi.dll placeholder it loads" "apple nvapi64" "$(sys system32 nvapi)"
+user_conf 'NVAPI=0'
+launch waitforexitandrun "$case_dir/game/game.exe"
+is "NVAPI=0 disables it again" "d3d10,d3d10core,d3d11,d3d12,dxgi=b;nvapi64,nvngx=d;$trio" "$(got WINEDLLOVERRIDES)"
 new_case
 engine d3dmetal-linked empty
 launch waitforexitandrun "$case_dir/game/game.exe" NOTPROTON_BACKEND=dxmt
