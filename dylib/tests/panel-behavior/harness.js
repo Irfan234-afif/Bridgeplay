@@ -25,7 +25,9 @@ const FORMS = {
   statement: { arg: 'statement', react: 'R0', barrel: 'B0' },
 };
 
-function panel(emit, form, globals = { document: { documentElement: { lang: 'en' } } }) {
+// The stand-in global falls through to the real one, so a test's globalThis.MSCXFx still reaches the panel.
+function panel(emit, form, globals = Object.assign(Object.create(globalThis),
+                                                   { document: { documentElement: { lang: 'en' } } })) {
   const raw = execFileSync(emit, [form], { encoding: 'utf8' }).trim();
   const src = form === 'component'
     ? 'var ' + raw.replace(/,$/, '')
