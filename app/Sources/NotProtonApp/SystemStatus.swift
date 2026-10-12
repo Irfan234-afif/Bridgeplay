@@ -491,8 +491,8 @@ final class SystemStatus {
     func installFreeEngine() async {
         guard canInstall else { return }
         await perform(from: FreeEngine.step) { progress in
-            let lock = try DeploymentContent.acquireInstallationLock(for: SupportPaths.Steam.app)
-            defer { close(lock) }
+            let lock = try DeploymentContent.acquireInstallationLock()
+            defer { lock.release() }
             try await requireInstallableContent()
             let install = try await FreeEngine.install { progress($0.label) }
             let result = try await Task.detached(priority: .userInitiated) {
@@ -507,8 +507,8 @@ final class SystemStatus {
     func installWinecxEngine() async {
         guard canInstall else { return }
         await perform(from: FreeEngineWinecx.step) { progress in
-            let lock = try DeploymentContent.acquireInstallationLock(for: SupportPaths.Steam.app)
-            defer { close(lock) }
+            let lock = try DeploymentContent.acquireInstallationLock()
+            defer { lock.release() }
             try await requireInstallableContent()
             let install = try await FreeEngineWinecx.install { progress($0.label) }
             let result = try await Task.detached(priority: .userInitiated) {
@@ -525,8 +525,8 @@ final class SystemStatus {
     func rescanGameportingToolkit() async {
         guard canInstall else { return }
         await perform(from: Self.rescanStep) { _ in
-            let lock = try DeploymentContent.acquireInstallationLock(for: SupportPaths.Steam.app)
-            defer { close(lock) }
+            let lock = try DeploymentContent.acquireInstallationLock()
+            defer { lock.release() }
             try await requireInstallableContent()
             let found = await Task.detached(priority: .userInitiated) {
                 Self.relinkGameportingToolkit()

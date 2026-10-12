@@ -22,8 +22,8 @@ enum InstallIntoSteamCommand {
                 throw StepFailure(step: SteamInstaller.step,
                                   detail: "A game or Wine tool is running. Quit it before updating NotProton.")
             }
-            let lock = try DeploymentContent.acquireInstallationLock(for: SupportPaths.Steam.app)
-            defer { close(lock) }
+            let lock = try DeploymentContent.acquireInstallationLock()
+            defer { lock.release() }
             let result = try SteamInstaller.run(holdingInstallationLock: true, report: { say($0.label) })
 
             let valve = try ValvePackageManifest.bundled()
