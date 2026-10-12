@@ -683,15 +683,19 @@ activate_backend() {
   done
   backend_overrides="${native:+$native=n,b}"
   [ -z "$builtin" ] || backend_overrides="${backend_overrides:+$backend_overrides;}$builtin=b"
-  # A linked Game Porting Toolkit can bring Apple's nvapi64 into lib/wine. An nvapi that
-  # answers sends some games down NVIDIA-only paths, so it stays disabled unless the game's
-  # conf says NVAPI=1, and then only on D3DMetal, the only backend it talks to.
+  # A linked Game Porting Toolkit can bring Apple's nvapi64 and nvngx (DLSS on MetalFX) into
+  # lib/wine. An nvapi that answers sends some games down NVIDIA-only paths, so both stay
+  # disabled unless the game's conf says NVAPI=1, and then only on D3DMetal, the only
+  # backend they talk to.
   if d3dmetal_engine && [ -e "$CX_ROOT/lib/wine/x86_64-windows/nvapi64.dll" ]; then
+    nv_dlls=nvapi64
+    [ ! -e "$CX_ROOT/lib/wine/x86_64-windows/nvngx.dll" ] || nv_dlls="nvapi64,nvngx"
     if [ "$gamefix_nvapi" = 1 ] && [ "$backend" = d3dmetal ]; then
-      backend_overrides="${backend_overrides:+$backend_overrides;}nvapi64=b"
+      backend_overrides="${backend_overrides:+$backend_overrides;}$nv_dlls=b"
+      graphics_log "NVAPI=1: $nv_dlls on"
     else
       [ "$gamefix_nvapi" != 1 ] || graphics_log "NVAPI=1 not applied, $backend is not d3dmetal"
-      backend_overrides="${backend_overrides:+$backend_overrides;}nvapi64=d"
+      backend_overrides="${backend_overrides:+$backend_overrides;}$nv_dlls=d"
     fi
   fi
   if [ "$backend" = d3dmetal ]; then
@@ -1083,6 +1087,8 @@ import_prefix_settings() {
       '[HKEY_CURRENT_USER\Software\Wine\WineDbg]' '"ShowCrashDialog"=dword:00000000' '' \
       '[HKEY_CURRENT_USER\Software\Wine\Mac Driver]' "$retina_line" '' \
       '[HKEY_LOCAL_MACHINE\Software\Classes\steam]' '"URL Protocol"=""' '' \
+      '[HKEY_LOCAL_MACHINE\Software\NVIDIA Corporation\Global\NGXCore]' \
+      '"FullPath"="C:\\Windows\\System32"' '' \
       '[HKEY_LOCAL_MACHINE\Software\Classes\steam\shell\open\command]' \
       '@="\"C:\\Program Files (x86)\\Steam\\steam.exe\" \"%1\""' '' \
       && hidraw_lines add "$controllers_add" && hidraw_lines remove "$controllers_remove"; } \

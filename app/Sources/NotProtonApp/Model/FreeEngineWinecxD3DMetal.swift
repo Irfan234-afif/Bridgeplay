@@ -16,8 +16,10 @@
 //   lib/wine/x86_64-{windows,unix}/nvapi64.*  -> the user's, when the GPTK has them. Wine has
 //       none of its own here. compat_run.sh disables it unless a game's conf says NVAPI=1,
 //       since an nvapi that answers sends some games down NVIDIA-only paths.
-//       nvngx-on-metalfx is not linked: it only serves DLSS through that nvapi, and CrossOver
-//       renames it to nvngx.dll per prefix, which NotProton does not do.
+//   lib/wine/x86_64-{windows,unix}/nvngx.*    -> the user's nvngx-on-metalfx.*, DLSS served
+//       by MetalFX. CrossOver copies it into each prefix as nvngx.dll; linking it under
+//       that name here lets the prefix's placeholder nvngx.dll resolve to it. compat_run.sh
+//       gates it together with nvapi64.
 //   lib/external/{D3DMetal.framework,libd3dshared.dylib}  -> the user's external/
 //       winecx's own lib/external, and the CX_APPLEGPTK_LIBD3DSHARED_PATH winecx's ntdll
 //       dlopens for non-native code regions.
@@ -32,8 +34,10 @@ import Foundation
 enum WinecxD3DMetal {
 
     static let forwarders = ["d3d10.dll", "d3d11.dll", "d3d12.dll", "dxgi.dll"]
-    // Linked when the GPTK has it, never required. Wine's tree has no file of this name.
-    static let optionalForwarders = ["nvapi64.dll"]
+    // Linked when the GPTK has it, never required. Wine's tree has no file of these names.
+    static let optionalForwarders = ["nvapi64.dll", "nvngx.dll"]
+    // The GPTK file an optional forwarder links to, when its name differs.
+    static let optionalSources = ["nvngx.dll": "nvngx-on-metalfx.dll"]
     static let sharedLibrary = "libd3dshared.dylib"
     static let framework = "D3DMetal.framework"
 
@@ -48,6 +52,10 @@ enum WinecxD3DMetal {
 
     static func unixName(of forwarder: String) -> String {
         (forwarder as NSString).deletingPathExtension + ".so"
+    }
+
+    static func sourceName(of forwarder: String) -> String {
+        optionalSources[forwarder] ?? forwarder
     }
 
     struct Payload: Sendable, Equatable {
@@ -141,15 +149,15 @@ enum WinecxD3DMetal {
             (root.appending(path: "\(externalPath)/\(sharedLibrary)"), shared),
         ]
         let optional = optionalForwarders.filter { name in
-            isBuiltin(source.appending(path: "wine/x86_64-windows/\(name)"))
+            isBuiltin(source.appending(path: "wine/x86_64-windows/\(sourceName(of: name))"))
                 && !exists(root.appending(path: "\(builtinPath)/\(name)"))
         }
         for name in forwarders + optional {
             links.append((root.appending(path: "\(builtinPath)/\(name)"),
-                          source.appending(path: "wine/x86_64-windows/\(name)").path(percentEncoded: false)))
+                          source.appending(path: "wine/x86_64-windows/\(sourceName(of: name))").path(percentEncoded: false)))
             // Apple's own unix half when the GPTK ships one, which is itself a link to
             // libd3dshared, otherwise libd3dshared directly.
-            let unix = source.appending(path: "wine/x86_64-unix/\(unixName(of: name))")
+            let unix = source.appending(path: "wine/x86_64-unix/\(unixName(of: sourceName(of: name)))")
             links.append((root.appending(path: "\(unixPath)/\(unixName(of: name))"),
                           fm.fileExists(atPath: unix.path(percentEncoded: false))
                               ? unix.path(percentEncoded: false) : shared))

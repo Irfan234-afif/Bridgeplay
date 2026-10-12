@@ -373,12 +373,13 @@ struct FreeEngineWinecxTests {
             == source.appending(path: "external/libd3dshared.dylib").path(percentEncoded: false))
         #expect(try destination(of: root.appending(path: "lib/external/D3DMetal.framework"))
             == source.appending(path: "external/D3DMetal.framework").path(percentEncoded: false))
-        for name in WinecxD3DMetal.forwarders + ["nvapi64.dll"] {
+        for name in WinecxD3DMetal.forwarders + ["nvapi64.dll", "nvngx.dll"] {
+            let from = WinecxD3DMetal.sourceName(of: name)
             #expect(try destination(of: root.appending(path: "lib/wine/x86_64-windows/\(name)"))
-                == source.appending(path: "wine/x86_64-windows/\(name)").path(percentEncoded: false))
+                == source.appending(path: "wine/x86_64-windows/\(from)").path(percentEncoded: false))
             let so = WinecxD3DMetal.unixName(of: name)
             #expect(try destination(of: root.appending(path: "lib/wine/x86_64-unix/\(so)"))
-                == source.appending(path: "wine/x86_64-unix/\(so)").path(percentEncoded: false))
+                == source.appending(path: "wine/x86_64-unix/\(WinecxD3DMetal.unixName(of: from))").path(percentEncoded: false))
             // Through Apple's own relative link, onto the shared library.
             #expect(try Data(contentsOf: root.appending(path: "lib/wine/x86_64-unix/\(so)")) == Data("dylib".utf8))
         }
@@ -386,7 +387,7 @@ struct FreeEngineWinecxTests {
             let saved = root.appending(path: "lib/notproton-backends/wine-stock/x86_64-windows/\(name)")
             #expect(Digest.sha256IfPresent(saved) == Self.stock[name])
         }
-        // nvngx-on-metalfx is left out.
+        // nvngx-on-metalfx is linked as nvngx, never under its own name.
         #expect(!fm.fileExists(atPath: root.appending(path: "lib/wine/x86_64-windows/nvngx-on-metalfx.dll").path(percentEncoded: false)))
         #expect(!fm.fileExists(atPath: root.appending(path: "lib/notproton-backends/d3dmetal").path(percentEncoded: false)))
         #expect(fm.fileExists(atPath: root.appending(path: "lib/external/README").path(percentEncoded: false)))
@@ -602,7 +603,7 @@ struct FreeEngineWinecxTests {
         #expect(WinecxD3DMetal.isLinked(root: root))
         #expect(WinecxD3DMetal.layoutProblems(root: root, stock: Self.stock).isEmpty)
         let shared = try Data(contentsOf: payload.libRoot.appending(path: "external/libd3dshared.dylib"))
-        for name in WinecxD3DMetal.forwarders + ["nvapi64.dll"] {
+        for name in WinecxD3DMetal.forwarders + ["nvapi64.dll", "nvngx.dll"] {
             let pe = root.appending(path: "lib/wine/x86_64-windows/\(name)")
             #expect(WinecxD3DMetal.isBuiltin(pe), "\(name)")
             #expect(try Data(contentsOf: root.appending(path: "lib/wine/x86_64-unix/\(WinecxD3DMetal.unixName(of: name))"))

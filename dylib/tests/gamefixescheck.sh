@@ -66,7 +66,9 @@ engine() {
 					ln -s "$case_dir/gptk/$dll.dll" "$case_dir/engine/lib/wine/x86_64-windows/$dll.dll"
 				done
 				printf 'apple nvapi64\n' > "$case_dir/gptk/nvapi64.dll"
-				ln -s "$case_dir/gptk/nvapi64.dll" "$case_dir/engine/lib/wine/x86_64-windows/nvapi64.dll" ;;
+				ln -s "$case_dir/gptk/nvapi64.dll" "$case_dir/engine/lib/wine/x86_64-windows/nvapi64.dll"
+				printf 'apple nvngx-on-metalfx\n' > "$case_dir/gptk/nvngx-on-metalfx.dll"
+				ln -s "$case_dir/gptk/nvngx-on-metalfx.dll" "$case_dir/engine/lib/wine/x86_64-windows/nvngx.dll" ;;
 			msync) : > "$case_dir/engine/.notproton-msync" ;;
 			empty) mkdir -p "$case_dir/engine/lib/notproton-backends" ;;
 			*) mkdir -p "$case_dir/engine/lib/notproton-backends/${file%/*}"
@@ -345,7 +347,7 @@ engine d3dmetal-linked
 launch waitforexitandrun 'steam://rungameid/4242'
 is "the default is d3dmetal" "d3dmetal" "$(got backend)"
 has "logged as default" "backend=d3dmetal (default)" "$case_dir/log"
-is "every D3D DLL is builtin, Apple's nvapi64 disabled" "d3d10,d3d10core,d3d11,d3d12,dxgi=b;nvapi64=d;$trio" "$(got WINEDLLOVERRIDES)"
+is "every D3D DLL is builtin, Apple's nvapi64 and nvngx disabled" "d3d10,d3d10core,d3d11,d3d12,dxgi=b;nvapi64,nvngx=d;$trio" "$(got WINEDLLOVERRIDES)"
 is "CX_GRAPHICS_BACKEND is exported" "d3dmetal" "$(got CX_GRAPHICS_BACKEND)"
 launch waitforexitandrun "$case_dir/game/game.exe"
 is "a D3D11 game auto-detects d3dmetal" "d3dmetal" "$(got backend)"
@@ -363,12 +365,12 @@ is "so does a conf BACKEND=wined3d" "d3dmetal" "$(got backend)"
 user_conf 'BACKEND=dxmt'
 launch waitforexitandrun "$case_dir/game/game.exe"
 is "dxmt still works per game" "dxmt" "$(got backend)"
-is "as natives, with Apple's d3d10 and d3d12 builtin" "d3d10core,d3d11,dxgi=n,b;d3d10,d3d12=b;nvapi64=d;$trio" "$(got WINEDLLOVERRIDES)"
+is "as natives, with Apple's d3d10 and d3d12 builtin" "d3d10core,d3d11,dxgi=n,b;d3d10,d3d12=b;nvapi64,nvngx=d;$trio" "$(got WINEDLLOVERRIDES)"
 is "dxmt dxgi is in system32" "backend dxmt/x86_64-windows/dxgi.dll" "$(sys system32 dxgi)"
 is "and CX_GRAPHICS_BACKEND is left alone" "<unset>" "$(got CX_GRAPHICS_BACKEND)"
 user_conf 'BACKEND=dxvk'
 launch waitforexitandrun "$case_dir/game/game.exe"
-is "dxvk still works per game" "d3d10core,d3d11=n,b;d3d10,d3d12,dxgi=b;nvapi64=d;$trio" "$(got WINEDLLOVERRIDES)"
+is "dxvk still works per game" "d3d10core,d3d11=n,b;d3d10,d3d12,dxgi=b;nvapi64,nvngx=d;$trio" "$(got WINEDLLOVERRIDES)"
 is "the stale dxmt dxgi goes back to Wine's set-aside copy, never Apple's" "stock x86_64-windows dxgi" "$(sys system32 dxgi)"
 user_conf ''
 launch waitforexitandrun "$case_dir/game/game.exe"
@@ -376,10 +378,10 @@ is "back on d3dmetal, dxvk's d3d11 goes back to Wine's copy" "stock x86_64-windo
 is "and nothing of Apple's is copied into the prefix" "0" "$(grep -rl '^apple ' "$case_dir/data/pfx" | wc -l | tr -d ' ')"
 user_conf 'NVAPI=1'
 launch waitforexitandrun "$case_dir/game/game.exe"
-is "a conf NVAPI=1 turns Apple's nvapi64 on" "d3d10,d3d10core,d3d11,d3d12,dxgi=b;nvapi64=b;$trio" "$(got WINEDLLOVERRIDES)"
+is "a conf NVAPI=1 turns Apple's nvapi64 and nvngx (DLSS) on" "d3d10,d3d10core,d3d11,d3d12,dxgi=b;nvapi64,nvngx=b;$trio" "$(got WINEDLLOVERRIDES)"
 user_conf 'NVAPI=1' 'BACKEND=dxmt'
 launch waitforexitandrun "$case_dir/game/game.exe"
-is "but not for dxmt" "d3d10core,d3d11,dxgi=n,b;d3d10,d3d12=b;nvapi64=d;$trio" "$(got WINEDLLOVERRIDES)"
+is "but not for dxmt" "d3d10core,d3d11,dxgi=n,b;d3d10,d3d12=b;nvapi64,nvngx=d;$trio" "$(got WINEDLLOVERRIDES)"
 has "and says so" "NVAPI=1 not applied, dxmt is not d3dmetal" "$case_dir/log"
 user_conf 'NVAPI=yes'
 launch waitforexitandrun "$case_dir/game/game.exe"

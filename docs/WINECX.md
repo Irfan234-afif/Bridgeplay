@@ -252,9 +252,12 @@ What `compat_run.sh` does with it is in [GAMEFIXES.md](GAMEFIXES.md#winecx-with-
 `d3dmetal` becomes the default and the D3D12 choice, `wined3d` runs `d3dmetal`, and `dxmt`
 and `dxvk` still work per game as natives.
 
-`nvngx-on-metalfx.dll` is not linked. It only serves DLSS through Apple's nvapi, and
-CrossOver renames it to `nvngx.dll` per prefix, which NotProton does not do. Apple's
-`nvapi64` is linked but disabled per game unless its conf says `NVAPI=1`.
+`nvngx-on-metalfx.dll` is linked as `nvngx.dll` (and its unix half as `nvngx.so`), the
+name CrossOver gives it when it copies it into each prefix. The prefix's placeholder
+`nvngx.dll` then resolves to it, and the prefix gets `HKLM\Software\NVIDIA Corporation\Global\NGXCore`
+`FullPath=C:\Windows\System32` so the game's NGX loader finds it. Apple's `nvapi64` and
+`nvngx` are linked but disabled per game unless its conf says `NVAPI=1`. With both on and
+`D3DM_ENABLE_METALFX=1`, games show DLSS and D3DMetal serves it with MetalFX.
 
 ## Using D3DMetal with your own Game Porting Toolkit
 

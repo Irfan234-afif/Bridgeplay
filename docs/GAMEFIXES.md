@@ -31,7 +31,7 @@ logged, when:
 | `FRAMEGEN_UI` | `0`, `1` | Same as `NOTPROTON_FRAMEGEN_UI`, Protect UI: keeps static HUD and menus sharp. On when unset |
 | `FRAMEGEN_FALLBACK` | `0`, `1` | Same as `NOTPROTON_FRAMEGEN_FALLBACK`, Fast-motion fallback: skips generated frames that would smear. On when unset |
 | `FRAMEGEN_ENGINE` | `own`, `metalfx` | Same as `NOTPROTON_FRAMEGEN_ENGINE`: the built-in optical flow (`own`, the default) or MetalFX frame interpolation |
-| `NVAPI` | `0`, `1` | `1` turns on Apple's `nvapi64` on an engine with a linked Game Porting Toolkit, for `d3dmetal` only. Off by default, since an nvapi that answers sends some games down NVIDIA-only paths |
+| `NVAPI` | `0`, `1` | `1` turns on Apple's `nvapi64` and `nvngx` (DLSS on MetalFX) on an engine with a linked Game Porting Toolkit, for `d3dmetal` only. Off by default, since an nvapi that answers sends some games down NVIDIA-only paths |
 | `DXMT_*`, `DXVK_*`, `MVK_*`, `VKD3D_*`, `D3DM_*`, `STAGING_*` | any | Exported as is |
 | `MTL_HUD_ENABLED`, `WINEDEBUG`, `WINE_LARGE_ADDRESS_AWARE`, `WINE_CPU_TOPOLOGY` | any | Exported as is |
 
@@ -78,7 +78,7 @@ are set aside. So on that engine:
   and `d3d10`/`d3d12` stay builtin, which is Apple's
 - `d3dmetal` sets every D3D DLL (`d3d10`, `d3d10core`, `d3d11`, `d3d12`, `dxgi`) to `b`,
   exports `CX_GRAPHICS_BACKEND=d3dmetal` and `CX_APPLEGPTK_LIBD3DSHARED_PATH`
-- Apple's `nvapi64` is set to `d` unless the conf says `NVAPI=1` and the backend is
+- Apple's `nvapi64` and `nvngx` are set to `d` unless the conf says `NVAPI=1` and the backend is
   `d3dmetal`
 
 Without a linked Game Porting Toolkit the WineCX engine behaves like the WineHQ one.
