@@ -692,7 +692,11 @@ activate_backend() {
     [ ! -e "$CX_ROOT/lib/wine/x86_64-windows/nvngx.dll" ] || nv_dlls="nvapi64,nvngx"
     if [ "$gamefix_nvapi" = 1 ] && [ "$backend" = d3dmetal ]; then
       backend_overrides="${backend_overrides:+$backend_overrides;}$nv_dlls=b"
-      graphics_log "NVAPI=1: $nv_dlls on"
+      # D3DMetal reports an AMD adapter (0x1002) on its own, and games only offer DLSS on an
+      # NVIDIA one. A D3DM_* value from a conf or the launch options wins.
+      export D3DM_VENDOR_ID="${D3DM_VENDOR_ID:-0x10de}" D3DM_DEVICE_ID="${D3DM_DEVICE_ID:-0x2684}"
+      export D3DM_DEVICE_DESCRIPTION="${D3DM_DEVICE_DESCRIPTION:-NVIDIA GeForce RTX 4090}"
+      graphics_log "NVAPI=1: $nv_dlls on, adapter $D3DM_VENDOR_ID:$D3DM_DEVICE_ID ($D3DM_DEVICE_DESCRIPTION)"
     else
       [ "$gamefix_nvapi" != 1 ] || graphics_log "NVAPI=1 not applied, $backend is not d3dmetal"
       backend_overrides="${backend_overrides:+$backend_overrides;}$nv_dlls=d"

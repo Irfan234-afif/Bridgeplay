@@ -93,7 +93,7 @@ struct FreeEngineWinecxTests {
             #expect(parts[0] == "dxvk", "\(file.destination)")
             #expect(!file.source.hasPrefix("DXMT/"))
             #expect(["x86_64-windows", "i386-windows"].contains(parts[1]), "\(file.destination)")
-            #expect(!["nvapi64.dll", "nvngx.dll"].contains(parts[2]))
+            #expect(!["nvapi64.dll", "nvapi.dll", "nvngx.dll"].contains(parts[2]))
             #expect(file.sha256.count == 64 && file.sha256.allSatisfy(\.isHexDigit))
             #expect(FreeEngineWinecx.backend(file.destination, in: URL(filePath: "/r")).path(percentEncoded: false)
                 == "/r/lib/notproton-backends/\(file.destination)")
@@ -373,7 +373,7 @@ struct FreeEngineWinecxTests {
             == source.appending(path: "external/libd3dshared.dylib").path(percentEncoded: false))
         #expect(try destination(of: root.appending(path: "lib/external/D3DMetal.framework"))
             == source.appending(path: "external/D3DMetal.framework").path(percentEncoded: false))
-        for name in WinecxD3DMetal.forwarders + ["nvapi64.dll", "nvngx.dll"] {
+        for name in WinecxD3DMetal.forwarders + ["nvapi64.dll", "nvapi.dll", "nvngx.dll"] {
             let from = WinecxD3DMetal.sourceName(of: name)
             #expect(try destination(of: root.appending(path: "lib/wine/x86_64-windows/\(name)"))
                 == source.appending(path: "wine/x86_64-windows/\(from)").path(percentEncoded: false))
@@ -603,7 +603,7 @@ struct FreeEngineWinecxTests {
         #expect(WinecxD3DMetal.isLinked(root: root))
         #expect(WinecxD3DMetal.layoutProblems(root: root, stock: Self.stock).isEmpty)
         let shared = try Data(contentsOf: payload.libRoot.appending(path: "external/libd3dshared.dylib"))
-        for name in WinecxD3DMetal.forwarders + ["nvapi64.dll", "nvngx.dll"] {
+        for name in WinecxD3DMetal.forwarders + ["nvapi64.dll", "nvapi.dll", "nvngx.dll"] {
             let pe = root.appending(path: "lib/wine/x86_64-windows/\(name)")
             #expect(WinecxD3DMetal.isBuiltin(pe), "\(name)")
             #expect(try Data(contentsOf: root.appending(path: "lib/wine/x86_64-unix/\(WinecxD3DMetal.unixName(of: name))"))

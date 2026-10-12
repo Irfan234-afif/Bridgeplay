@@ -16,6 +16,8 @@
 //   lib/wine/x86_64-{windows,unix}/nvapi64.*  -> the user's, when the GPTK has them. Wine has
 //       none of its own here. compat_run.sh disables it unless a game's conf says NVAPI=1,
 //       since an nvapi that answers sends some games down NVIDIA-only paths.
+//   lib/wine/x86_64-{windows,unix}/nvapi.*    -> the user's nvapi64.* again, under the internal
+//       name Wine resolves Apple's nvapi64 builtin by.
 //   lib/wine/x86_64-{windows,unix}/nvngx.*    -> the user's nvngx-on-metalfx.*, DLSS served
 //       by MetalFX. CrossOver copies it into each prefix as nvngx.dll; linking it under
 //       that name here lets the prefix's placeholder nvngx.dll resolve to it. compat_run.sh
@@ -35,9 +37,12 @@ enum WinecxD3DMetal {
 
     static let forwarders = ["d3d10.dll", "d3d11.dll", "d3d12.dll", "dxgi.dll"]
     // Linked when the GPTK has it, never required. Wine's tree has no file of these names.
-    static let optionalForwarders = ["nvapi64.dll", "nvngx.dll"]
+    // nvapi.dll is nvapi64.dll again: Apple's nvapi64 carries the internal name nvapi.dll, and
+    // Wine looks its builtin up by that name, so without it nvapi64 loads with no unix half
+    // and its DllMain fails.
+    static let optionalForwarders = ["nvapi64.dll", "nvapi.dll", "nvngx.dll"]
     // The GPTK file an optional forwarder links to, when its name differs.
-    static let optionalSources = ["nvngx.dll": "nvngx-on-metalfx.dll"]
+    static let optionalSources = ["nvapi.dll": "nvapi64.dll", "nvngx.dll": "nvngx-on-metalfx.dll"]
     static let sharedLibrary = "libd3dshared.dylib"
     static let framework = "D3DMetal.framework"
 

@@ -217,6 +217,7 @@ lib/wine/x86_64-unix/{d3d10,d3d11,d3d12,dxgi}.so      -> <gptk>/wine/x86_64-unix
                                                          (or <gptk>/external/libd3dshared.dylib
                                                          when the GPTK has no unix folder)
 lib/wine/x86_64-{windows,unix}/nvapi64.{dll,so}       -> <gptk>, when the GPTK has it
+lib/wine/x86_64-{windows,unix}/nvapi.{dll,so}         -> <gptk>/…/nvapi64.*, the internal name Wine finds Apple's nvapi64 by
 lib/external/{D3DMetal.framework,libd3dshared.dylib}  -> <gptk>/external/
 lib/notproton-backends/wine-stock/x86_64-windows/{d3d10,d3d11,d3d12,dxgi}.dll  Wine's originals
 lib/notproton-backends/d3dmetal.enabled

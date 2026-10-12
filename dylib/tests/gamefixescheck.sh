@@ -112,7 +112,7 @@ launch() {
 			eval "$bridge_line"
 			for v in backend WINEDLLOVERRIDES WINEMSYNC msync_from NOTPROTON_RETINA NOTPROTON_FRAMEGEN \
 				NOTPROTON_FRAMEGEN_QUALITY NOTPROTON_FRAMEGEN_UI NOTPROTON_FRAMEGEN_FALLBACK NOTPROTON_FRAMEGEN_ENGINE CX_GRAPHICS_BACKEND \
-				DXVK_HUD VKD3D_CONFIG WINEDEBUG MTL_HUD_ENABLED gamefix_args; do
+				DXVK_HUD VKD3D_CONFIG WINEDEBUG MTL_HUD_ENABLED D3DM_VENDOR_ID D3DM_DEVICE_ID D3DM_DEVICE_DESCRIPTION gamefix_args; do
 				eval "printf \"%s=%s\\n\" \$v \"\${$v-<unset>}\""
 			done
 		' launch "$target" > "$case_dir/out" 2>&1 || echo "launch exited $?" >> "$case_dir/out"
@@ -379,9 +379,15 @@ is "and nothing of Apple's is copied into the prefix" "0" "$(grep -rl '^apple ' 
 user_conf 'NVAPI=1'
 launch waitforexitandrun "$case_dir/game/game.exe"
 is "a conf NVAPI=1 turns Apple's nvapi64 and nvngx (DLSS) on" "d3d10,d3d10core,d3d11,d3d12,dxgi=b;nvapi64,nvngx=b;$trio" "$(got WINEDLLOVERRIDES)"
+is "and D3DMetal reports an NVIDIA adapter" "0x10de 0x2684 NVIDIA GeForce RTX 4090" \
+	"$(got D3DM_VENDOR_ID) $(got D3DM_DEVICE_ID) $(got D3DM_DEVICE_DESCRIPTION)"
+user_conf 'NVAPI=1' 'D3DM_DEVICE_ID=0x2704'
+launch waitforexitandrun "$case_dir/game/game.exe"
+is "a conf's D3DM_DEVICE_ID wins over the default" "0x10de 0x2704" "$(got D3DM_VENDOR_ID) $(got D3DM_DEVICE_ID)"
 user_conf 'NVAPI=1' 'BACKEND=dxmt'
 launch waitforexitandrun "$case_dir/game/game.exe"
 is "but not for dxmt" "d3d10core,d3d11,dxgi=n,b;d3d10,d3d12=b;nvapi64,nvngx=d;$trio" "$(got WINEDLLOVERRIDES)"
+is "nor its adapter" "<unset>" "$(got D3DM_VENDOR_ID)"
 has "and says so" "NVAPI=1 not applied, dxmt is not d3dmetal" "$case_dir/log"
 user_conf 'NVAPI=yes'
 launch waitforexitandrun "$case_dir/game/game.exe"
