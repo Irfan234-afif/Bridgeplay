@@ -696,6 +696,9 @@ activate_backend() {
       # NVIDIA one. A D3DM_* value from a conf or the launch options wins.
       export D3DM_VENDOR_ID="${D3DM_VENDOR_ID:-0x10de}" D3DM_DEVICE_ID="${D3DM_DEVICE_ID:-0x2684}"
       export D3DM_DEVICE_DESCRIPTION="${D3DM_DEVICE_DESCRIPTION:-NVIDIA GeForce RTX 4090}"
+      # Streamline loads an NGX core only when it is NVIDIA-signed; the engine's crypt32 and
+      # wintrust answer for Apple's bridge from a signed Streamline module (ngx-signer-patch/).
+      export NOTPROTON_NGX_SIGNER=1
       graphics_log "NVAPI=1: $nv_dlls on, adapter $D3DM_VENDOR_ID:$D3DM_DEVICE_ID ($D3DM_DEVICE_DESCRIPTION)"
     else
       [ "$gamefix_nvapi" != 1 ] || graphics_log "NVAPI=1 not applied, $backend is not d3dmetal"
@@ -2135,7 +2138,7 @@ else
   echo "=== client staged no overlay renderer, overlay disabled ===" >> "$log" 2>&1 || true
 fi
 set -- --args "$shim_exe" "$@"
-for name in $(env | sed -nE 's/^(CX_APPLEGPTK_LIBD3DSHARED_PATH|SDL_GAMECONTROLLERCONFIG(_FILE)?|SDL_JOYSTICK_MFI|WINE_LARGE_ADDRESS_AWARE|WINE_CPU_TOPOLOGY|Steam[A-Za-z0-9]*|(CX_GRAPHICS|D3DM_|DXMT_|DXVK_|MVK_|VKD3D_|STAGING_|MTL_|ROSETTA_)[A-Z0-9_]*|NOTPROTON_FRAMEGEN(_[A-Z]+)?)=.*/\1/p'); do
+for name in $(env | sed -nE 's/^(CX_APPLEGPTK_LIBD3DSHARED_PATH|SDL_GAMECONTROLLERCONFIG(_FILE)?|SDL_JOYSTICK_MFI|WINE_LARGE_ADDRESS_AWARE|WINE_CPU_TOPOLOGY|Steam[A-Za-z0-9]*|(CX_GRAPHICS|D3DM_|DXMT_|DXVK_|MVK_|VKD3D_|STAGING_|MTL_|ROSETTA_)[A-Z0-9_]*|NOTPROTON_FRAMEGEN(_[A-Z]+)?|NOTPROTON_NGX_SIGNER)=.*/\1/p'); do
   eval "value=\$$name"
   # shellcheck disable=SC2154 # eval assigns value on the line above
   set -- --env "$name=$value" "$@"

@@ -209,6 +209,23 @@ struct FreeEngineWinecxTests {
         #expect(!FreeEngineWinecx.layoutProblems(root: root, release: release).contains(files[0].path))
     }
 
+    // ngx-signer-patch: 11.17 ships crypt32 and wintrust that let Streamline accept Apple's
+    // NGX bridge; 11.15 keeps the runtime's.
+    @Test("The NGX signer crypt32 and wintrust ship with the app and are pinned for 11.17",
+          arguments: FreeEngineWinecx.releases.map(\.build))
+    func ngxSigner(id: String) throws {
+        let release = try #require(FreeEngineWinecx.release(build: id))
+        let expected: Set<String> = release.build == "winecx-11.17"
+            ? ["lib/wine/x86_64-windows/crypt32.dll", "lib/wine/x86_64-windows/wintrust.dll"] : []
+        #expect(Set(release.signer.map(\.path)) == expected)
+        let table = FreeEngineWinecx.expectedFiles(release)
+        for file in release.signer {
+            let bundled = try #require(Bundle.module.url(forResource: file.resource, withExtension: file.ext))
+            #expect(Digest.sha256IfPresent(bundled) == file.sha256, "\(file.resource)")
+            #expect(table[file.path] == file.sha256, "\(file.path)")
+        }
+    }
+
     @Test("Each free engine is current, outdated or missing on its own pins")
     func perEngineState() throws {
         let winehqBuild = try #require(SupportedRunners.build(id: FreeEngine.current.build))

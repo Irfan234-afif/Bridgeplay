@@ -59,6 +59,11 @@ struct WinecxRelease: Sendable {
     // link-local addresses macOS lists first, as Windows never returns them
     // (ws2_32-patch/). Empty where the runtime's own ws2_32 is kept.
     let network: [WinecxBundledFile]
+    // crypt32 and wintrust rebuilt so, with NOTPROTON_NGX_SIGNER set, a signature check of
+    // the system32 NGX core (Apple's unsigned MetalFX bridge) is answered from an
+    // NVIDIA-signed Streamline module next to the game, which lets Streamline load it
+    // (ngx-signer-patch/). Empty where the runtime's own are kept.
+    let signer: [WinecxBundledFile]
     // The runner build this release unpacks to, keyed by its pinned loader, and the ntdll
     // detours for it (NtdllPatcher.byBuild).
     let runner: RunnerBuild
@@ -153,6 +158,16 @@ enum FreeEngineWinecx {
                               path: "lib/wine/x86_64-windows/ws2_32.dll",
                               sha256: "cb0a5670ce6dbf949ed25cca54e9f1c4930cd4c2ade895836d518d3d9073079c"),
         ],
+        // crypt32.dll, wintrust.dll: winecx e0aa380's PE halves with
+        // ngx-signer-patch/winecx-ngx-signer.patch.
+        signer: [
+            WinecxBundledFile(resource: "crypt32-winecx-11.17", ext: "dll",
+                              path: "lib/wine/x86_64-windows/crypt32.dll",
+                              sha256: "19330827fc085603c2a73b859b801980f494a942ae470398634fbb6e1d62ada9"),
+            WinecxBundledFile(resource: "wintrust-winecx-11.17", ext: "dll",
+                              path: "lib/wine/x86_64-windows/wintrust.dll",
+                              sha256: "6ae3a8723bae11e5ff9ad6e23d1f1325740b1892d01b78abdeb1b77ac8bb6da8"),
+        ],
         runner: RunnerBuild(
             bundleVersion: "winecx-11.17",
             releaseVersion: "WineCX 11.17",
@@ -240,6 +255,7 @@ enum FreeEngineWinecx {
             sdl,
         ],
         network: [],
+        signer: [],
         // The hash-pinned loader is what makes it free, so a CrossOver install can never be
         // taken for it.
         runner: RunnerBuild(
@@ -332,7 +348,7 @@ enum FreeEngineWinecx {
     // checks them, since they are either Wine's own or links into a Game Porting Toolkit.
     static func expectedFiles(_ release: WinecxRelease = current) -> [String: String] {
         var table: [String: String] = [FreeEngine.macDriverPath: release.macDriver]
-        for file in release.gamepad + release.network { table[file.path] = file.sha256 }
+        for file in release.gamepad + release.network + release.signer { table[file.path] = file.sha256 }
         for file in release.backends { table["\(backendsPath)/\(file.destination)"] = file.sha256 }
         for path in release.renderer.files.keys {
             table[release.renderer.installPath(of: path)] = release.renderer.installedHash(of: path)
@@ -421,7 +437,7 @@ enum FreeEngineWinecx {
         try fm.createDirectory(at: root.deletingLastPathComponent(), withIntermediateDirectories: true)
         try fm.moveItem(at: wine, to: root)
         try FreeEngine.installMacDriver(root: root, build: release.build, sha256: release.macDriver, step: step)
-        try installBundled(release.gamepad + release.network, root: root)
+        try installBundled(release.gamepad + release.network + release.signer, root: root)
 
         let libraries = wine.deletingLastPathComponent()
         for file in release.backends {

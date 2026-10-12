@@ -1,0 +1,142 @@
+diff --git a/dlls/crypt32/object.c b/dlls/crypt32/object.c
+index 8a4a161b..fc88b3fa 100644
+--- a/dlls/crypt32/object.c
++++ b/dlls/crypt32/object.c
+@@ -767,7 +767,7 @@ static BOOL CRYPT_QueryPFXObject(DWORD dwObjectType, const void *pvObject,
+     return ret;
+ }
+ 
+-BOOL WINAPI CryptQueryObject(DWORD dwObjectType, const void *pvObject,
++static BOOL crypt_query_object(DWORD dwObjectType, const void *pvObject,
+  DWORD dwExpectedContentTypeFlags, DWORD dwExpectedFormatTypeFlags,
+  DWORD dwFlags, DWORD *pdwMsgAndCertEncodingType, DWORD *pdwContentType,
+  DWORD *pdwFormatType, HCERTSTORE *phCertStore, HCRYPTMSG *phMsg,
+@@ -863,6 +863,54 @@ BOOL WINAPI CryptQueryObject(DWORD dwObjectType, const void *pvObject,
+     return ret;
+ }
+ 
++/* NotProton: Apple's MetalFX DLSS bridge (nvngx-on-metalfx, linked as system32 nvngx.dll)
++ * carries no NVIDIA signature, and the NGX loader inside NVIDIA Streamline refuses an
++ * unsigned NGX core, so Streamline games never offer DLSS. When the run script sets
++ * NOTPROTON_NGX_SIGNER (NVAPI=1 on D3DMetal), a signature check of that one file, by
++ * path, is answered from an NVIDIA-signed Streamline module that ships with the game. */
++static const WCHAR *notproton_ngx_signer( const WCHAR *path, WCHAR *buf, DWORD len )
++{
++    static const WCHAR * const signed_modules[] = { L"sl.interposer.dll", L"sl.common.dll", L"nvngx_dlss.dll" };
++    const WCHAR *base;
++    WCHAR *slash;
++    DWORD i;
++
++    if (!path || !GetEnvironmentVariableW( L"NOTPROTON_NGX_SIGNER", NULL, 0 )) return path;
++    base = wcsrchr( path, '\\' );
++    if (!base) return path;
++    base++;
++    if (wcsicmp( base, L"nvngx.dll" ) && wcsicmp( base, L"_nvngx.dll" )) return path;
++    if (base - path < 10 || wcsnicmp( base - 10, L"\\system32\\", 10 )) return path;
++    if (!GetModuleFileNameW( NULL, buf, len ) || !(slash = wcsrchr( buf, '\\' ))) return path;
++    for (i = 0; i < ARRAY_SIZE(signed_modules); i++)
++    {
++        if (wcslen( signed_modules[i] ) + 1 > len - (DWORD)(slash + 1 - buf)) continue;
++        wcscpy( slash + 1, signed_modules[i] );
++        if (GetFileAttributesW( buf ) == INVALID_FILE_ATTRIBUTES) continue;
++        FIXME( "NotProton: checking the signature of %s against %s\n", debugstr_w(path), debugstr_w(buf) );
++        return buf;
++    }
++    return path;
++}
++
++/***********************************************************************
++ *		CryptQueryObject (CRYPT32.@)
++ */
++BOOL WINAPI CryptQueryObject(DWORD dwObjectType, const void *pvObject,
++ DWORD dwExpectedContentTypeFlags, DWORD dwExpectedFormatTypeFlags,
++ DWORD dwFlags, DWORD *pdwMsgAndCertEncodingType, DWORD *pdwContentType,
++ DWORD *pdwFormatType, HCERTSTORE *phCertStore, HCRYPTMSG *phMsg,
++ const void **ppvContext)
++{
++    WCHAR ngx_signer[MAX_PATH];
++
++    if (dwObjectType == CERT_QUERY_OBJECT_FILE)
++        pvObject = notproton_ngx_signer(pvObject, ngx_signer, ARRAY_SIZE(ngx_signer));
++    return crypt_query_object(dwObjectType, pvObject, dwExpectedContentTypeFlags,
++     dwExpectedFormatTypeFlags, dwFlags, pdwMsgAndCertEncodingType, pdwContentType,
++     pdwFormatType, phCertStore, phMsg, ppvContext);
++}
++
+ static BOOL WINAPI CRYPT_FormatHexString(DWORD dwCertEncodingType,
+  DWORD dwFormatType, DWORD dwFormatStrType, void *pFormatStruct,
+  LPCSTR lpszStructType, const BYTE *pbEncoded, DWORD cbEncoded, void *pbFormat,
+diff --git a/dlls/wintrust/wintrust_main.c b/dlls/wintrust/wintrust_main.c
+index a9b1587e..b72094ea 100644
+--- a/dlls/wintrust/wintrust_main.c
++++ b/dlls/wintrust/wintrust_main.c
+@@ -655,6 +655,39 @@ static void dump_wintrust_data(WINTRUST_DATA *data)
+  *   Trust providers can be found at:
+  *   HKLM\SOFTWARE\Microsoft\Cryptography\Providers\Trust\
+  */
++/* NotProton: Apple's MetalFX DLSS bridge (nvngx-on-metalfx, linked as system32 nvngx.dll)
++ * carries no NVIDIA signature, and the NGX loader inside NVIDIA Streamline refuses an
++ * unsigned NGX core, so Streamline games never offer DLSS. When the run script sets
++ * NOTPROTON_NGX_SIGNER (NVAPI=1 on D3DMetal), a signature check of that one file, by
++ * path, is answered from an NVIDIA-signed Streamline module that ships with the game. */
++static const WCHAR *notproton_ngx_signer( const WCHAR *path, WCHAR *buf, DWORD len )
++{
++    static const WCHAR * const signed_modules[] = { L"sl.interposer.dll", L"sl.common.dll", L"nvngx_dlss.dll" };
++    const WCHAR *base;
++    WCHAR *slash;
++    DWORD i;
++
++    if (!path || !GetEnvironmentVariableW( L"NOTPROTON_NGX_SIGNER", NULL, 0 )) return path;
++    base = wcsrchr( path, '\\' );
++    if (!base) return path;
++    base++;
++    if (wcsicmp( base, L"nvngx.dll" ) && wcsicmp( base, L"_nvngx.dll" )) return path;
++    if (base - path < 10 || wcsnicmp( base - 10, L"\\system32\\", 10 )) return path;
++    if (!GetModuleFileNameW( NULL, buf, len ) || !(slash = wcsrchr( buf, '\\' ))) return path;
++    for (i = 0; i < ARRAY_SIZE(signed_modules); i++)
++    {
++        if (wcslen( signed_modules[i] ) + 1 > len - (DWORD)(slash + 1 - buf)) continue;
++        wcscpy( slash + 1, signed_modules[i] );
++        if (GetFileAttributesW( buf ) == INVALID_FILE_ATTRIBUTES) continue;
++        FIXME( "NotProton: checking the signature of %s against %s\n", debugstr_w(path), debugstr_w(buf) );
++        return buf;
++    }
++    return path;
++}
++
++/***********************************************************************
++ *		WinVerifyTrust (WINTRUST.@) with the NotProton NGX signer redirect
++ */
+ LONG WINAPI WinVerifyTrust( HWND hwnd, GUID *ActionID, LPVOID ActionData )
+ {
+     static const GUID unknown = { 0xC689AAB8, 0x8E78, 0x11D0, { 0x8C,0x47,
+@@ -667,9 +700,21 @@ LONG WINAPI WinVerifyTrust( HWND hwnd, GUID *ActionID, LPVOID ActionData )
+     LONG err = ERROR_SUCCESS;
+     WINTRUST_DATA *actionData = ActionData;
+ 
++    WINTRUST_FILE_INFO *ngx_file = NULL;
++    LPCWSTR ngx_path = NULL;
++    WCHAR ngx_signer[MAX_PATH];
++
+     TRACE("(%p, %s, %p)\n", hwnd, debugstr_guid(ActionID), ActionData);
+     dump_wintrust_data(ActionData);
+ 
++    if (actionData && actionData->dwUnionChoice == WTD_CHOICE_FILE && actionData->pFile &&
++        !actionData->pFile->hFile)
++    {
++        ngx_file = actionData->pFile;
++        ngx_path = ngx_file->pcwszFilePath;
++        ngx_file->pcwszFilePath = notproton_ngx_signer( ngx_path, ngx_signer, ARRAY_SIZE(ngx_signer) );
++    }
++
+     /* Support for known old-style callers: */
+     if (IsEqualGUID(ActionID, &published_software))
+         err = WINTRUST_PublishedSoftware(hwnd, ActionID, ActionData);
+@@ -709,6 +754,7 @@ LONG WINAPI WinVerifyTrust( HWND hwnd, GUID *ActionID, LPVOID ActionData )
+         }
+     }
+ 
++    if (ngx_file) ngx_file->pcwszFilePath = ngx_path;
+     if (err) SetLastError(err);
+     TRACE("returning %08lx\n", err);
+     return err;
