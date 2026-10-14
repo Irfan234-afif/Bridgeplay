@@ -116,6 +116,9 @@ func prepare(_ target: URL, _ info: URL) throws {
         [
             "CFBundleAllowMixedLocalizations", "CFBundleDevelopmentRegion",
             "CFBundleInfoDictionaryVersion", "CFBundleShortVersionString", "CFBundleVersion",
+            // Keeps Wine's helper processes (services, explorer, steam.exe) out of the Dock;
+            // a process that opens a window still becomes a regular app.
+            "LSUIElement",
         ].contains($0.key)
     }
     updated.merge([
