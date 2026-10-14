@@ -1845,16 +1845,6 @@
         }
       }
     },
-    "Installed, but not for this account." : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "已安装，但当前账户尚未配置。"
-          }
-        }
-      }
-    },
     "Installing" : {
       "localizations" : {
         "zh-Hans" : {
@@ -2061,6 +2051,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "缺失。"
+          }
+        }
+      }
+    },
+    "Missing: %@. Install to restore these files for your macOS user." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "缺少：%@。请点击“安装”，为当前 macOS 用户恢复这些文件。"
           }
         }
       }
@@ -3321,6 +3321,16 @@
         }
       }
     },
+    "Steam integration needs repair." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Steam 集成需要修复。"
+          }
+        }
+      }
+    },
     "Steam is restored to its unmodified state and NotProton is removed, including the compatibility tool that lives inside the Steam folder. Windows games and Steam Play prefixes are not removed." : {
       "localizations" : {
         "zh-Hans" : {
@@ -3347,16 +3357,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Steam 正在运行，请先关闭 Steam。"
-          }
-        }
-      }
-    },
-    "Steam is set up for NotProton, but this account is missing its components. Install to add them." : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Steam 已配置 NotProton，但当前账户缺少所需组件。请点击“安装”添加组件。"
           }
         }
       }
