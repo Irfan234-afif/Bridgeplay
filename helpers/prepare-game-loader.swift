@@ -147,8 +147,14 @@ func prepare(_ target: URL, _ info: URL) throws {
     let attributes = try files.attributesOfItem(atPath: target.path)
     try files.setAttributes(
         [.posixPermissions: attributes[.posixPermissions] ?? 0o755], ofItemAtPath: staged.path)
-    let entitlements = try runCodesign(["-d", "--entitlements", ":-", target.path])
-    var arguments = ["--force", "--sign", "-", "--identifier", identity, "--options", "runtime"]
+    // CrossOver's loader is signed with the hardened runtime and entitlements; a free
+    // runtime's loader (WineCX) is not signed at all. Re-signing that one under the
+    // hardened runtime with no entitlements would refuse the DYLD_INSERT_LIBRARIES the
+    // launcher relies on, so it gets a plain ad hoc signature instead.
+    let signed = (try? runCodesign(["-d", target.path])) != nil
+    let entitlements = signed ? try runCodesign(["-d", "--entitlements", ":-", target.path]) : Data()
+    var arguments = ["--force", "--sign", "-", "--identifier", identity]
+    if signed { arguments += ["--options", "runtime"] }
     if !entitlements.isEmpty {
         _ = try PropertyListSerialization.propertyList(from: entitlements, format: nil)
         let file = temporary.appendingPathComponent("entitlements.plist")
