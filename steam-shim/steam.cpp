@@ -1475,18 +1475,22 @@ run:
             si.wShowWindow = SW_HIDE;
         }
 
-        si.dwFlags |= STARTF_USESTDHANDLES;
-        si.hStdInput = GetStdHandle(STD_INPUT_HANDLE);
-        si.hStdOutput = GetStdHandle(STD_OUTPUT_HANDLE);
-        si.hStdError = GetStdHandle(STD_ERROR_HANDLE);
+        /* STARTF_USESTDHANDLES would pin console games to the log, and console calls like Console.Clear() would fail. */
+        BOOL inherit = !(flags & CREATE_NEW_CONSOLE);
+
         /* Steam on Windows starts games without a stdout. Source 2 takes any stdout as
          * a console build (tier0 Plat_IsConsoleApplication: GetFileType(stdout) != 0)
          * and then skips NGX, so Deadlock never offers DLSS. The STDOUT_NULL gamefix
          * starts the game the Windows way. */
         if (GetEnvironmentVariableW(L"NOTPROTON_STDOUT_NULL", NULL, 0))
+        {
+            si.dwFlags |= STARTF_USESTDHANDLES;
+            si.hStdInput = GetStdHandle(STD_INPUT_HANDLE);
             si.hStdOutput = NULL;
+            si.hStdError = GetStdHandle(STD_ERROR_HANDLE);
+        }
 
-        if (!CreateProcessW(NULL, cmdline, NULL, NULL, TRUE, flags, NULL, NULL, &si, &pi))
+        if (!CreateProcessW(NULL, cmdline, NULL, NULL, inherit, flags, NULL, NULL, &si, &pi))
         {
             WINE_ERR("Failed to create process %s: %u\n", wine_dbgstr_w(cmdline), GetLastError());
             return INVALID_HANDLE_VALUE;

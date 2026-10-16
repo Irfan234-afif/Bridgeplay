@@ -60,6 +60,11 @@ let package = Package(
                 .copy("Resources/wined3d-winecx-11.17.dll"),
                 .copy("Resources/winecoreaudio-winecx-11.17.so"),
                 .copy("Resources/libSDL2-2.0.0.dylib"),
+                .copy("Resources/detour2-41073.bin"),
+                .copy("Resources/detour32-41073.bin"),
+                .copy("Resources/detour2-fex-41073.bin"),
+                .copy("Resources/detour32-fex-41073.bin"),
+                .copy("Resources/detour64-fex-41073.bin"),
             ],
             swiftSettings: [.swiftLanguageMode(.v6)]
         ),
