@@ -779,7 +779,7 @@ np-native: $(NP_NATIVE)
 $(NP_NATIVE): $(NP_NATIVE_SRC)
 	@mkdir -p $(dir $@)
 	$(CC) -arch arm64 -arch x86_64 -mmacosx-version-min=11.0 -std=c17 -O2 \
-		-Wall -Wextra -Werror $< -o $@
+		-Wall -Wextra -Werror $< -framework CoreFoundation -o $@
 	codesign -s - -f $@
 	@echo "==> Built $@ ($$(lipo -archs $@))"
 

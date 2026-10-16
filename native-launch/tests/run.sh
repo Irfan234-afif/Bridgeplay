@@ -27,7 +27,7 @@ if [ $# -ge 1 ]; then
 	launcher=$1
 else
 	launcher=$tmp/np-native
-	build "$src/np-native.c" -o "$launcher"
+	build "$src/np-native.c" -framework CoreFoundation -o "$launcher"
 	codesign -s - -f "$launcher" 2>/dev/null
 fi
 [ -x "$launcher" ] || { echo "==> np-native-tests: no launcher at $launcher" >&2; exit 1; }
@@ -157,6 +157,17 @@ chmod +x "$tmp/game.sh"
 run "DYLD_INSERT_LIBRARIES=$steamlib" -- NP_PAD_MODE=hid "$tmp/game.sh"
 expect_rc "script: exit 0" 0
 expect "script: STEAM_DYLD_ carries the composed list" "script STEAM_DYLD=$pad:$steamlib"
+
+# Steam passes some games as the .app bundle itself (Chained Beasts 3569420)
+mkdir -p "$tmp/Game.app/Contents/MacOS"
+cp "$probe" "$tmp/Game.app/Contents/MacOS/Game"
+cat >"$tmp/Game.app/Contents/Info.plist" <<'EOF'
+<?xml version="1.0" encoding="UTF-8"?>
+<plist version="1.0"><dict><key>CFBundleExecutable</key><string>Game</string></dict></plist>
+EOF
+run -- NP_PAD_MODE=off "$tmp/Game.app" -novid
+expect_rc "bundle: exit 0" 0
+expect "bundle: runs the bundle's executable, arm64" "arch=arm64" "arg1=-novid"
 
 # --- architecture ----------------------------------------------------------
 (exec env -i HOME="$H" PATH=/usr/bin:/bin NP_NATIVE_LOG=1 NP_PAD_MODE=hid \

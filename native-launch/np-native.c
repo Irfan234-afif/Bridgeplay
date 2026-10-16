@@ -32,6 +32,7 @@
  * NAME=VALUE token) or a failed exec exits 127. A library that does not exist
  * is never put into DYLD_INSERT_LIBRARIES, since dyld would abort the game.
  */
+#include <CoreFoundation/CoreFoundation.h>
 #include <ctype.h>
 #include <errno.h>
 #include <limits.h>
@@ -252,6 +253,34 @@ static int file_exists(const char *p)
 	return stat(p, &st) == 0 && S_ISREG(st.st_mode);
 }
 
+/* Steam passes some games (Chained Beasts 3569420) as the .app bundle rather
+ * than its binary; a directory cannot be exec'd, so run the bundle's main
+ * executable instead. NULL when prog is not a bundle with one. */
+static char *bundle_executable(const char *prog)
+{
+	size_t n = strlen(prog);
+	while (n > 1 && prog[n - 1] == '/')
+		n--;
+	struct stat st;
+	if (n < 5 || strncasecmp(prog + n - 4, ".app", 4) != 0 ||
+	    stat(prog, &st) != 0 || !S_ISDIR(st.st_mode))
+		return NULL;
+	char *exe = NULL;
+	CFURLRef url = CFURLCreateFromFileSystemRepresentation(NULL, (const UInt8 *)prog, (CFIndex)n, true);
+	CFBundleRef bundle = url ? CFBundleCreate(NULL, url) : NULL;
+	CFURLRef exe_url = bundle ? CFBundleCopyExecutableURL(bundle) : NULL;
+	char buf[PATH_MAX];
+	if (exe_url && CFURLGetFileSystemRepresentation(exe_url, true, (UInt8 *)buf, sizeof buf))
+		exe = xstrdup(buf);
+	if (exe_url)
+		CFRelease(exe_url);
+	if (bundle)
+		CFRelease(bundle);
+	if (url)
+		CFRelease(url);
+	return exe;
+}
+
 struct libs {
 	char *v[MAX_LIBS];
 	int n;
@@ -343,6 +372,9 @@ int main(int argc, char **argv)
 	}
 	if (i >= argc || argv[i][0] == '\0')
 		die("no program to run; usage: np-native [VAR=VALUE ...] %%command%% [args]");
+	char *exe = bundle_executable(argv[i]);
+	if (exe)
+		argv[i] = exe;
 	char *const *prog_argv = &argv[i];
 	const char *prog = argv[i];
 
