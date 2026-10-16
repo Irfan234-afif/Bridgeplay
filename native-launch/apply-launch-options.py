@@ -49,6 +49,7 @@ GAMES = {
     "728880": "hid",  # Overcooked! 2
     "870780": "gc",  # Control
     "934700": "gc",  # Dead Island 2
+    "3569420": "hid",  # Chained Beasts
     "3978510": "hid",  # Chained Beasts Demo
 }
 # SDL builds with their own MFi backend would see the pad twice
