@@ -133,8 +133,8 @@ for (const form of Object.keys(FORMS)) {
   t.ok(nodes('').some(x => x.type === 'Section' && x.props.label === FGL),
        'the frame generation section warns about latency');
   const mode = fgrow('', 'Mode');
-  t.ok(mode.type === 'Dropdown' && mode.props.className === undefined && mode.props.strClassName === 'MSCXRow',
-       'the mode is a dropdown row');
+  t.ok(mode.type === 'Dropdown' && mode.props.className === undefined && mode.props.strClassName === 'MSCXDrop',
+       'the mode is a dropdown with its label above it');
   t.ok(mode.props.rgOptions.map(x => x.label).join(',') === 'Off,2x,3x,Adaptive (fills to display refresh)' &&
        mode.props.rgOptions.map(x => x.data).join(',') === '0,2,3,adaptive',
        `the modes name themselves (${mode.props.rgOptions.map(x => x.label).join(',')})`);
@@ -145,8 +145,9 @@ for (const form of Object.keys(FORMS)) {
   const ordered = fgRows('NOTPROTON_FRAMEGEN=2').map(x => x.props.label);
   t.ok(ordered.join('|') === ['Mode', 'Quality', FGT.ui, FGT.fb, 'Engine'].join('|'),
        `on shows five rows in order (${ordered.join('|')})`);
-  t.ok(fgRows('NOTPROTON_FRAMEGEN=2').every(x => (x.props.className || x.props.strClassName) === 'MSCXRow'),
-       'every frame generation row carries the row class');
+  t.ok(fgRows('NOTPROTON_FRAMEGEN=2').every(x => x.type === 'Dropdown' ? x.props.strClassName === 'MSCXDrop'
+       : x.props.className === 'MSCXRow'),
+       'frame generation toggles are rows and its dropdowns stack their label above');
   for (const [v, want] of [['1', '2'], ['2', '2'], ['3', '3'], ['adaptive', 'adaptive'], ['Adaptive', 'adaptive']]) {
     t.ok(fgrow('NOTPROTON_FRAMEGEN=' + v, 'Mode').props.selectedOption === want, `${v} reads as ${want}`);
   }
@@ -255,7 +256,7 @@ for (const form of Object.keys(FORMS)) {
   t.ok(pad.props.selectedOption === '', 'Automatic is selected when NP_PAD_MODE is unset everywhere');
   t.ok(nrow(NAT + ' MTL_HUD_ENABLED=1 %command%', 'Controller layer').props.selectedOption === '',
        'Automatic stays selected when other variables are set');
-  t.ok(pad.props.strClassName === 'MSCXRow', 'the controller layer is a row');
+  t.ok(pad.props.strClassName === 'MSCXDrop', 'the controller layer is a stacked dropdown');
   t.ok(nnodes('').some(x => x.type === 'Section' && x.props.label === 'Controllers'), 'the native controller section');
   t.ok(P({ details: mac('', { unAppID: 3420702832 }) }).props.children.props.children.length > 4,
        'a mac shortcut still gets the full panel');

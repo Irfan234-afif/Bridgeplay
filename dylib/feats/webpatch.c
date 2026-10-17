@@ -255,6 +255,9 @@ static int out_expand(np_out_t *o, const char *replace, const np_cap_t *caps) {
     ".MSCXPanel .MSCXRow{display:flex;flex-direction:row;padding:9px;margin:0;" \
     "color:#dfe3e6;background:rgba(59,63,72,.5);border-radius:3px}" \
     ".MSCXPanel .MSCXRow:hover{box-shadow:0 6px 8px 0 rgba(0,0,0,.16)}" \
+    ".MSCXPanel .MSCXDrop{display:flex;flex-direction:column;align-items:stretch;gap:6px;" \
+    "padding:0;margin:10px 0;background:none}" \
+    ".MSCXPanel .MSCXDrop>*{width:100%;max-width:none;margin:0}" \
     ".MSCXNoBottomGap{margin-bottom:0}\""
 
 // FEX runs arm64 Wine, which has no D3DMetal and never runs under Rosetta.
@@ -301,9 +304,10 @@ static int out_expand(np_out_t *o, const char *replace, const np_cap_t *caps) {
     "T=(ks,l,on,off)=>(0," RT ".jsx)(" BARREL ".Yh,{className:\"MSCXRow\",label:l," \
     "checked:ev(ks[0])===on," \
     "onChange:v=>s(ks.map(k=>[k,v?(dv(k)===on?\"\":on):(dv(k)===on?(off||\"0\"):\"\")]))},ks[0])," \
-    /* A labelled dropdown row. n turns a raw value, set or not, into an option's data, so \
+    /* A labelled dropdown: its label above it, full width, without a row box around it, \
+       like the section dropdowns. n turns a raw value, set or not, into an option's data, so \
        picking what the confs already give drops the argument instead of writing it. */ \
-    "D=(k,l,O,n)=>(0," RT ".jsx)(" BARREL ".m,{label:l,strClassName:\"MSCXRow\",rgOptions:O," \
+    "D=(k,l,O,n)=>(0," RT ".jsx)(" BARREL ".m,{label:l,strClassName:\"MSCXDrop\",rgOptions:O," \
     "selectedOption:n(ev(k)),onChange:v=>s([[k,v.data===n(dv(k))?\"\":v.data]])},k)," \
     "lc=z=>x=>(x||z).toLowerCase()," \
     "fz=x=>{x=(x||\"\").toLowerCase();return x===\"1\"?\"2\":/^(0|off|false|no)?$/.test(x)?\"0\":x}," \
