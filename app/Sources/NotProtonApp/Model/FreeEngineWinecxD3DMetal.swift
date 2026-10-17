@@ -18,6 +18,9 @@
 //       since an nvapi that answers sends some games down NVIDIA-only paths.
 //   lib/wine/x86_64-{windows,unix}/nvapi.*    -> the user's nvapi64.* again, under the internal
 //       name Wine resolves Apple's nvapi64 builtin by.
+//   lib/wine/x86_64-{windows,unix}/d3d12core.*  -> the user's, when the GPTK has them (4.0 beta 3
+//       on). Its d3d12.dll loads d3d12core.dll by name for Agility SDK games, so Wine's own
+//       (vkd3d's) goes aside like a forwarder's original and comes back on unlink.
 //   lib/wine/x86_64-{windows,unix}/nvngx.*    -> the user's nvngx-on-metalfx.*, DLSS served
 //       by MetalFX. CrossOver copies it into each prefix as nvngx.dll; linking it under
 //       that name here lets the prefix's placeholder nvngx.dll resolve to it. compat_run.sh
@@ -42,6 +45,10 @@ enum WinecxD3DMetal {
     // and its DllMain fails.
     static let optionalForwarders = ["nvapi64.dll", "nvapi.dll", "nvngx.dll"]
     // The GPTK file an optional forwarder links to, when its name differs.
+    // Linked when the GPTK has it, like the optional forwarders, but Wine ships one of the same
+    // name, which is set aside and put back like a forwarder's original. No pin: Wine's file
+    // is only moved, never rewritten, and is kept whatever its bytes are.
+    static let replacedForwarders = ["d3d12core.dll"]
     static let optionalSources = ["nvapi.dll": "nvapi64.dll", "nvngx.dll": "nvngx-on-metalfx.dll"]
     static let sharedLibrary = "libd3dshared.dylib"
     static let framework = "D3DMetal.framework"
@@ -61,6 +68,11 @@ enum WinecxD3DMetal {
 
     static func sourceName(of forwarder: String) -> String {
         optionalSources[forwarder] ?? forwarder
+    }
+
+    // The replaced forwarders this GPTK ships as builtins.
+    static func replacedForwarders(in source: URL) -> [String] {
+        replacedForwarders.filter { isBuiltin(source.appending(path: "wine/x86_64-windows/\($0)")) }
     }
 
     struct Payload: Sendable, Equatable {
@@ -157,7 +169,7 @@ enum WinecxD3DMetal {
             isBuiltin(source.appending(path: "wine/x86_64-windows/\(sourceName(of: name))"))
                 && !exists(root.appending(path: "\(builtinPath)/\(name)"))
         }
-        for name in forwarders + optional {
+        for name in forwarders + replacedForwarders(in: source) + optional {
             links.append((root.appending(path: "\(builtinPath)/\(name)"),
                           source.appending(path: "wine/x86_64-windows/\(sourceName(of: name))").path(percentEncoded: false)))
             // Apple's own unix half when the GPTK ships one, which is itself a link to
@@ -181,6 +193,15 @@ enum WinecxD3DMetal {
             for name in forwarders {
                 let live = root.appending(path: "\(builtinPath)/\(name)")
                 guard let hash = stock[name], Digest.sha256IfPresent(live) == hash, !isSymlink(live) else {
+                    throw StepFailure(step: FreeEngineWinecx.step,
+                                      detail: "\(builtinPath)/\(name) is not Wine's own. Update & Set Up the WineCX engine again.")
+                }
+                try fm.moveItem(at: live, to: saved.appending(path: name))
+            }
+            for name in replacedForwarders(in: payload.libRoot.standardizedFileURL) {
+                let live = root.appending(path: "\(builtinPath)/\(name)")
+                guard exists(live) else { continue }
+                guard !isSymlink(live) else {
                     throw StepFailure(step: FreeEngineWinecx.step,
                                       detail: "\(builtinPath)/\(name) is not Wine's own. Update & Set Up the WineCX engine again.")
                 }
@@ -223,7 +244,7 @@ enum WinecxD3DMetal {
                 if isSymlink(link) { try? fm.removeItem(at: link) }
             }
         }
-        for name in forwarders {
+        for name in forwarders + replacedForwarders {
             let live = root.appending(path: "\(builtinPath)/\(name)")
             if isSymlink(live) { try? fm.removeItem(at: live) }
             let original = saved.appending(path: name)
@@ -280,6 +301,23 @@ enum WinecxD3DMetal {
                 if exists(unix) { problems.append(unixPath) }
             }
         }
+        for name in replacedForwarders {
+            let livePath = "\(builtinPath)/\(name)"
+            let savedPath = "\(stockPath)/\(name)"
+            let unixPath = "\(self.unixPath)/\(unixName(of: name))"
+            let live = root.appending(path: livePath)
+            let saved = root.appending(path: savedPath)
+            let unix = root.appending(path: unixPath)
+            if linked && isSymlink(live) {
+                if isSymlink(saved) { problems.append(savedPath) }
+                if !isSymlink(unix) { problems.append(unixPath) }
+            } else {
+                // Stock, or linked from a GPTK without one: Wine's own, if any, in place.
+                if isSymlink(live) { problems.append(livePath) }
+                if exists(saved) { problems.append(savedPath) }
+                if exists(unix) { problems.append(unixPath) }
+            }
+        }
         for name in optionalForwarders {
             for path in ["\(builtinPath)/\(name)", "\(unixPath)/\(unixName(of: name))"] {
                 let url = root.appending(path: path)
@@ -297,7 +335,7 @@ enum WinecxD3DMetal {
 
     // fileExists follows links, so a GPTK that was moved or deleted shows up here.
     private static func linksResolve(root: URL) -> Bool {
-        let linkedOptional = optionalForwarders.filter { isSymlink(root.appending(path: "\(builtinPath)/\($0)")) }
+        let linkedOptional = (replacedForwarders + optionalForwarders).filter { isSymlink(root.appending(path: "\(builtinPath)/\($0)")) }
         let paths = [root.appending(path: "\(externalPath)/\(framework)"),
                      root.appending(path: "\(externalPath)/\(sharedLibrary)")]
             + (forwarders + linkedOptional).flatMap { name in

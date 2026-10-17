@@ -437,6 +437,44 @@ struct FreeEngineWinecxTests {
         #expect(WinecxD3DMetal.layoutProblems(root: root, stock: Self.stock).isEmpty)
     }
 
+    @Test("GPTK 4.0 beta 3's d3d12core replaces Wine's own while linked and gives it back on unlink")
+    func linksReplacedForwarder() throws {
+        let base = try makeDirectory("d3d12core")
+        defer { try? FileManager.default.removeItem(at: base) }
+        let fm = FileManager.default
+
+        let lib = try makePayload(in: base.appending(path: "gptk"))
+        let apple = lib.appending(path: "wine/x86_64-windows/d3d12core.dll")
+        try fm.copyItem(at: lib.appending(path: "wine/x86_64-windows/d3d12.dll"), to: apple)
+        try fm.createSymbolicLink(
+            atPath: lib.appending(path: "wine/x86_64-unix/d3d12core.so").path(percentEncoded: false),
+            withDestinationPath: "../../external/libd3dshared.dylib")
+        let root = try makeEngineRoot(in: base)
+        let live = root.appending(path: "lib/wine/x86_64-windows/d3d12core.dll")
+        try Data("vkd3d d3d12core".utf8).write(to: live)
+        #expect(WinecxD3DMetal.layoutProblems(root: root, stock: Self.stock).isEmpty)
+
+        try WinecxD3DMetal.link(try #require(WinecxD3DMetal.locate(in: [lib])), root: root, stock: Self.stock)
+        #expect(WinecxD3DMetal.isLinked(root: root))
+        #expect(WinecxD3DMetal.layoutProblems(root: root, stock: Self.stock).isEmpty)
+        #expect(try destination(of: live) == apple.standardizedFileURL.path(percentEncoded: false))
+        #expect(try Data(contentsOf: root.appending(path: "lib/wine/x86_64-unix/d3d12core.so")) == Data("dylib".utf8))
+        let saved = root.appending(path: "lib/notproton-backends/wine-stock/x86_64-windows/d3d12core.dll")
+        #expect(try Data(contentsOf: saved) == Data("vkd3d d3d12core".utf8))
+
+        WinecxD3DMetal.unlink(root: root)
+        #expect(WinecxD3DMetal.layoutProblems(root: root, stock: Self.stock).isEmpty)
+        #expect((try? fm.destinationOfSymbolicLink(atPath: live.path(percentEncoded: false))) == nil)
+        #expect(try Data(contentsOf: live) == Data("vkd3d d3d12core".utf8))
+        #expect(!fm.fileExists(atPath: root.appending(path: "lib/wine/x86_64-unix/d3d12core.so").path(percentEncoded: false)))
+
+        // A GPTK without one (4.0 beta 2) leaves Wine's in place.
+        try fm.removeItem(at: apple)
+        try WinecxD3DMetal.link(try #require(WinecxD3DMetal.locate(in: [lib])), root: root, stock: Self.stock)
+        #expect(WinecxD3DMetal.layoutProblems(root: root, stock: Self.stock).isEmpty)
+        #expect(try Data(contentsOf: live) == Data("vkd3d d3d12core".utf8))
+    }
+
     @Test("Unlinking puts Wine's originals back byte for byte and removes only links")
     func unlinksCleanly() throws {
         let base = try makeDirectory("unlink")
