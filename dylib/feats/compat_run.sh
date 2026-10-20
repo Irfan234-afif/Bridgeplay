@@ -1024,9 +1024,14 @@ first_launch_notice() {
     [ -d "$metal_cache" ] && return 0
   fi
   echo "=== first launch, notice shown ===" >> "$log" 2>&1 || true
+  # Posted by the Bridgeplay app, so it carries Bridgeplay's name and icon; osascript (shown
+  # as Script Editor) only when the app cannot be found.
   (
     exec 8>&- 9>&-
-    osascript -e 'display notification "The first launch sets the game up and prepares its graphics. It can take a few minutes, and the screen may stay black until it is ready." with title "Bridgeplay" subtitle "Getting this game ready"'
+    title="Bridgeplay" subtitle="Getting this game ready"
+    body="The first launch sets the game up and prepares its graphics. It can take a few minutes, and the screen may stay black until it is ready."
+    open -n -g -b com.bridgeplay.Bridgeplay --args --notify "$title" "$subtitle" "$body" ||
+      osascript -e "display notification \"$body\" with title \"$title\" subtitle \"$subtitle\""
   ) >/dev/null 2>&1 &
 }
 

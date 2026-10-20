@@ -3,6 +3,8 @@ import Foundation
 @main
 enum Launch {
     static func main() {
+        // A game launch is waiting on this one: post and leave before anything else runs.
+        if let parts = NotifyCommand.requested() { NotifyCommand.run(parts) }
         // Before anything opens the support folder: the 3.0.0 move needs the old one intact.
         MainActor.assumeIsolated { MigrationLaunch.shared.runAtLaunch() }
         #if DEBUG
