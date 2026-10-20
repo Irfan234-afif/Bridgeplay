@@ -184,9 +184,33 @@ struct SetupAssistantView: View {
                       value: model.signedIn ? String(localized: "Signed in.") : String(localized: "Waiting for you to sign in. Bridgeplay never sees your password."),
                       tone: model.signedIn ? .ok : .info,
                       action: model.signedIn || !model.steamInstalled ? nil : StatusAction(label: String(localized: "Open Steam")) { model.openSteam() }))
+            checked(2, trustRow)
         } header: {
             StepHeader(title: "Sign in to Steam",
                        detail: "Sign in with your account in Steam. Bridgeplay continues on its own once you're in.")
+        }
+    }
+
+    // Optional: Continue does not wait for it. No password is asked for.
+    private var trustRow: StatusRow {
+        let title = String(localized: "Trust Bridgeplay on this Mac")
+        switch model.trust {
+        case .unknown, .needed:
+            return StatusRow(title: title,
+                             value: String(localized: "Keeps your controller working after Bridgeplay updates. Adds a certificate for this Mac to your login keychain."),
+                             tone: .info,
+                             action: StatusAction(label: String(localized: "Trust"), isEnabled: !model.isWorking && model.trust == .needed) {
+                                 Task { await model.trustThisMac() }
+                             })
+        case .working:
+            return StatusRow(title: title, value: String(localized: "Adding the certificate…"), tone: .info)
+        case .done:
+            return StatusRow(title: title, value: String(localized: "Done. Your controller keeps working after updates."), tone: .ok)
+        case .declined(let note):
+            return StatusRow(title: title, value: note, tone: .warning,
+                             action: StatusAction(label: String(localized: "Try Again"), isEnabled: !model.isWorking) {
+                                 Task { await model.trustThisMac() }
+                             })
         }
     }
 
@@ -225,6 +249,7 @@ struct SetupAssistantView: View {
                 StatusRow(title: String(localized: "App Management"),
                           value: String(localized: "Turn on Bridgeplay in Privacy & Security › App Management. Setup continues by itself once it's on."),
                           tone: .warning,
+                          detail: String(localized: "After a Bridgeplay update the switch can look on but no longer work. Turn it off and on again, or remove Bridgeplay from the list with − and add it back with +."),
                           action: StatusAction(label: Remedy.settingsButton, isProminent: true) { model.openAppManagement() })
             }
         }
@@ -238,6 +263,10 @@ struct SetupAssistantView: View {
             checked(2, StatusRow(title: String(localized: "Game Porting Toolkit"),
                       value: model.gptk == nil ? String(localized: "Skipped. Games use DXMT; add it later from Status.") : String(localized: "Linked."),
                       tone: model.gptk == nil ? .neutral : .ok))
+            checked(3, StatusRow(title: String(localized: "Controllers"),
+                      value: String(localized: "The first time a game uses a controller, macOS asks to let Steam use Input Monitoring. Click Allow. If you missed it, turn on Steam in Input Monitoring."),
+                      tone: .info,
+                      action: StatusAction(label: String(localized: "Open Input Monitoring")) { SystemStatus.openInputMonitoring() }))
         } header: {
             StepHeader(title: "You're all set",
                        detail: "Open Steam, install a Windows game and press Play. Status, Prefixes and Prefix Backups in this window change engines, fix a game or undo everything.")

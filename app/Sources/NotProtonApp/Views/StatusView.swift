@@ -333,14 +333,18 @@ struct StatusView: View {
                     )
                 }
                 updateBlockRow(snapshot.updateBlocked)
-                StatusRow(
-                    title: String(localized: "Controller permission"),
-                    value: String(localized: "Clear Steam's controller permission so macOS asks for it again."),
-                    action: StatusAction(
-                        label: String(localized: "Reset"),
-                        isEnabled: status.isIdle
-                    ) { Task { await status.resetControllerPermission() } }
-                )
+                controllerRow
+                if status.signingIdentityReady == false {
+                    StatusRow(
+                        title: String(localized: "Trust Bridgeplay on this Mac"),
+                        value: String(localized: "Keeps your controller working after Bridgeplay updates. Adds a certificate for this Mac to your login keychain."),
+                        tone: .info,
+                        action: StatusAction(
+                            label: String(localized: "Trust"),
+                            isEnabled: status.isIdle
+                        ) { Task { await status.trustThisMac() } }
+                    )
+                }
             }
 
             Section {
@@ -361,6 +365,38 @@ struct StatusView: View {
             dangerSection
         }
         .formStyle(.grouped)
+    }
+
+    // A reset macOS refused leaves Steam's old approval in place, and macOS then blocks the
+    // controller without asking. Only the user can clear it in System Settings.
+    @ViewBuilder
+    private var controllerRow: some View {
+        if status.controllerResetFailures.isEmpty {
+            StatusRow(
+                title: String(localized: "Controller permission"),
+                value: String(localized: "Clear Steam's controller permission so macOS asks for it again."),
+                secondaryAction: StatusAction(label: String(localized: "Open Input Monitoring")) {
+                    SystemStatus.openInputMonitoring()
+                },
+                action: StatusAction(
+                    label: String(localized: "Reset"),
+                    isEnabled: status.isIdle
+                ) { Task { await status.resetControllerPermission() } }
+            )
+        } else {
+            StatusRow(
+                title: String(localized: "Controllers may not work"),
+                value: String(localized: "macOS kept Steam's old controller permission. In Input Monitoring, turn Steam off and on again, then restart Steam."),
+                tone: .warning,
+                secondaryAction: StatusAction(
+                    label: String(localized: "Try Again"),
+                    isEnabled: status.isIdle
+                ) { Task { await status.resetControllerPermission() } },
+                action: StatusAction(label: String(localized: "Open Input Monitoring"), isProminent: true) {
+                    SystemStatus.openInputMonitoring()
+                }
+            )
+        }
     }
 
     private var dangerSection: some View {
@@ -806,5 +842,38 @@ struct StatusView: View {
                 }
             }
         }
+    }
+}
+
+// Shown above every pane when Steam lost Bridgeplay (or has an older copy) and Bridgeplay
+// could not put it back on its own. One button; the install flow does the rest.
+struct PatchBanner: View {
+    @Environment(SystemStatus.self) private var status
+    let banner: SteamPatchKeeper.Banner
+
+    var body: some View {
+        HStack(alignment: .center, spacing: 12) {
+            Image(systemName: "exclamationmark.triangle.fill")
+                .foregroundStyle(.orange)
+                .accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(banner.title).font(.headline)
+                Text(banner.message)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            Spacer(minLength: 12)
+            if status.activity != nil {
+                ProgressView().controlSize(.small)
+            }
+            Button(banner.button) { Task { await status.reapplyFromBanner() } }
+                .buttonStyle(.borderedProminent)
+                .disabled(!banner.canApply || !status.isIdle)
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 10)
+        .background(.bar)
+        .overlay(alignment: .bottom) { Divider() }
+        .accessibilityElement(children: .combine)
     }
 }

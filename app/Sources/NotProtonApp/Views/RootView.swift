@@ -27,6 +27,7 @@ enum Pane: String, CaseIterable, Identifiable, Hashable {
 struct RootView: View {
 
     @Binding var pane: Pane
+    @Environment(SystemStatus.self) private var status
 
     var body: some View {
         NavigationSplitView {
@@ -39,10 +40,17 @@ struct RootView: View {
             .listStyle(.sidebar)
             .navigationSplitViewColumnWidth(min: 180, ideal: 200, max: 260)
         } detail: {
-            switch pane {
-            case .status: StatusView()
-            case .prefixes: PrefixesView()
-            case .backups: BackupsView()
+            Group {
+                switch pane {
+                case .status: StatusView()
+                case .prefixes: PrefixesView()
+                case .backups: BackupsView()
+                }
+            }
+            .safeAreaInset(edge: .top, spacing: 0) {
+                if let banner = status.patchBanner {
+                    PatchBanner(banner: banner)
+                }
             }
         }
     }

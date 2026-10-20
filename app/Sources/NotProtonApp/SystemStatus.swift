@@ -594,6 +594,7 @@ final class SystemStatus {
     }
 
     func installIntoSteam() async {
+        var failedInputResets: [String]?
         await perform(from: InstallPhase.checkingPayload.label) { progress in
             let lock = try DeploymentContent.acquireInstallationLock()
             defer { lock.release() }
@@ -635,8 +636,129 @@ final class SystemStatus {
             try await Task.detached(priority: .userInitiated) {
                 try SteamInstaller.finish(result)
             }.value
+            failedInputResets = result.failedInputResets
 
             return parts.joined(separator: " ")
+        }
+        if failure == nil {
+            UserDefaults.standard.removeObject(forKey: SteamPatchKeeper.pausedKey)
+        }
+        // Only an install that changed Steam's signature tried a reset, so only it decides.
+        if let failedInputResets, failure == nil, !failedInputResets.isEmpty || !controllerResetFailures.isEmpty {
+            controllerResetFailures = failedInputResets
+        }
+    }
+
+    // MARK: Controller permission
+
+    static let inputMonitoringPane =
+        URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_ListenEvent")!
+
+    static func openInputMonitoring() {
+        AppLog.note("opening Input Monitoring settings")
+        NSWorkspace.shared.open(inputMonitoringPane)
+    }
+
+    private static let controllerResetFailuresKey = "steamInputResetFailures"
+
+    // What macOS refused to reset after the last install changed Steam's signature. Kept
+    // across launches: until it is fixed, controllers stay silently blocked.
+    var controllerResetFailures: [String] = UserDefaults.standard.stringArray(forKey: SystemStatus.controllerResetFailuresKey) ?? [] {
+        didSet {
+            if controllerResetFailures.isEmpty {
+                UserDefaults.standard.removeObject(forKey: Self.controllerResetFailuresKey)
+            } else {
+                UserDefaults.standard.set(controllerResetFailures, forKey: Self.controllerResetFailuresKey)
+                AppLog.note("controller permission: macOS kept \(controllerResetFailures.joined(separator: ", ")) for Steam")
+            }
+        }
+    }
+
+    // MARK: Signing identity
+
+    // nil until checked.
+    private(set) var signingIdentityReady: Bool?
+
+    func refreshSigningIdentity() async {
+        signingIdentityReady = await Task.detached(priority: .utility) { LocalSigning.existingHash() != nil }.value
+    }
+
+    func trustThisMac() async {
+        guard isIdle else { return }
+        await perform(from: LocalSigning.step) { _ in
+            _ = try await Task.detached(priority: .userInitiated) { try LocalSigning.ensure() }.value
+            return String(localized: "Bridgeplay is trusted on this Mac. Controllers keep their permission after the next update.")
+        }
+        await refreshSigningIdentity()
+    }
+
+    // MARK: Keeping Bridgeplay in Steam
+
+    var patchBanner: SteamPatchKeeper.Banner?
+    @ObservationIgnored private var lastPatchCheck: Date?
+    @ObservationIgnored private var lastAutoReapply: Date?
+    @ObservationIgnored private var autoReapplyFailed = false
+
+    // Called at launch, when the app comes to the front and every few minutes. Re-applies
+    // Bridgeplay on its own only while Steam and every game are closed; otherwise it shows
+    // a banner with one button.
+    func checkSteamPatch(trigger: String, setupShowing: Bool = false, now: Date = Date()) async {
+        if let last = lastPatchCheck, now.timeIntervalSince(last) < SteamPatchKeeper.checkInterval { return }
+        guard isIdle, !setupShowing else { return }
+        lastPatchCheck = now
+        let version = AppVersion.bundled
+        let seen = await Task.detached(priority: .utility) { SteamPatchKeeper.capture(bundledVersion: version) }.value
+        let decision = SteamPatchKeeper.decide(SteamPatchKeeper.Inputs(
+            deployment: seen.deployment,
+            previouslyDeployed: seen.previouslyDeployed,
+            steamRunning: seen.steamRunning,
+            gameRunning: seen.gameRunning,
+            paused: UserDefaults.standard.bool(forKey: SteamPatchKeeper.pausedKey),
+            installBlocked: snapshot?.installContent.blocksInstallation == true,
+            lastAttempt: lastAutoReapply,
+            lastAttemptFailed: autoReapplyFailed,
+            now: now))
+
+        switch decision {
+        case .nothing:
+            if patchBanner != nil { AppLog.note("patch keeper (\(trigger)): Steam carries Bridgeplay again") }
+            patchBanner = nil
+            autoReapplyFailed = false
+        case .ask(let kind, let blocker):
+            let banner = SteamPatchKeeper.Banner(kind: kind, blocker: blocker)
+            if banner != patchBanner { AppLog.note("patch keeper (\(trigger)): \(kind) waits, \(blocker)") }
+            patchBanner = banner
+        case .reapply(let kind):
+            guard isIdle else { return }
+            AppLog.note("patch keeper (\(trigger)): re-applying on its own, \(kind)")
+            lastAutoReapply = now
+            await installIntoSteam()
+            settleReapply(kind)
+        }
+    }
+
+    func reapplyFromBanner() async {
+        guard isIdle, let banner = patchBanner, banner.canApply else { return }
+        AppLog.note("patch keeper: re-applying on request, \(banner.kind)")
+        let wasRunning = await Task.detached(priority: .userInitiated) { SteamBundle.isRunning }.value
+        await installIntoSteam()
+        settleReapply(banner.kind)
+        if failure == nil, wasRunning {
+            let stillRunning = await Task.detached(priority: .userInitiated) { SteamBundle.isRunning }.value
+            if !stillRunning { NSWorkspace.shared.open(SupportPaths.Steam.app) }
+        }
+    }
+
+    private func settleReapply(_ kind: SteamPatchKeeper.Kind) {
+        autoReapplyFailed = failure != nil
+        if autoReapplyFailed {
+            AppLog.note("patch keeper: re-apply failed")
+            patchBanner = SteamPatchKeeper.Banner(kind: kind, blocker: .lastTryFailed)
+        } else {
+            patchBanner = nil
+            outcome = kind == .removedBySteam
+                ? String(localized: "Steam updated, so Bridgeplay put itself back into Steam.")
+                : String(localized: "Bridgeplay updated its files in Steam.")
         }
     }
 
@@ -658,6 +780,8 @@ final class SystemStatus {
             let lock = try DeploymentContent.acquireInstallationLock()
             defer { lock.release() }
             let result = try await SteamRepair.run(report: { progress($0.label) })
+            UserDefaults.standard.set(true, forKey: SteamPatchKeeper.pausedKey)
+            AppLog.note("patch keeper: paused until Bridgeplay is installed again")
 
             var parts = [String(localized: "Steam restored to its original state.")]
             if result.stoppedClient { parts.append(Self.restartHint) }
@@ -668,6 +792,7 @@ final class SystemStatus {
     func resetControllerPermission() async {
         await perform(from: String(localized: "Resetting Steam's controller permission")) { _ in
             let failed = SteamInstaller.failedInputAccessResets()
+            controllerResetFailures = failed
             guard failed.isEmpty else {
                 throw StepFailure(
                     step: String(localized: "Reset controller permission"),
@@ -701,6 +826,7 @@ final class SystemStatus {
         }.value
         snapshot = captured
         AppLog.note(captured)
+        await refreshSigningIdentity()
         await refreshRunnerStorage(cleanTemplates: !captured.installContent.blocksInstallation)
     }
 
