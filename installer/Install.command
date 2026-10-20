@@ -1,8 +1,9 @@
 #!/bin/bash
 # Bridgeplay one-click installer.
 # Copies Bridgeplay, Apple's Game Porting Toolkit (D3DMetal), the WineCX engine (no download)
-# and the default configs, then opens Bridgeplay, whose Setup Assistant does the rest:
-# Rosetta, Steam, sign-in, the App Management permission and the Steam setup.
+# and the default configs, installs Steam from Valve's CDN when it is missing, then opens
+# Bridgeplay, whose Setup Assistant does the rest: Rosetta, sign-in, the App Management
+# permission and the Steam setup. Assembled into a zip by scripts/package-installer.sh.
 set -uo pipefail
 
 here="$(cd "$(dirname "$0")" && pwd)"
@@ -11,11 +12,26 @@ support="$HOME/Library/Application Support/notproton"
 say()  { printf '\n\033[1;32m==>\033[0m %s\n' "$*"; }
 die()  { printf '\n\033[1;31mGagal:\033[0m %s\n' "$*" >&2; read -r -p "Tekan Enter untuk menutup..." _; exit 1; }
 
+# Valve's official macOS Steam installer, and the Team ID Valve signs Steam.app with.
+steam_url="https://cdn.cloudflare.steamstatic.com/client/installer/steam.dmg"
+valve_team="MXGJJ98X76"
+steam_tmp=""
+steam_mnt=""
+# shellcheck disable=SC2329 # runs from the EXIT trap
+cleanup() {
+    if [ -n "$steam_mnt" ]; then hdiutil detach -quiet "$steam_mnt" >/dev/null 2>&1; fi
+    if [ -n "$steam_tmp" ]; then rm -rf "$steam_tmp"; fi
+    return 0
+}
+trap cleanup EXIT
+
 xattr -dr com.apple.quarantine "$here" 2>/dev/null || true
 
 [ "$(sysctl -n hw.optional.arm64 2>/dev/null)" = "1" ] || die "Mac ini bukan Apple Silicon (M1/M2/M3/...). Bridgeplay tidak jalan di Mac Intel."
 major="$(sw_vers -productVersion | cut -d. -f1)"
 [ "$major" -ge 26 ] || die "Butuh macOS 26 atau lebih baru (sekarang $(sw_vers -productVersion)). Update macOS dulu."
+[ -w /Applications ] || die "Akun ini tidak bisa menulis ke folder Applications. Login dengan akun admin, lalu jalankan Install.command lagi."
+[ -d "$here/Bridgeplay.app" ] || die "Bridgeplay.app tidak ada di folder installer. Ekstrak ulang zip-nya, lalu coba lagi."
 
 say "Memasang Bridgeplay..."
 osascript -e 'tell application id "com.bridgeplay.Bridgeplay" to quit' >/dev/null 2>&1 || true
@@ -24,12 +40,26 @@ ditto "$here/Bridgeplay.app" /Applications/Bridgeplay.app || die "Bridgeplay gag
 xattr -dr com.apple.quarantine /Applications/Bridgeplay.app 2>/dev/null || true
 
 if [ ! -d /Applications/Steam.app ]; then
+    say "Steam belum terpasang. Mengunduh installer Steam resmi dari Valve..."
+    steam_tmp="$(mktemp -d)" || die "Folder sementara tidak bisa dibuat."
+    dmg="$steam_tmp/steam.dmg"
+    curl -fL --retry 3 --connect-timeout 20 --progress-bar -o "$dmg" "$steam_url" \
+        || die "Steam gagal diunduh. Pastikan Mac tersambung ke internet, lalu jalankan Install.command lagi."
+    # A UDIF disk image ends with a 512-byte trailer that starts with "koly".
+    [ "$(tail -c 512 "$dmg" | head -c 4)" = "koly" ] \
+        || die "File yang diunduh bukan installer Steam (bukan DMG). Coba lagi nanti."
     say "Memasang Steam..."
-    mnt="$(mktemp -d)"
-    hdiutil attach -nobrowse -readonly -quiet -mountpoint "$mnt" "$here/steam.dmg" || die "Installer Steam tidak bisa dibuka."
-    ditto "$mnt/Steam.app" /Applications/Steam.app; ok=$?
-    hdiutil detach -quiet "$mnt" 2>/dev/null; rmdir "$mnt" 2>/dev/null
-    [ $ok -eq 0 ] || die "Steam gagal disalin ke Applications."
+    steam_mnt="$steam_tmp/mnt"
+    mkdir "$steam_mnt"
+    hdiutil attach -nobrowse -readonly -noautoopen -quiet -mountpoint "$steam_mnt" "$dmg" </dev/null \
+        || { steam_mnt=""; die "Installer Steam tidak bisa dibuka."; }
+    if ! codesign --verify --strict "$steam_mnt/Steam.app" 2>/dev/null \
+        || ! codesign -dv "$steam_mnt/Steam.app" 2>&1 | grep -qx "TeamIdentifier=$valve_team"; then
+        die "Steam yang diunduh tidak ditandatangani Valve. Instalasi dibatalkan."
+    fi
+    ditto "$steam_mnt/Steam.app" /Applications/Steam.app || die "Steam gagal disalin ke Applications."
+    hdiutil detach -quiet "$steam_mnt" >/dev/null 2>&1
+    steam_mnt=""
     xattr -dr com.apple.quarantine /Applications/Steam.app 2>/dev/null || true
 fi
 

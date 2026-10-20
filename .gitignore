@@ -30,3 +30,18 @@ installer/gptk/
 installer/cache/
 installer/steam.dmg
 installer/GPTK-License.rtf
+installer/*.zip
+
+# Secrets and signing material: never commit these.
+.env*
+*.p12
+*.pem
+*.key
+*.cer
+*.keychain
+*.keychain-db
+*.mobileprovision
+# Sparkle EdDSA private key exported with generate_keys -x.
+*sparkle*private*
+*sparkle_key*
+*.ed25519

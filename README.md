@@ -60,10 +60,12 @@ Also running on the same setup: Street Fighter 6, Mortal Kombat 1, The Last of U
 
 ## Install
 
-1. **Download the installer** from [bridgeplay.dev](https://bridgeplay.dev). About 660 MB, with the engine and graphics already inside.
-2. **Open `Install.command`.** It puts everything in place. No terminal.
+1. **Download the installer** from [bridgeplay.dev](https://bridgeplay.dev). About 570 MB, with the engine and graphics already inside.
+2. **Open `Install.command`.** macOS blocks it the first time: open **System Settings > Privacy & Security**, scroll down, click **Open Anyway** and confirm with your password or Touch ID. It needs an admin account, puts everything in place and downloads Steam from Valve if it is missing.
 3. **Follow the Setup Assistant**: Rosetta, graphics, Steam sign-in and one permission.
-4. **Press Play** on any Windows game in Steam.
+4. **Press Play** on any Windows game in Steam. The first time you use a controller, allow Steam's Input Monitoring request.
+
+The installer includes Apple's Game Porting Toolkit redistributables under Apple's license, which allows non-commercial distribution only. Bridgeplay is free and non-commercial.
 
 <p align="center">
   <img src="docs/readme/install-v4.png" alt="The Setup Assistant working through Your Mac, Rosetta, Graphics, Steam and Set Up" width="100%">
@@ -80,22 +82,25 @@ Also running on the same setup: Street Fighter 6, Mortal Kombat 1, The Last of U
 | Mac | Apple Silicon, M1 or later. Intel Macs are not supported. |
 | macOS | 26 or later |
 | Steam | A Steam account. Windows games install from Steam as usual. |
-| Download | About 660 MB. Installing Rosetta 2 and signing in to Steam need internet. |
+| Download | About 570 MB. Installing Rosetta 2 and Steam, and signing in to Steam, need internet. |
 
 ## How it works
 
 Bridgeplay runs inside the native macOS Steam client and registers itself as a Steam Play compatibility tool. Under the hood:
 
 - **Engine:** CodeWeavers' open-source WineCX 11.17 with MSync, running under Rosetta 2.
-- **Graphics:** Apple's Game Porting Toolkit 4.0 beta 3 (D3DMetal), linked locally from Apple's download and never redistributed in this repository. DXMT and DXVK are available for games that prefer them.
+- **Graphics:** Apple's Game Porting Toolkit 4.0 beta 3 (D3DMetal). It is not stored in this repository; the installer ships its redistributables under Apple's non-commercial license (see Install). DXMT and DXVK are available for games that prefer them.
 - **Extras:** NVAPI/NGX routing for DLSS on MetalFX, in-process frame generation on `CAMetalLayer`, per-game Game Mode, Retina back buffers and a controller layer for HID pads.
 
-Building from source: see [docs/DEVELOPING.md](docs/DEVELOPING.md) and [docs/BUILD-LOCAL.md](docs/BUILD-LOCAL.md). The one-click installer lives in [`installer/`](installer/).
+Building from source: see [docs/DEVELOPING.md](docs/DEVELOPING.md) and [docs/BUILD-LOCAL.md](docs/BUILD-LOCAL.md). The one-click installer lives in [`installer/`](installer/) and is packaged by `scripts/package-installer.sh`.
 
 ## Credits
 
+Bridgeplay is a fork of [NotProton](https://github.com/NotProtonNot/NotProton) (GPL-3.0), built on CodeWeavers' [WineCX](https://www.codeweavers.com/crossover) and Apple's [Game Porting Toolkit](https://developer.apple.com/games/game-porting-toolkit/). The DualSense Bluetooth bridge and Steam rumble forwarding come from [sn0wst0rm's NotProton fork](https://github.com/sn0wst0rm/NotProton). It also uses [Dobby](https://github.com/jmpews/Dobby) (Apache-2.0), [Sparkle](https://sparkle-project.org) (MIT), [DXMT](https://github.com/3Shain/dxmt) and [DXVK-macOS](https://github.com/Gcenx/DXVK-macOS).
 
-Bridgeplay is a fork of [NotProton](https://github.com/NotProtonNot/NotProton) (GPL-3.0), built on CodeWeavers' [WineCX](https://www.codeweavers.com/crossover) and Apple's [Game Porting Toolkit](https://developer.apple.com/games/game-porting-toolkit/).
+## License
+
+Bridgeplay is licensed under the [GPL-3.0](LICENSE). Third-party licenses, and the source for the patched Wine files the app ships (LGPL-2.1-or-later), are listed in [NOTICE](NOTICE).
 
 <p>
   <a href="https://github.com/raymondchins"><img src="https://github.com/raymondchins.png?size=64" width="32" height="32" alt="" align="left" style="border-radius:50%"></a>

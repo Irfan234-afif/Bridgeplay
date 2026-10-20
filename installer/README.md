@@ -1,17 +1,31 @@
 # Installer
 
 `Install.command` installs the app, Apple's Game Porting Toolkit, the WineCX engine and the
-default configs from the folder it sits in, then opens the app's Setup Assistant.
+default configs from the folder it sits in, downloads Steam from Valve's CDN when
+`/Applications/Steam.app` is missing, then opens the app's Setup Assistant.
 
-Assembled next to it at packaging time, never committed:
+Build the zip with:
 
-| Path | Source |
+    make app
+    scripts/package-installer.sh      # writes out/Bridgeplay-Installer.zip
+
+The script stages `out/installer/Bridgeplay/` and fails if a piece is missing or an engine
+archive does not match its pin in `FreeEngine*.swift`:
+
+| Path in the zip | Source |
 |---|---|
-| `Bridgeplay.app` | `build/Bridgeplay.app` from `scripts/build-local.sh` |
-| `gptk/` | `redist/lib` of Apple's Game Porting Toolkit DMG (Apple license, non-commercial) |
-| `GPTK-License.rtf` | From the same DMG |
-| `cache/` | `~/Library/Caches/notproton` after an engine install (files matching the pins) |
-| `steam.dmg` | Valve's macOS Steam installer |
+| `Bridgeplay.app` | `out/Bridgeplay.app` from `make app` |
+| `Install.command`, `BACA DULU.txt`, `README.txt`, `config/` | this folder |
+| `LICENSE`, `LICENSE.*`, `NOTICE` | repository root |
+| `gptk/` | `~/Library/Application Support/notproton/gptk` (`redist/lib` of Apple's Game Porting Toolkit DMG) |
+| `GPTK-License.rtf` | `gptk/License.rtf` from the same DMG |
+| `cache/engines/` | the pinned WineCX runtime, DXMT and DXVK archives from `~/Library/Caches/notproton/engines` |
 
-`config/` holds the bundled `gamefixes` and `gamecontrollerdb.txt`. `BACA DULU.txt` is the
-user guide shipped in the zip.
+Never shipped: Valve's Steam client and the Steam packages in `valve-packages/` (the app
+downloads those from Valve's CDN), and GPTK is never committed. GPTK's `/redist` files are
+Apple software that Apple allows to be redistributed for non-commercial use only; Bridgeplay
+is free and non-commercial.
+
+`BACA DULU.txt` (Indonesian) and `README.txt` (English) are the user guides in the zip. macOS
+15 and later no longer opens unsigned scripts from right-click > Open, so step 1 sends users to
+System Settings > Privacy & Security > Open Anyway.
