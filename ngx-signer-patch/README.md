@@ -7,10 +7,18 @@ NVIDIA Streamline loads an NGX core only when it carries an NVIDIA Authenticode 
 never offered DLSS. Games calling NGX directly (Death Stranding) were unaffected.
 
 `winecx-ngx-signer.patch` (against winecx `e0aa380`) wraps `CryptQueryObject` (crypt32) and
-`WinVerifyTrust` (wintrust): with `NOTPROTON_NGX_SIGNER` set, a check of
-`...\system32\nvngx.dll` or `_nvngx.dll` by path is answered from an NVIDIA-signed Streamline
-module next to the game executable (`sl.interposer.dll`, `sl.common.dll` or `nvngx_dlss.dll`).
-Every other path is untouched. `compat_run.sh` sets the variable only with `NVAPI=1` on D3DMetal.
+`WinVerifyTrust` (wintrust): with `NOTPROTON_NGX_SIGNER` set, a check of `nvngx.dll` or
+`_nvngx.dll` by path in the system directory (`GetSystemDirectoryW()`, not any folder named
+`system32`) is answered from an NVIDIA-signed Streamline module next to the game executable
+(`sl.interposer.dll`, `sl.common.dll` or `nvngx_dlss.dll`). Every other path is untouched.
+`compat_run.sh` sets the variable only with `NVAPI=1` on D3DMetal. `WinVerifyTrust` runs a
+redirected check on a heap copy of the caller's `WINTRUST_DATA` and `WINTRUST_FILE_INFO`, so
+the caller's structs are only written where Windows writes them too (`hWVTStateData`); a
+`WTD_STATEACTION_VERIFY` copy stays alive until its `WTD_STATEACTION_CLOSE`.
+
+The committed `crypt32-winecx-11.17.dll` and `wintrust-winecx-11.17.dll` predate those two
+changes (system-directory match, struct copy). They need a rebuild, a DLSS check in a
+Streamline game, and new pins in `FreeEngineWinecx.swift`.
 
 Verified 2026-10-12: RE Requiem lists NVIDIA DLSS; 007 First Light logs
 `Loaded NGXCore from path (C:\windows\system32\nvngx.dll)`.
