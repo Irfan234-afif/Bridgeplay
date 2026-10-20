@@ -78,3 +78,27 @@ archive, and never check on their own (`SUEnableAutomaticChecks` was false).
 the same app zipped as `NotProton.app`. Those users get it from Check for Updates…; it
 installs over `/Applications/NotProton.app`, and later updates come from the Bridgeplay
 feed, matched by bundle identifier.
+
+## The 3.0.0 rename
+
+3.0.0 renames everything on disk from `notproton` to `bridgeplay`:
+
+| Before | From 3.0.0 |
+|---|---|
+| `~/Library/Application Support/notproton` | `~/Library/Application Support/bridgeplay` |
+| `~/Library/Caches/notproton` | `~/Library/Caches/bridgeplay` |
+| `~/.notproton` (np-native, libnp_gamepad.dylib) | `~/.bridgeplay` |
+| Steam tools `notproton-winecx-11.17`, `notproton-winehq`, … | `bridgeplay-winecx-11.17`, `bridgeplay-winehq`, … |
+| `notproton-run.log`, `notproton-wine.log`, `notproton.log` | `bridgeplay-run.log`, `bridgeplay-wine.log`, `bridgeplay.log` |
+| `NOTPROTON_*` in launch options and conf files | `BRIDGEPLAY_*` (the old spelling still works) |
+
+Unchanged: `notproton.dylib`, `lib/notproton-backends`, the prefix markers in `compatdata`
+(`notproton-build`, `notproton-backend`), the launcher bundle ids
+`com.notproton.launcher.<appid>` and the `NOTPROTON_VERSION` define.
+
+The app migrates on its first launch after the update, once Steam and every game are
+closed: it moves the folders and switches games mapped to a `notproton*` tool to its
+`bridgeplay*` name. What it replaces is backed up under
+`~/Library/Application Support/bridgeplay/backups/migration-3.0.0/`. Nothing is needed in the
+release steps; `scripts/release-local.sh` and `scripts/package-installer.sh` fall back to the
+`notproton` folders on a Mac that has not migrated yet.
