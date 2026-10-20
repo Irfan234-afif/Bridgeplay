@@ -188,11 +188,17 @@ feed "$out/bridgeplay" Bridgeplay.zip Bridgeplay.app "$slug"
 # installs over /Applications/NotProton.app; later updates match by bundle identifier.
 [ "$legacy" -eq 0 ] || feed "$out/legacy" NotProton.zip NotProton.app "$legacy_slug"
 
+# bridgeplay.dev's Download links to releases/latest/download/Bridgeplay-Installer.zip, so
+# every release that becomes Latest must carry it, built from this same app.
+APP=$app scripts/package-installer.sh
+mv out/Bridgeplay-Installer.zip "$out/bridgeplay/Bridgeplay-Installer.zip"
+
 title="Bridgeplay $version"
 body=$(printf '%s\n\nBuild %s, based on NotProton %s.\n' "$notes" "$build" "$upstream")
 echo "==> $title (build $build), notes since ${previous:-the beginning}:"
 printf '%s\n' "$notes" | sed 's/^/    /'
-run gh release create "$tag" "$out/bridgeplay/Bridgeplay.zip" "$out/bridgeplay/appcast.xml" -R "$slug" \
+run gh release create "$tag" "$out/bridgeplay/Bridgeplay.zip" "$out/bridgeplay/appcast.xml" \
+	"$out/bridgeplay/Bridgeplay-Installer.zip" -R "$slug" \
 	--target "$(git rev-parse HEAD)" --title "$title" --notes "$body" --latest
 if [ "$legacy" -eq 1 ]; then
 	# Only a carrier for the feed: the tag goes on that repository's default branch, since

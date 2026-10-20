@@ -1,7 +1,8 @@
 # Releasing Bridgeplay
 
-Every release is a GitHub release of `raymondchins/Bridgeplay` carrying `Bridgeplay.zip`
-and `appcast.xml`. Installed apps read
+Every release is a GitHub release of `raymondchins/Bridgeplay` carrying `Bridgeplay.zip`,
+`appcast.xml` and `Bridgeplay-Installer.zip` (bridgeplay.dev's Download links to
+`releases/latest/download/Bridgeplay-Installer.zip`). Installed apps read
 `https://github.com/raymondchins/Bridgeplay/releases/latest/download/appcast.xml`
 (`SUFeedURL`), so whatever release is marked **Latest** is the update feed.
 
@@ -45,8 +46,8 @@ installation. `VersioningTests` guards both.
 4. Release: `scripts/release-local.sh` (notes default to the commit subjects since the
    previous `vX.Y.Z` release; pass a string to override). It builds with
    `scripts/build-local.sh --checks`, signs the zip with the EdDSA key in the login
-   keychain, writes an appcast with `minimumSystemVersion` 26.0 and publishes `vX.Y.Z` as
-   Latest.
+   keychain, writes an appcast with `minimumSystemVersion` 26.0, packages the installer from the
+   same app (`scripts/package-installer.sh`) and publishes `vX.Y.Z` as Latest with all three.
 
 Any other release in the repository (a DXMT build, say) must be created with
 `--latest=false`, or the feed URL stops serving `appcast.xml` until the next app release.
