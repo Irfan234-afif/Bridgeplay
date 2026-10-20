@@ -92,7 +92,7 @@ struct BridgeplayApp: App {
 
         CommandMenu("Setup") {
             Button("Setup Assistant…") { showsSetup = true }
-                .disabled(!status.isIdle)
+                .disabled(!status.isIdle || MigrationLaunch.shared.pending)
 
             Divider()
 

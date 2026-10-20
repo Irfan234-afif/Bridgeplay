@@ -20,12 +20,23 @@ enum Launch {
         }
         if CommandLine.arguments.dropFirst().contains(InstallIntoSteamCommand.flag) {
             AppLog.note("command line: \(InstallIntoSteamCommand.flag)")
+            refuseWhileMigrating()
             InstallIntoSteamCommand.run()
         }
         if CommandLine.arguments.dropFirst().contains(SetupWinecxCommand.flag) {
             AppLog.note("command line: \(SetupWinecxCommand.flag)")
+            refuseWhileMigrating()
             SetupWinecxCommand.run()
         }
         BridgeplayApp.main()
+    }
+
+    // The installs write the new support folder, which the pending 3.0 move must find as
+    // it left it, so they wait for it like the app's own buttons do.
+    private static func refuseWhileMigrating() {
+        guard let refusal = MainActor.assumeIsolated({ MigrationLaunch.shared.refusal }) else { return }
+        AppLog.note("command line refused: the 3.0 folder move is pending")
+        FileHandle.standardError.write(Data("\(refusal)\n".utf8))
+        exit(AppLog.finished(1))
     }
 }

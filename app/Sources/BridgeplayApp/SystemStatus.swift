@@ -123,7 +123,11 @@ final class SystemStatus {
 
     var isBusy: Bool { activity != nil || runInFlight || checkingLicense }
     var isIdle: Bool { !isBusy && !isRefreshing }
-    var canInstall: Bool { isIdle && snapshot?.installContent.blocksInstallation != true }
+    // A pending 3.0 folder move blocks every install: anything written now would land in
+    // the new folders before the old ones are moved in.
+    var canInstall: Bool {
+        isIdle && snapshot?.installContent.blocksInstallation != true && !MigrationLaunch.shared.pending
+    }
 
     enum Confirmation: Identifiable, Hashable {
         case replaceSteam
@@ -462,6 +466,10 @@ final class SystemStatus {
     }
 
     private func setUpRunner(from install: CrossOverInstall?, replacingExisting: Bool = false) async {
+        if let refusal = MigrationLaunch.shared.refusal {
+            setFailure(refusal)
+            return
+        }
         guard let install else {
             setFailure(String(localized: "No supported Wine engine found. Download the free WineHQ or WineCX engine first."))
             AppLog.note("run refused: no supported CrossOver")
@@ -601,6 +609,11 @@ final class SystemStatus {
     // unattended: nobody pressed anything, so a Steam that opened since the decision to
     // install is left running and the install stops instead.
     func installIntoSteam(unattended: Bool = false) async {
+        if let refusal = MigrationLaunch.shared.refusal {
+            setFailure(refusal)
+            AppLog.note("run refused: install waits for the 3.0 folder move")
+            return
+        }
         var failedInputResets: [String]?
         await perform(from: InstallPhase.checkingPayload.label) { progress in
             let lock = try DeploymentContent.acquireInstallationLock()

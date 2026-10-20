@@ -145,6 +145,11 @@ final class SetupAssistant {
     // MARK: Graphics
 
     func importGPTK(_ image: URL) async {
+        // The toolkit is copied into the support folder, which the 3.0 move has to find untouched.
+        if let refusal = MigrationLaunch.shared.refusal {
+            message = refusal
+            return
+        }
         isWorking = true
         defer { isWorking = false }
         message = nil
@@ -232,6 +237,10 @@ final class SetupAssistant {
                 set(task.id, .done)
             }
             step = .done
+            return
+        }
+        if let refusal = MigrationLaunch.shared.refusal {
+            message = refusal
             return
         }
 
