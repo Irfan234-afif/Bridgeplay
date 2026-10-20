@@ -191,7 +191,12 @@ enum SteamInstaller {
                 try sign(app.appending(path: "Contents/MacOS/steam_osx"), identity: identity)
                 try sign(app, identity: identity)
             } catch {
-                revertPlist(priorPlist, at: plist, app: app)
+                do {
+                    try revertPlist(priorPlist, at: plist, app: app)
+                } catch let revertFailure {
+                    AppLog.note("install: putting the plist back failed: \(revertFailure.localizedDescription)")
+                    throw StepFailure(step: step, detail: error.localizedDescription + " " + String(localized: "Putting Steam back as it was also failed, so Steam may not start: \(revertFailure.localizedDescription) Use Repair Steam to restore it."))
+                }
                 throw error
             }
             // macOS keys Steam's input access to the designated requirement. Ad hoc that is the
@@ -367,10 +372,12 @@ enum SteamInstaller {
         return true
     }
 
-    static func revertPlist(_ bytes: Data?, at plist: URL, app: URL) {
+    // Throws when either half fails: a plist that still declares the insert, or a bundle
+    // whose seal no longer matches it, is a Steam that does not start.
+    static func revertPlist(_ bytes: Data?, at plist: URL, app: URL) throws {
         guard let bytes else { return }
-        try? bytes.write(to: plist)
-        try? adHocSign(app)
+        try WriteRefused.catching(plist) { try bytes.write(to: plist) }
+        try adHocSign(app)
     }
 
     static func setInsert(at plist: URL, to dylib: URL) throws {
