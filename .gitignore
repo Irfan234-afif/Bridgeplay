@@ -5,7 +5,7 @@ out/
 *.a
 *.dylib
 # The x86_64 SDL2 FreeEngineWinecx installs for winebus.so (docs/WINECX.md).
-!app/Sources/NotProtonApp/Resources/libSDL2-2.0.0.dylib
+!app/Sources/BridgeplayApp/Resources/libSDL2-2.0.0.dylib
 .DS_Store
 
 vendor/dobby/
@@ -23,7 +23,7 @@ xcuserdata/
 *.xcuserstate
 DerivedData/
 
-app/Sources/NotProtonApp/Resources/payload/
+app/Sources/BridgeplayApp/Resources/payload/
 __pycache__/
 installer/Bridgeplay.app/
 installer/gptk/

@@ -1,8 +1,8 @@
 // swift-tools-version: 6.2
 import Foundation
 import PackageDescription
-let testsPath = "Tests/NotProtonAppTests"
-let payloadPath = "Sources/NotProtonApp/Resources/payload"
+let testsPath = "Tests/BridgeplayAppTests"
+let payloadPath = "Sources/BridgeplayApp/Resources/payload"
 let packageRoot = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
 let hasTests = FileManager.default.fileExists(
     atPath: packageRoot.appendingPathComponent(testsPath).path)
@@ -13,7 +13,7 @@ let hasTests = FileManager.default.fileExists(
 let hasPayload = FileManager.default.fileExists(
     atPath: packageRoot.appendingPathComponent(payloadPath).path)
 let package = Package(
-    name: "NotProtonApp",
+    name: "BridgeplayApp",
     defaultLocalization: "en",
     platforms: [.macOS("15.0")],
     dependencies: [
@@ -21,9 +21,9 @@ let package = Package(
     ],
     targets: [
         .executableTarget(
-            name: "NotProtonApp",
+            name: "BridgeplayApp",
             dependencies: [.product(name: "Sparkle", package: "Sparkle")],
-            path: "Sources/NotProtonApp",
+            path: "Sources/BridgeplayApp",
             resources: (hasPayload ? [.copy("Resources/payload")] : []) + [
                 .process("Resources/Localization"),
                 .copy("Resources/Fonts"),
@@ -71,8 +71,8 @@ let package = Package(
         ),
     ] + (hasTests ? [
         .testTarget(
-            name: "NotProtonAppTests",
-            dependencies: ["NotProtonApp"],
+            name: "BridgeplayAppTests",
+            dependencies: ["BridgeplayApp"],
             path: testsPath
         ),
     ] : [])
