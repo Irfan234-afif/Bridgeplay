@@ -1,5 +1,5 @@
 <p align="center">
-  <a href="https://bridgeplay.dev"><img src="docs/readme/banner-v4.png" alt="Bridgeplay: Windows games, in your Mac's Steam" width="100%"></a>
+  <a href="https://bridgeplay.dev"><img src="docs/readme/banner-v5.png" alt="Bridgeplay: Windows games, in your Mac's Steam" width="100%"></a>
 </p>
 
 <p align="center">
@@ -70,13 +70,13 @@ Updates install themselves: Bridgeplay, its patch in Steam and the engine. **Ref
 The installer includes Apple's Game Porting Toolkit redistributables under Apple's license, which allows non-commercial distribution only. Bridgeplay is free and non-commercial.
 
 <p align="center">
-  <img src="docs/readme/install-v4.png" alt="The Setup Assistant working through Your Mac, Rosetta, Graphics, Steam and Set Up" width="100%">
+  <img src="docs/readme/install-v5.png" alt="The Setup Assistant working through Your Mac, Rosetta, Graphics, Steam and Set Up" width="100%">
 </p>
 
 ## Requirements
 
 <p align="center">
-  <a href="https://bridgeplay.dev/#specs"><img src="docs/readme/specs-v4.png" alt="Check your Mac in one click on bridgeplay.dev, next to the minimum requirements" width="100%"></a>
+  <a href="https://bridgeplay.dev/#specs"><img src="docs/readme/specs-v5.png" alt="Check your Mac in one click on bridgeplay.dev, next to the minimum requirements" width="100%"></a>
 </p>
 
 | | |
@@ -93,6 +93,10 @@ Bridgeplay runs inside the native macOS Steam client and registers itself as a S
 - **Engine:** CodeWeavers' open-source WineCX 11.17 with MSync, running under Rosetta 2.
 - **Graphics:** Apple's Game Porting Toolkit 4.0 beta 3 (D3DMetal). It is not stored in this repository; the installer ships its redistributables under Apple's non-commercial license (see Install). DXMT and DXVK are available for games that prefer them.
 - **Extras:** NVAPI/NGX routing for DLSS on MetalFX, in-process frame generation on `CAMetalLayer`, per-game Game Mode, Retina back buffers and a controller layer for HID pads.
+
+<p align="center">
+  <img src="docs/readme/architecture-v5.png" alt="How a Windows game reaches the Mac's GPU: Steam, Bridgeplay, the WineCX and Wine engines, D3DMetal, DXMT, DXVK and MoltenVK, then Metal, with the open-source project behind each piece" width="100%">
+</p>
 
 Building from source: see [docs/DEVELOPING.md](docs/DEVELOPING.md), [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) and [docs/BUILD-LOCAL.md](docs/BUILD-LOCAL.md). The one-click installer lives in [`installer/`](installer/) and is packaged by `scripts/package-installer.sh`.
 
