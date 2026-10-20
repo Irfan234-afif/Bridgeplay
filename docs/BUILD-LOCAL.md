@@ -33,9 +33,9 @@ output to `build/logs/<phase>.log`.
 | `build/NotProton.zip` | `ditto -c -k --keepParent` of the app, as CI packages it |
 | `out/NotProton.app` | the bundle `make app` writes; the script copies it to `build/` |
 
-At the end the script prints the version (from `dylib/version.h`, which `make app`
-writes into both `CFBundleShortVersionString` and `CFBundleVersion`) and the zip's
-sha256.
+At the end the script prints the version (from `dylib/version.h`: `make app` writes
+`BRIDGEPLAY_VERSION` into `CFBundleShortVersionString` and `BRIDGEPLAY_BUILD` into
+`CFBundleVersion`, see [RELEASING.md](RELEASING.md)) and the zip's sha256.
 
 ## Timings (M5 Max, 18 cores, Xcode 27.0 beta 27A5218g)
 
