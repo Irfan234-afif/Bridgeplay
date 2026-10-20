@@ -9,14 +9,17 @@ Bridgeplay is a modified version (fork) of NotProton,
 https://github.com/NotProtonNot/NotProton, by way of NotProton-WineHQ (below).
 It is licensed under the GNU General Public License version 3 (GPL-3.0), the
 same terms as NotProton; see LICENSE. Bridgeplay is free and non-commercial.
-Files under other licenses are listed below and keep their own terms.
+"Non-commercial" describes how Bridgeplay is distributed and is required by Apple's
+Game Porting Toolkit license (below); it does not restrict anyone's rights under the
+GPL-3.0 to Bridgeplay's own code. Files under other licenses are listed below and keep
+their own terms.
 
 Third-party components in Bridgeplay
 ------------------------------------
 
 Dobby (https://github.com/jmpews/Dobby, commit 5dfc8546), the hooking library
 linked into notproton.dylib, is licensed under the Apache License 2.0. Full
-text: LICENSE.dobby.
+text: LICENSE.dobby. Dobby has no NOTICE file to reproduce.
 
 Sparkle 2.10.0 (https://github.com/sparkle-project/Sparkle), embedded in the app
 as Sparkle.framework for updates, is licensed under the MIT license together
@@ -61,14 +64,47 @@ All files above are in app/Sources/BridgeplayApp/Resources/. The engine's ntdll
 is patched at setup with detours built from ntdll-patch/ (detour*.bin in the
 same folder). nvapi64-shim.dll is Bridgeplay's own code, built from nvapi-shim/.
 
+Shipped in the one-click installer (Bridgeplay-Installer.zip)
+-------------------------------------------------------------
+
+Besides the app, the installer carries these unmodified archives, so a Mac can set
+up without downloading them. The app installs the same archives (pinned by sha256
+in app/Sources/BridgeplayApp/Model/FreeEngine*.swift) when they are not there.
+
+  WineCX runtime 4.7.3 (Libraries.tar.gz from
+      https://github.com/dappermint/winecx-gptk/releases/tag/runtime-v4.7.3):
+      Wine built from https://github.com/dappermint/winecx at
+      e0aa380780b73e20fabcfe78fd42713b94929a53, LGPL-2.1-or-later, with the
+      third-party libraries that runtime bundles under their own licenses.
+  DXMT (dxmt-e94c312.tar.gz, built from https://github.com/3Shain/dxmt at
+      e94c312f5c054263acf261cfa109edf13e757587; docs/DXMT.md), Copyright (c)
+      2023-2026 Feifan He for CodeWeavers, LGPL-2.1-or-later.
+  DXVK-macOS 1.10.3 (dxvk-macOS-async-v1.10.3-20230507-repack-builtin.tar.gz from
+      https://github.com/Gcenx/DXVK-macOS/releases/tag/v1.10.3-20230507-repack),
+      zlib license.
+  Apple Game Porting Toolkit redistributables (gptk/: D3DMetal.framework and the
+      wine/ libraries from the toolkit's /redist directory), Apple software under
+      Apple's license, shipped as GPTK-License.rtf. Apple's license allows
+      distributing it "solely for non-commercial purposes" (section 2A(iii)), and
+      allows the Framework and Redistributables to be "distributed separately from
+      the Apple Software" (section 2C). The wine/ libraries are Apple's build of
+      Wine (LGPL-2.1-or-later); their source is the Wine source Apple publishes
+      for the Game Porting Toolkit, which Raymond Chin will also provide on request
+      under the offer below.
+
+The license texts of DXMT and DXVK ship next to these archives in the installer.
+
 Written offer for source code: the Corresponding Source of each binary above is
 the upstream source at the commit named above plus the patch or file named next
-to it, both of which are public: winecx at https://github.com/dappermint/winecx,
-Wine 11.15 at https://dl.winehq.org/wine/source/11.x/, and the patches in this
-repository (https://github.com/raymondchins/Bridgeplay). For at least three
-years after the last release that ships them, Raymond Chin will also provide
-that source on request, for no more than the cost of providing it; open an
-issue at https://github.com/raymondchins/Bridgeplay/issues.
+to it, all of which are public: winecx at https://github.com/dappermint/winecx,
+Wine 11.15 at https://dl.winehq.org/wine/source/11.x/, DXMT at
+https://github.com/3Shain/dxmt, DXVK-macOS at https://github.com/Gcenx/DXVK-macOS,
+and the patches in this repository (https://github.com/raymondchins/Bridgeplay).
+This offer covers every LGPL-licensed file Bridgeplay or its installer ships,
+including the unmodified WineCX runtime and DXMT above. For at least three years
+after the last release that ships them, Raymond Chin will also provide that source
+on request, for no more than the cost of providing it; open an issue at
+https://github.com/raymondchins/Bridgeplay/issues.
 
 NotProton-WineHQ licensing
 ==========================
@@ -116,8 +152,8 @@ These third party files carry their original notices from the project authors:
   steam-shim/jsoncpp.cpp             JsonCpp, public domain / MIT (header)
   steam-shim/json/json.h             JsonCpp, public domain / MIT (header)
   steam-shim/json/json-forwards.h    JsonCpp, public domain / MIT (header)
-  vendor/cJSON.c                     cJSON, MIT (header)
-  vendor/cJSON.h                     cJSON, MIT (header)
+  vendor/cJSON.c                     cJSON 1.7.19, MIT (header)
+  vendor/cJSON.h                     cJSON 1.7.19, MIT (header)
 
 The WineCX engine gets an x86_64 SDL2 from the app bundle, for controller support
 in winebus.so (docs/WINECX.md):

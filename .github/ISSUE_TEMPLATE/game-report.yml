@@ -6,7 +6,9 @@ body:
   - type: markdown
     attributes:
       value: |
-        Run `scripts/np-test-game.sh <appid> --stop` first; it writes logs and `result.json` to `compat/runs/<appid>-<timestamp>/`. Attach that folder (zipped) below.
+        Played it with the Bridgeplay app? Fill in the fields and attach the game's `bridgeplay-run.log` (Prefixes page › the game › Open Log).
+
+        Working from a Bridgeplay checkout? Run `scripts/np-test-game.sh <appid> --stop` instead and attach the zipped `compat/runs/<appid>-<timestamp>/` folder.
   - type: input
     id: name
     attributes:
@@ -58,14 +60,14 @@ body:
     id: engine
     attributes:
       label: Engine
-      placeholder: WineHQ 11.15
+      placeholder: WineCX 11.17
     validations:
       required: true
   - type: input
     id: fork_commit
     attributes:
-      label: Fork commit
-      description: The Bridgeplay version you run, or `git rev-parse --short HEAD` in your Bridgeplay checkout.
+      label: Bridgeplay version
+      description: Shown at the bottom of the app's sidebar (for example 3.0.1 (35)), or `git rev-parse --short HEAD` in a checkout.
     validations:
       required: true
   - type: input
@@ -82,4 +84,4 @@ body:
     id: logs
     attributes:
       label: Logs
-      description: Drag and drop the zipped `compat/runs/<appid>-<timestamp>/` folder here, or paste `result.json`.
+      description: Drag and drop `bridgeplay-run.log`, or the zipped `compat/runs/<appid>-<timestamp>/` folder, or paste `result.json`.

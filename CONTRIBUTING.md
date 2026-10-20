@@ -5,19 +5,46 @@ is the easiest to review. An imperfect PR is still welcome: say what is unfinish
 help.
 
 1. **Open an issue first** for anything large, and check closed issues and PRs so work is not
-   duplicated. Game reports use the "Game report" template.
-2. **Write the PR description yourself.** Translation is fine; plain human text is easier to
-   review than generated text.
-3. **Keep comments short and useful.** Comment where the code is hard to follow, not where it
+   duplicated. Game reports use the "Game report" template, bugs the "Bug report" one.
+2. **Read [docs/DEVELOPING.md](docs/DEVELOPING.md)** for what machine you need, how to build,
+   how to try a change in Steam, and the checks. [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
+   says where new code goes.
+3. **Write the PR description yourself.** Translation is fine; plain human text is easier to
+   review than generated text. Fill in the template: checks run, macOS, Steam build, engine.
+4. **Keep comments short and useful.** Comment where the code is hard to follow, not where it
    is obvious.
-4. **Think through the hard parts.** Code that runs inside Steam, the run script, lsteamclient,
+5. **Think through the hard parts.** Code that runs inside Steam, the run script, lsteamclient,
    Wine patches and game saves interact in subtle ways. Consider multiple Steam accounts,
    libraries, macOS users and file systems.
-5. **Run the checks** your change touches before opening the PR (`make scriptcheck`,
-   `make buildcheck`, `make app`; see [docs/DEVELOPING.md](docs/DEVELOPING.md)).
+6. **Run the checks** your change touches before opening the PR (`make ci-checks` runs them
+   all; `make scriptcheck runcheck` also works on Linux).
 
-By contributing you agree that your contribution is licensed under the GPL-3.0, like the rest
-of Bridgeplay (see [LICENSE](LICENSE) and [NOTICE](NOTICE)). Changes that belong upstream
-are better sent to [NotProton](https://github.com/NotProtonNot/NotProton).
+## Process
 
-Report problems at https://github.com/raymondchins/Bridgeplay/issues.
+- Pull requests go into `main`. Commits follow Conventional Commits (`feat(scope):`,
+  `fix(scope):`, `docs:`).
+- The maintainer reviews every PR. CI runs on PRs while the workflows are enabled; until then,
+  say in the PR which checks you ran.
+- Releases are made by the maintainer only (they need the Sparkle signing key); see
+  [docs/RELEASING.md](docs/RELEASING.md).
+- Security problems are reported privately; see [SECURITY.md](SECURITY.md).
+
+## Licensing
+
+A contribution is licensed under the license of the files it changes, as listed in
+[NOTICE](NOTICE). For most of Bridgeplay that is the GPL-3.0 ([LICENSE](LICENSE)). The
+exceptions:
+
+| Path | License |
+|---|---|
+| `lsteamclient/` | Steamworks SDK License (Valve), see `LICENSE.lsteamclient` |
+| `lsteamclient/steamworks_sdk_*/` | Valve's Steamworks SDK headers, redistributed under the Steamworks SDK License |
+| `steam-shim/` | BSD-3-Clause (port of Proton's steam_helper), see `LICENSE.steam-shim` |
+| `*-patch/` Wine patches and the Wine files built from them | LGPL-2.1-or-later, like Wine |
+| `fonts/` | Each font's own license; the build files under `LICENSE.fonts` |
+| `vendor/cJSON.*`, `steam-shim/jsoncpp.cpp`, `steam-shim/json/` | MIT (cJSON), public domain / MIT (JsonCpp) |
+
+Changes that belong upstream are better sent to [NotProton](https://github.com/NotProtonNot/NotProton).
+
+This project follows a [Code of Conduct](CODE_OF_CONDUCT.md). Report problems at
+https://github.com/raymondchins/Bridgeplay/issues.

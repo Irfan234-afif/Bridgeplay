@@ -2,7 +2,14 @@
 
 ## cJSON
 
-`cJSON.c` and `cJSON.h`, MIT licensed, used by the signature database loader.
+`cJSON.c` and `cJSON.h`, version 1.7.19 (`CJSON_VERSION_*` in `cJSON.h`), MIT licensed, used
+by the signature database loader. When updating, compare with the current cJSON release and
+its security fixes.
+
+## JsonCpp
+
+`steam-shim/jsoncpp.cpp` and `steam-shim/json/`, the amalgamated JsonCpp 1.6.5
+(`JSONCPP_VERSION_STRING`), public domain / MIT, used by steam-shim.
 
 ## Dobby
 

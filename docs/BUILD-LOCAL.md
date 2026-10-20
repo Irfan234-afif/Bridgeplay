@@ -9,9 +9,10 @@ targets, in the same order, as `.github/workflows/app.yml`.
   exports `DEVELOPER_DIR` for its own process, so the Command Line Tools can stay the
   active developer dir and you don't need `xcode-select`. To use a different Xcode, set
   `DEVELOPER_DIR` yourself.
-- Homebrew: `brew install cmake mingw-w64 bison flex` (bison must be Homebrew's, at
-  `/opt/homebrew/opt/bison/bin`). `shellcheck` and `node` are optional; without them the
-  lint and panel checks skip.
+- Homebrew: `brew install cmake mingw-w64 bison flex fontforge gpatch` (bison must be
+  Homebrew's, at `/opt/homebrew/opt/bison/bin`), and the font tools:
+  `python3 -m pip install fonttools brotli`. `shellcheck` and `node` are optional; without
+  them the lint and panel checks skip.
 - Network on the first run: Dobby, Wine 11.15 (gitlab.winehq.org), the Proton tarball
   and Sparkle.
 
@@ -19,7 +20,7 @@ targets, in the same order, as `.github/workflows/app.yml`.
 
 ```sh
 scripts/build-local.sh            # build only
-scripts/build-local.sh --checks   # build, then every CI check target and the Swift tests
+scripts/build-local.sh --checks   # build, then `make ci-checks` (the list CI runs) and the Swift tests
 ```
 
 `JOBS=n` overrides the parallelism (default: `hw.ncpu`). Every phase also writes its
@@ -50,6 +51,9 @@ At the end the script prints the version (from `dylib/version.h`: `make app` wri
 | app | 42s | 13s |
 | checks (`--checks`) | about 3m20s | 3m20s |
 | total | about 15m, about 18m with checks | 27s, 3m47s with checks |
+
+A `fonts` phase (the Proton font build, needs fontforge and the font tools) also runs; it is
+not in the table because it was added after these timings.
 
 The cold bridge phase breaks down roughly as follows:
 

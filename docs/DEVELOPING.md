@@ -1,102 +1,89 @@
-# Bridgeplay developer guide
+# Developing Bridgeplay
 
-> **This is a fork of [NotProton](https://github.com/NotProtonNot/NotProton).**
->
-> I built this for my girlfriend. She only plays occasionally, maybe once or twice a month, and
-> buying a CrossOver license for that just isn't worth it for us. So this fork adds a free WineHQ
-> engine that runs without CrossOver.
->
-> I'll keep maintaining it until someone asks me to stop. That said, don't expect it to stay up to
-> date: I only work on it when I find the time and motivation, or when something breaks. This fork
-> may lag far behind upstream.
->
-> **If you actually want to support the developers**, please read
-> [NotProtonNot/NotProton#37](https://github.com/NotProtonNot/NotProton/issues/37) first. It explains
-> why the main project chose not to support WineHQ. If you can afford it, consider using the
-> upstream project with CrossOver as intended.
->
-> This fork is not affiliated with or endorsed by the NotProton developers, the Wine project
-> (WineHQ), CodeWeavers or Valve. "Wine" and "CrossOver" are trademarks of their respective
-> owners and are only used here to describe what the software works with. Please report problems
-> with this fork [here](https://github.com/raymondchins/Bridgeplay/issues), not upstream.
->
-> Modified by Leon Seemann, 2026. Like upstream, this fork is licensed under the GPLv3; see
-> [NOTICE](NOTICE) for details.
+How to build Bridgeplay, try a change inside Steam, and run the checks. For what each folder
+is and where new code goes, read [ARCHITECTURE.md](ARCHITECTURE.md). The inherited upstream
+README (NotProton, NotProton-WineHQ) is kept in [UPSTREAM.md](UPSTREAM.md).
 
----
+## What you need
 
-## NotProton (upstream)
+| You want to | You need |
+|---|---|
+| Lint shell scripts, check the run script | Any OS with shellcheck 0.11.0: `make scriptcheck runcheck` |
+| Build the app, the dylib, the Wine bridge; run the C and Swift tests | An Apple Silicon Mac, macOS 26 or later, Xcode 27 (`/Applications/Xcode-beta.app` or `/Applications/Xcode.app`), Homebrew |
+| Try a change in Steam, run games | The above, plus Steam installed and Apple's Game Porting Toolkit (see the app's Setup Assistant) |
+| Package the installer or publish a release | The maintainer's Mac (engine cache, GPTK, Sparkle key in the keychain); see [RELEASING.md](RELEASING.md) |
 
-_From upstream's README._
+Homebrew packages:
 
-NotProton enables the Steam Play experience from Linux Steam in the macOS Steam client.
+```sh
+brew install cmake mingw-w64 bison flex fontforge gpatch shellcheck node
+python3 -m pip install fonttools brotli
+```
 
-This is done by forcibly enabling the Steam Play functionality in macOS Steam (which is
-present and inert) as well as by porting some components of Valve's Proton to macOS.
+`/opt/homebrew` is assumed (Homebrew's bison and the Wine tree setup look there). Without
+`shellcheck` or `node` the lint and panel checks skip.
 
-This tool is intended to be used with the stable Steam Client (version 1791918634) as well as the beta Steam Client (version 1791686101) paired with **CrossOver 26.3 or CrossOver [Preview](https://www.codeweavers.com/preview)
-20261006 / 20260821 / 20261015**, with more supported versions to come.
+## Build
 
-**NTFS file systems/drivers are not currently supported.**
+```sh
+scripts/build-local.sh            # full build: dylib, shims, helpers, Wine bridge, app
+scripts/build-local.sh --checks   # the same, then `make ci-checks` and the Swift tests
+```
 
-Supporting specifically CrossOver is a design goal of this project. Better support for modifying CrossOver (using custom builds of DXMT/patched D3DMetal/MacGameVideoFix) will come in a future update, but support for alternatives to CrossOver itself is not planned.
+A cold build takes about 15 minutes, almost all of it the Wine bridge; later builds take
+under a minute. Outputs, caches and timings are in [BUILD-LOCAL.md](BUILD-LOCAL.md).
 
-Both the FEX and the Rosetta versions are supported. I recommend using the FEX version of the 
-Preview 20261006, as it includes both the FEX version as well as the Rosetta one. 
+If a tool fails with a long error, read it before pasting it anywhere: some Xcode tools
+print the whole shell environment, secrets included, when they fail to launch.
 
-I further recommend going into Steam Settings - Compatibility and selecting the Rosetta version as your default compatibility tool. You can select FEX on a per game basis by right clicking a game in Steam, going into Properties - Compatibility and selecting FEX there.
+## Try a change in Steam
 
-If a game has a native macOS version as well as a Windows one, Steam will download the macOS version. To override this behavior, right click on the game, select Properties, select Compatibility. Enable 'Force the use of a specific Steam Play compatibility tool'. Select whichever version of CrossOver you want to do use. That will make Steam download the Windows version. Unchecking the 'Force the use...' box or selecting 'No Compatibility Tool' in the drop down list will revert to the macOS version of the game, with the specifics there varying based on your Steam version.
+1. Quit Steam.
+2. `make deploy` installs the dylib, the signature database, fonts and helpers into
+   `~/Library/Application Support/bridgeplay/`. For app changes, run the built
+   `build/Bridgeplay.app` and press Install on its Status page.
+3. Start Steam and launch a game.
 
-**Valve Anti-Cheat is not supported.** Proton itself does not support VAC in Valve titles; Valve ships native Linux ports instead. VAC titles will launch in Insecure Mode and will not allow matchmaking. 
+Logs:
 
-## Free Wine engine (no CrossOver needed)
+| Log | Where |
+|---|---|
+| Steam side (dylib) | `~/Library/Application Support/bridgeplay/bridgeplay.log` |
+| One game's launch and Wine output | `bridgeplay-run.log`, `bridgeplay-wine.log`; Prefixes page › a game › Open Log |
+| The app | Setup › Reveal Log in Finder |
 
-Bridgeplay can also run entirely on free software. Under Compatibility Tool, **Download & Set Up**
-fetches the WineHQ 11.15 macOS build from [Gcenx/macOS_Wine_builds](https://github.com/Gcenx/macOS_Wine_builds)
-(hash pinned), unpacks it into `~/Library/Application Support/bridgeplay/engines/` and sets the
-compatibility tool up from it exactly like a CrossOver copy. No CrossOver license is involved; the
-license check is skipped only for loaders whose hash pins the free build.
+To try the Setup Assistant without changing anything:
+`app/.build/debug/BridgeplayApp --setup-preview [--fresh] [--step N]` (debug builds only).
+If it stops with `Library not loaded: @rpath/Sparkle.framework`, start it with
+`DYLD_FRAMEWORK_PATH=app/.build/out/Products/Debug`.
 
-11.15 is chosen because it is the Wine the bridge components (`lsteamclient`, `steam.exe`) are built
-against. Differences from CrossOver to be aware of:
+## Checks
 
-- It is an x86_64 build and runs under Rosetta 2, like the Rosetta build of CrossOver.
-- Direct3D 10/11 goes through [DXMT](https://github.com/3Shain/dxmt) (master `e94c312`, LGPL-2.1+,
-  see `docs/DXMT.md`), downloaded and pinned alongside Wine, which translates straight to Metal.
-  Wine's own wined3d cannot reach feature level 11 on macOS OpenGL. D3DMetal is Apple's and needs
-  CrossOver's Wine changes, so this engine does not use it; the WineCX engine can, with a Game
-  Porting Toolkit you supply (`docs/WINECX.md`).
-- DXMT needs macdrv functions upstream Wine hides; Bridgeplay ships a rebuilt `winemac.so`
-  that exports them (see `winemac-patch/`).
-- D3D 12 has no fast path; vkd3d over the bundled MoltenVK is limited.
-- WineHQ has no msync/esync, so CPU-heavy games can run slower than under CrossOver or Sikarugir.
-- The graphics backend options in the Steam panel have no effect on this engine.
+| Command | Runs |
+|---|---|
+| `make ci-checks` | Every check CI runs (the list lives in the Makefile; `.github/workflows/app.yml` and `build-local.sh --checks` both call it) |
+| `make scriptcheck runcheck` | shellcheck over the build scripts and the run script (also runs on Linux) |
+| `make app-tests` | The Swift tests |
+| `make <name>check` | One suite; see `make ci-checks` for the names |
 
-To support another WineHQ build, run `ntdll-patch/resolve.py` against its Wine tree, build the
-payloads with `ntdll-patch/build.sh` / `build32.sh`, and add the hashes to `SupportedRunners`,
-`NtdllPatcher.byBuild` and `FreeEngine`.
+Run the checks your change touches before opening a pull request, and say which ones in
+the PR.
 
-Please read NOTICE for license information.
+## Scripts that are not part of the build
 
-Please open issue reports with any issues. PRs are welcome and encouraged.
+| Script | Use |
+|---|---|
+| `scripts/np-test-game.sh`, `np-test-batch.sh` | Launch a game (or a list) with Bridgeplay and record the result under `compat/runs/` |
+| `scripts/np-inventory.py`, `np-seed-games.py`, `np_lookup.py`, `compat-table.py` | Build and query `compat/games.json` and the compatibility table |
+| `scripts/steam-launch-options.py` | Read or set a game's Steam launch options |
+| `scripts/sync-upstream.sh` | Merge NotProton upstream and bump the minor version |
+| `scripts/update-gamecontrollerdb.sh` | Refresh the SDL controller mappings at a pinned commit |
 
-There are many people who worked on similar ideas, similar projects. I did not base NotProton on their work, but I still want to 
-give thanks to the people who came before me:
+## Conventions
 
-[Nat Brown](https://github.com/natbro) made [Kaon](https://github.com/natbro/kaon), which is similar in goals to NotProton.
-
-mont127's [Neutron](https://github.com/mont127/Neutron) is also a similar idea, but implemented differently. 
-
-[Gio](https://github.com/giodotblue) was working enabling Steam Play inside of Steam on macOS prior to the release of NotProton itself. 
-I would have done things differently had I been aware of that. 
-
-Thanks to everyone who has positively contributed to macOS gaming. 
-
-Developer Notes:
-
-As far as the source structure goes, the macOS app itself is located in the ```app``` folder. The core logic is in ```dylib```.
-```lsteamclient``` is a macOS port of Valve's lsteamclient. ```steam-shim```is a port of Valve's
-steam-helper from Proton 9.0. ntdll-patch patches the copy of CrossOver that the app
-makes/places in the ```~/Library/Application Support/bridgeplay/runners/``` folder so that
-lsteamclient is loaded.
+- Commits follow Conventional Commits: `feat(scope):`, `fix(scope):`, `docs:`, `chore(release):`.
+- Comments explain why, where the code is not obvious. Match the style of the file you edit.
+- Shipped binaries in `app/Sources/BridgeplayApp/Resources/` are built from the recipe in
+  their patch folder's README; a PR that changes one says how it was rebuilt.
+- Runtime names (`notproton.dylib`, `NOTPROTON_*`, `com.notproton.*`) stay as they are:
+  renaming them would need another migration. Paths and logs use `bridgeplay`.
