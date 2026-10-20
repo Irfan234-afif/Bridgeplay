@@ -117,7 +117,6 @@ enum SupportPaths {
             !FileManager.default.fileExists(atPath: bundle.deletingLastPathComponent().path(percentEncoded: false))
         }
         static var infoPlist: URL { infoPlist(inBundle: app) }
-        static var executable: URL { app.appending(path: "Contents/MacOS/steam_osx") }
         static var deployedDylib: URL { deployedDylib(inBundle: app) }
 
         static func infoPlist(inBundle bundle: URL) -> URL {

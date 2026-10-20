@@ -21,24 +21,21 @@ struct BrandMigration: Sendable {
     let home: URL
     let steamUserData: URL
 
-    var steamRunning: @Sendable () -> Bool = { Shell.processIsRunning(named: "steam_osx") }
+    var steamRunning: @Sendable () -> Bool = { SteamBundle.isRunningForThisUser }
     var gameRunning: @Sendable () -> Bool = { Shell.processIsRunning(named: "wineserver") }
 
     static let markerName = ".migrated-3.0.0"
     static let backupFolder = "backups/migration-3.0.0"
 
     static func live() -> BrandMigration {
-        let home = URL(filePath: NSHomeDirectory())
-        let applicationSupport = home.appending(path: "Library/Application Support")
-        let caches = home.appending(path: "Library/Caches")
-        return BrandMigration(
-            legacySupport: applicationSupport.appending(path: "notproton"),
-            support: applicationSupport.appending(path: "bridgeplay"),
-            legacyCaches: caches.appending(path: "notproton"),
-            caches: caches.appending(path: "bridgeplay"),
-            legacyHome: home.appending(path: ".notproton"),
-            home: home.appending(path: ".bridgeplay"),
-            steamUserData: applicationSupport.appending(path: "Steam"))
+        BrandMigration(
+            legacySupport: SupportPaths.legacyApplicationSupport,
+            support: SupportPaths.support,
+            legacyCaches: SupportPaths.legacyCaches,
+            caches: SupportPaths.caches,
+            legacyHome: SupportPaths.legacyHomeDir,
+            home: SupportPaths.homeDir,
+            steamUserData: SupportPaths.Steam.userData)
     }
 
     enum Blocker: Equatable, Sendable {
