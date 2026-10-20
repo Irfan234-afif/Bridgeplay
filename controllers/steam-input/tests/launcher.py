@@ -12,7 +12,7 @@ end = source.index("export NOTPROTON_RUMBLE_LIBRARY", start) + len(
     "export NOTPROTON_RUMBLE_LIBRARY"
 )
 block = source[start:end]
-with tempfile.TemporaryDirectory(prefix="notproton rumble ") as tmp:
+with tempfile.TemporaryDirectory(prefix="bridgeplay rumble ") as tmp:
     library = Path(tmp) / "controllers/steam-input/rumble.dylib"
     library.parent.mkdir(parents=True)
     library.touch()

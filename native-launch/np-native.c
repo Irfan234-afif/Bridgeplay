@@ -13,13 +13,19 @@
  *
  * Environment sources, highest precedence first:
  *   1. VAR=VALUE launch-option arguments
- *   2. ~/Library/Application Support/notproton/gamefixes/native/<appid>.conf
- *   3. ~/Library/Application Support/notproton/gamefixes/native-default.conf
+ *   2. ~/Library/Application Support/bridgeplay/gamefixes/native/<appid>.conf
+ *   3. ~/Library/Application Support/bridgeplay/gamefixes/native-default.conf
  *   4. the environment Steam passed in
+ * Until the app moves them over, ~/Library/Application Support/notproton and
+ * ~/.notproton are used when the bridgeplay ones do not exist.
+ *
+ * Settings are spelled BRIDGEPLAY_<X>; the shims read NOTPROTON_<X>, the upstream
+ * name, so each BRIDGEPLAY_<X> is also set as NOTPROTON_<X>. A NOTPROTON_<X> given
+ * in the same source wins, so options written before Bridgeplay 3.0 still apply.
  *
  * DYLD_INSERT_LIBRARIES is composed, never replaced:
- *   gamepad shim (~/.notproton/libnp_gamepad.dylib, unless NP_PAD_MODE=off)
- *   overlay shim (only when NOTPROTON_FRAMEGEN is set and not 0/off)
+ *   gamepad shim (~/.bridgeplay/libnp_gamepad.dylib, unless NP_PAD_MODE=off)
+ *   overlay shim (only when BRIDGEPLAY_FRAMEGEN is set and not 0/off)
  *   DYLD_INSERT_LIBRARIES given through the sources above
  *   DYLD_INSERT_LIBRARIES and STEAM_DYLD_INSERT_LIBRARIES received from Steam
  * de-duplicated, ours first. STEAM_DYLD_INSERT_LIBRARIES is set to the same
@@ -49,9 +55,14 @@
 extern char **environ;
 
 #define FAIL_EXIT 127
-#define PAD_SHIM_REL "/.notproton/libnp_gamepad.dylib"
-#define OVERLAY_SHIM_REL "/Library/Application Support/notproton/overlay-shim.dylib"
-#define CONF_DIR_REL "/Library/Application Support/notproton/gamefixes"
+#define PAD_SHIM_REL "/.bridgeplay/libnp_gamepad.dylib"
+#define LEGACY_PAD_SHIM_REL "/.notproton/libnp_gamepad.dylib"
+#define SUPPORT_REL "/Library/Application Support/bridgeplay"
+#define LEGACY_SUPPORT_REL "/Library/Application Support/notproton"
+#define OVERLAY_SHIM_REL "/overlay-shim.dylib"
+#define CONF_DIR_REL "/gamefixes"
+#define PUBLIC_PREFIX "BRIDGEPLAY_"
+#define LEGACY_PREFIX "NOTPROTON_"
 #define MAX_LIBS 64
 
 static void die(const char *fmt, ...) __attribute__((noreturn, format(printf, 1, 2)));
@@ -253,6 +264,60 @@ static int file_exists(const char *p)
 	return stat(p, &st) == 0 && S_ISREG(st.st_mode);
 }
 
+static int dir_exists(const char *p)
+{
+	struct stat st;
+	return stat(p, &st) == 0 && S_ISDIR(st.st_mode);
+}
+
+/* home + rel, or home + legacy when only that one exists. */
+static char *current_or_legacy(const char *home, const char *rel, const char *legacy,
+			       int (*exists)(const char *))
+{
+	char *cur = join3(home, rel, ""), *old = join3(home, legacy, "");
+	if (!exists(cur) && exists(old)) {
+		free(cur);
+		return old;
+	}
+	free(old);
+	return cur;
+}
+
+/* NOTPROTON_<X> for a BRIDGEPLAY_<X> name, NULL for any other. */
+static char *legacy_name(const char *name)
+{
+	size_t n = strlen(PUBLIC_PREFIX);
+	if (strncmp(name, PUBLIC_PREFIX, n) != 0 || name[n] == '\0')
+		return NULL;
+	return join3(LEGACY_PREFIX, name + n, "");
+}
+
+/* The environment Steam passed in: BRIDGEPLAY_<X> becomes NOTPROTON_<X> unless that is set. */
+static void map_public_env(void)
+{
+	size_t count = 0;
+	for (char **e = environ; *e; e++)
+		count++;
+	char **copy = calloc(count + 1, sizeof(*copy));
+	if (!copy)
+		die("out of memory");
+	size_t n = 0;
+	for (char **e = environ; *e; e++)
+		if (strncmp(*e, PUBLIC_PREFIX, strlen(PUBLIC_PREFIX)) == 0 && strchr(*e, '='))
+			copy[n++] = xstrdup(*e);
+	for (size_t i = 0; i < n; i++) {
+		char *eq = strchr(copy[i], '=');
+		*eq = '\0';
+		char *legacy = legacy_name(copy[i]);
+		if (legacy && valid_name(legacy, strlen(legacy)) && !getenv(legacy) &&
+		    setenv(legacy, eq + 1, 1) != 0)
+			die("setenv %s: %s", legacy, strerror(errno));
+		free(legacy);
+		free(copy[i]);
+	}
+	free(copy);
+}
+
 /* Steam passes some games (Chained Beasts 3569420) as the .app bundle rather
  * than its binary; a directory cannot be exec'd, so run the bundle's main
  * executable instead. NULL when prog is not a bundle with one. */
@@ -349,6 +414,7 @@ static void xsetenv(const char *name, const char *value)
 int main(int argc, char **argv)
 {
 	const char *home = home_dir();
+	map_public_env();
 	static struct layer args_l = {.src = "launch options"};
 	static struct layer app_l, def_l;
 
@@ -389,7 +455,8 @@ int main(int argc, char **argv)
 	if (!valid_appid(appid))
 		appid = getenv("SteamGameId");
 	if (home) {
-		char *conf_dir = join3(home, CONF_DIR_REL, "");
+		char *support = current_or_legacy(home, SUPPORT_REL, LEGACY_SUPPORT_REL, dir_exists);
+		char *conf_dir = join3(support, CONF_DIR_REL, "");
 		char *def_path = join3(conf_dir, "/native-default.conf", "");
 		load_conf(&def_l, def_path, home);
 		if (valid_appid(appid)) {
@@ -407,24 +474,32 @@ int main(int argc, char **argv)
 		user_dyld = layer_get(&def_l, "DYLD_INSERT_LIBRARIES");
 	char *user_dyld_c = user_dyld ? xstrdup(user_dyld) : NULL;
 
-	/* apply lowest precedence first so higher layers win */
+	/* apply lowest precedence first so higher layers win; within a layer a
+	 * NOTPROTON_<X> wins over the BRIDGEPLAY_<X> it would be set from */
 	struct layer *order[] = {&def_l, &app_l, &args_l};
 	for (int k = 0; k < 3; k++)
-		for (int j = 0; j < order[k]->n; j++)
+		for (int j = 0; j < order[k]->n; j++) {
 			xsetenv(order[k]->names[j], order[k]->values[j]);
+			char *legacy = legacy_name(order[k]->names[j]);
+			if (legacy && !layer_get(order[k], legacy))
+				xsetenv(legacy, order[k]->values[j]);
+			free(legacy);
+		}
 
 	/* 3. compose DYLD_INSERT_LIBRARIES */
 	struct libs L = {.n = 0};
 	const char *pad_mode = getenv("NP_PAD_MODE");
 	if (home && !is_off(pad_mode)) {
-		char *pad_shim = join3(home, PAD_SHIM_REL, "");
+		char *pad_shim = current_or_legacy(home, PAD_SHIM_REL, LEGACY_PAD_SHIM_REL, file_exists);
 		/* no NP_PAD_MODE and no shim installed: nothing was asked for */
 		if (file_exists(pad_shim) || (pad_mode && *pad_mode))
 			libs_add(&L, pad_shim); /* warns and skips when missing */
 	}
 	const char *framegen = getenv("NOTPROTON_FRAMEGEN");
-	if (home && framegen && *framegen && !is_off(framegen))
-		libs_add(&L, join3(home, OVERLAY_SHIM_REL, ""));
+	if (home && framegen && *framegen && !is_off(framegen)) {
+		char *support = current_or_legacy(home, SUPPORT_REL, LEGACY_SUPPORT_REL, dir_exists);
+		libs_add(&L, join3(support, OVERLAY_SHIM_REL, ""));
+	}
 	libs_add_list(&L, user_dyld_c);
 	libs_add_list(&L, steam_dyld_c);
 	libs_add_list(&L, steam_dyld2_c);

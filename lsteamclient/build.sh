@@ -34,7 +34,7 @@ WINE_SRC_REL=${WINE_SRC_REL:-../wine}
 TREE=${TREE:-$repo/build/lsteamclient}
 # The runner clone, never the installed CrossOver.
 if [ -z "${CX_ROOT:-}" ]; then
-	for clone in "$HOME/Library/Application Support/notproton/runners"/crossover-*/CrossOver; do
+	for clone in "$HOME/Library/Application Support/bridgeplay/runners"/crossover-*/CrossOver; do
 		[ -d "$clone" ] || continue
 		if [ -n "${CX_ROOT:-}" ]; then
 			echo "==> more than one runner clone is set up, set CX_ROOT to one of them" >&2
@@ -43,8 +43,8 @@ if [ -z "${CX_ROOT:-}" ]; then
 		CX_ROOT=$clone
 	done
 fi
-CX_ROOT=${CX_ROOT:-$HOME/Library/Application Support/notproton/runners/(none set up)}
-BRIDGE_DIR=${BRIDGE_DIR:-$HOME/Library/Application Support/notproton/bridge}
+CX_ROOT=${CX_ROOT:-$HOME/Library/Application Support/bridgeplay/runners/(none set up)}
+BRIDGE_DIR=${BRIDGE_DIR:-$HOME/Library/Application Support/bridgeplay/bridge}
 
 install=0
 do_pe=1

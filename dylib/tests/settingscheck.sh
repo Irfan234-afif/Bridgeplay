@@ -159,7 +159,7 @@ again "" 0
 { cat "$work/retina-off"; shown 054c/0ce6; shown 057e/2006; shown 057e/2007; shown 057e/2009; } > "$work/expected"
 same_file "NOTPROTON_RAW_CONTROLLERS=1 removes every key Bridgeplay wrote" "$work/expected" "$case_dir/imported"
 is "NOTPROTON_RAW_CONTROLLERS=1 tracks nothing" "" "$(owned)"
-is "NOTPROTON_RAW_CONTROLLERS=1 is logged" "controllers: games read them directly (NOTPROTON_RAW_CONTROLLERS=1)" "$(cat "$case_dir/log")"
+is "NOTPROTON_RAW_CONTROLLERS=1 is logged" "controllers: games read them directly (BRIDGEPLAY_RAW_CONTROLLERS=1)" "$(cat "$case_dir/log")"
 
 new_case
 in_registry 28de/1304 057e/2009

@@ -179,7 +179,7 @@ static int get_compat_tools(uintptr_t request, uintptr_t response) {
     // Raw mapping, including names that resolve to no installed tool.
     const char *chosen = appid ? np_compat_app_mapping(mgr, appid)
                                : tool_name(np_compat_chosen_tool(mgr, 0));
-    const bool  holds_none = chosen && strcmp(chosen, NP_COMPAT_TOOL_NONE) == 0;
+    const bool  holds_none = np_compat_is_none(chosen);
     // The fallback tool for when no choice is made. The wildcard covers apps the
     // client will not run natively (Windows stuff). Left unset where nothing carries the app,
     // so the "Default" entry shows no name.

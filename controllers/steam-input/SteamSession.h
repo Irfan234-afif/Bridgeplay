@@ -53,7 +53,7 @@ struct SteamSession {
             close();
             return false;
         }
-        fprintf(stderr, "notproton-rumble: native Steam controller API ready (pid %d)\n", getpid());
+        fprintf(stderr, "bridgeplay-rumble: native Steam controller API ready (pid %d)\n", getpid());
         return true;
     }
     void close() {

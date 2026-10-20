@@ -2,6 +2,7 @@
 #include "webpatch.h"
 #include "nativeplatform.h"
 #include "../util/log.h"
+#include "../util/file.h"
 
 #include <dirent.h>
 #include <stdio.h>
@@ -307,8 +308,11 @@ static int out_expand(np_out_t *o, const char *replace, const np_cap_t *caps) {
     "nat=t.unAppID<2147483648&&(t.vecPlatforms||[]).indexOf(\"osx\")>=0&&!t.strCompatToolName," \
     "wv=w=>w.value===null?o.slice(w.start,w.end):w.value," \
     "NE=E.c<0?[]:E.G.slice(0,E.c).filter(w=>/^[A-Za-z_]\\w*=/.test(wv(w)))," \
-    "A=k=>(nat?NE.filter(w=>wv(w).startsWith(k+\"=\")):E.e.filter(w=>o.startsWith(k+\"=\",w.start))).pop()," \
-    "g=k=>{const p=A(k);return p?wv(p).slice(k.length+1):\"\"}," \
+    /* The panel writes BRIDGEPLAY_<X>. NOTPROTON_<X>, from launch options written before 3.0, \
+       is read too and wins, as it does in the run script and np-native. */ \
+    "A1=k=>(nat?NE.filter(w=>wv(w).startsWith(k+\"=\")):E.e.filter(w=>o.startsWith(k+\"=\",w.start))).pop()," \
+    "A=k=>/^BRIDGEPLAY_/.test(k)&&A1(\"NOTPROTON_\"+k.slice(11))||A1(k)," \
+    "g=k=>{const p=A(k);if(!p)return\"\";const x=wv(p);return x.slice(x.indexOf(\"=\")+1)}," \
     "qv=v=>/^[\\w.,:=\\/+@%-]*$/.test(v)?v:\"'\"+v.replace(/'/g,\"'\\\\''\")+\"'\"," \
     "sl=ps=>{const add=ps.filter(p=>p[1]).map(p=>p[0]+\"=\"+qv(p[1])).join(\" \");let r;" \
     "if(!/%command%/i.test(o)){if(!add)return;r=add+\" %command%\"+(o.trim()?\" \"+o:\"\")}" \
@@ -321,8 +325,8 @@ static int out_expand(np_out_t *o, const char *replace, const np_cap_t *caps) {
        older "/usr/bin/arch ... -e VAR=VALUE" form is understood, and rewritten without the \
        arch prefix and its DYLD_INSERT_LIBRARIES. */ \
     "sn=ps=>{const c=E.c<0?null:E.G[E.c]," \
-    "L=Fx.h?Fx.h+\"/.notproton/np-native\":(c&&E.G.slice(0,E.c).map(wv)" \
-    ".find(x=>/\\/\\.notproton\\/np-native$/.test(x)))||\"\";" \
+    "L=Fx.h?Fx.h+\"/.bridgeplay/np-native\":(c&&E.G.slice(0,E.c).map(wv)" \
+    ".find(x=>/\\/\\.(bridgeplay|notproton)\\/np-native$/.test(x)))||\"\";" \
     "if(!L||!c&&!ps.some(p=>p[1]))return;" \
     "const kn=w=>{const x=wv(w);return x.slice(0,x.indexOf(\"=\"))};" \
     "let vs=NE.filter(w=>kn(w)!==\"DYLD_INSERT_LIBRARIES\").map(w=>[kn(w),o.slice(w.start,w.end)]);" \
@@ -331,7 +335,9 @@ static int out_expand(np_out_t *o, const char *replace, const np_cap_t *caps) {
     "const h=[qv(L)].concat(vs.map(x=>x[1])).join(\" \");" \
     "SteamClient.Apps.SetAppLaunchOptions(t.unAppID," \
     "c?o.slice(0,E.p)+h+\" \"+o.slice(c.start):h+\" %command%\"+(o.trim()?\" \"+o.trim():\"\"))}," \
-    "s=ps=>nat?sn(ps):sl(ps)," \
+    /* Writing BRIDGEPLAY_<X> drops a NOTPROTON_<X> the line still carries. */ \
+    "s=ps=>{ps=ps.concat(ps.filter(p=>/^BRIDGEPLAY_/.test(p[0])).map(p=>[\"NOTPROTON_\"+p[0].slice(11),\"\"]));" \
+    "return nat?sn(ps):sl(ps)}," \
     "Fx=globalThis.MSCXFx||{}," \
     "dv=k=>{if(nat){const a=(Fx.na||{})[t.unAppID]||{},n=Fx.ng||{};" \
     "return k in a?a[k]:k in n?n[k]:(Fx.d||{})[k]||\"\"}" \
@@ -348,15 +354,15 @@ static int out_expand(np_out_t *o, const char *replace, const np_cap_t *caps) {
     "selectedOption:n(ev(k)),onChange:v=>s([[k,v.data===n(dv(k))?\"\":v.data]])},k)," \
     "lc=z=>x=>(x||z).toLowerCase()," \
     "fz=x=>{x=(x||\"\").toLowerCase();return x===\"1\"?\"2\":/^(0|off|false|no)?$/.test(x)?\"0\":x}," \
-    "fo=fz(ev(\"NOTPROTON_FRAMEGEN\"))!==\"0\"," \
+    "fo=fz(ev(\"BRIDGEPLAY_FRAMEGEN\"))!==\"0\"," \
     "FG=()=>(0," RT ".jsxs)(" BARREL ".XY,{label:\"Frame Generation (Experimental. Adds input lag)\",children:[" \
-    "D(\"NOTPROTON_FRAMEGEN\",\"Mode\",[{data:\"0\",label:\"Off\"},{data:\"2\",label:\"2x\"}," \
+    "D(\"BRIDGEPLAY_FRAMEGEN\",\"Mode\",[{data:\"0\",label:\"Off\"},{data:\"2\",label:\"2x\"}," \
     "{data:\"3\",label:\"3x\"},{data:\"adaptive\",label:\"Adaptive (fills to display refresh)\"}],fz)," \
-    "fo&&D(\"NOTPROTON_FRAMEGEN_QUALITY\",\"Quality\",[{data:\"performance\",label:\"Performance\"}," \
+    "fo&&D(\"BRIDGEPLAY_FRAMEGEN_QUALITY\",\"Quality\",[{data:\"performance\",label:\"Performance\"}," \
     "{data:\"balanced\",label:\"Balanced\"},{data:\"quality\",label:\"Quality\"}],lc(\"balanced\"))," \
-    "fo&&T([\"NOTPROTON_FRAMEGEN_UI\"],\"Protect UI (keeps static HUD and menus sharp)\",\"1\",\"0\")," \
-    "fo&&T([\"NOTPROTON_FRAMEGEN_FALLBACK\"],\"Fast-motion fallback (skips frames that would smear)\",\"1\",\"0\")," \
-    "fo&&D(\"NOTPROTON_FRAMEGEN_ENGINE\",\"Engine\",[{data:\"own\",label:\"Built-in optical flow\"}," \
+    "fo&&T([\"BRIDGEPLAY_FRAMEGEN_UI\"],\"Protect UI (keeps static HUD and menus sharp)\",\"1\",\"0\")," \
+    "fo&&T([\"BRIDGEPLAY_FRAMEGEN_FALLBACK\"],\"Fast-motion fallback (skips frames that would smear)\",\"1\",\"0\")," \
+    "fo&&D(\"BRIDGEPLAY_FRAMEGEN_ENGINE\",\"Engine\",[{data:\"own\",label:\"Built-in optical flow\"}," \
     "{data:\"metalfx\",label:\"MetalFX\"}],lc(\"own\"))]},\"fgn\")," \
     /* A toggle that is on unless set to "0" (upstream 1.2.0: AVX2, FEX x87 precision). */ \
     "X=(k,l)=>(0," RT ".jsx)(" BARREL ".Yh,{className:\"MSCXRow\",label:l," \
@@ -402,7 +408,7 @@ static int out_expand(np_out_t *o, const char *replace, const np_cap_t *caps) {
     "\"dxmt\"===b&&T([\"DXMT_ENABLE_NVEXT\"],\"DLSS\",\"1\")," \
     "!fex&&X(\"ROSETTA_ADVERTISE_AVX\",npL(\"Advertise AVX2 to Rosetta\",\"向 Rosetta 声明 AVX2 支持\",\"Segnala AVX2 a Rosetta\"))," \
     "T([\"WINEMSYNC\"],\"MSync\",\"1\",\"0\")," \
-    "T([\"NOTPROTON_RETINA\"],npL(\"High Resolution\",\"高分辨率\",\"Alta risoluzione\"),\"1\",\"0\")" \
+    "T([\"BRIDGEPLAY_RETINA\"],npL(\"High Resolution\",\"高分辨率\",\"Alta risoluzione\"),\"1\",\"0\")" \
     "]},\"gfx\")," \
     "dx&&(0," RT ".jsx)(" BARREL ".XY," \
     "{label:npL(\"MetalFX Upscaling (Samples from the resolution the game is set to)\"," \
@@ -412,10 +418,10 @@ static int out_expand(np_out_t *o, const char *replace, const np_cap_t *caps) {
     "onChange:v=>s([[\"DXMT_METALFX_SPATIAL_SWAPCHAIN\",v.data?\"1\":\"\"],[\"DXMT_CONFIG\",fx(v.data)]])})},\"usf\")," \
     "FG()," \
     "(0," RT ".jsxs)(" BARREL ".XY,{label:npL(\"Controllers\",\"控制器\",\"Controller\"),children:[" \
-    "T([\"NOTPROTON_RAW_CONTROLLERS\"],npL(\"Let games read controllers directly (May break Steam Input. Not recommended)\"," \
+    "T([\"BRIDGEPLAY_RAW_CONTROLLERS\"],npL(\"Let games read controllers directly (May break Steam Input. Not recommended)\"," \
     "\"允许游戏直接读取控制器（可能导致 Steam Input 失效，不推荐）\"," \
     "\"Lascia che i giochi leggano direttamente i controller (pu\\u00f2 interferire con Steam Input, sconsigliato)\"),\"1\",\"\")," \
-    "T([\"NOTPROTON_DISABLE_HIDRAW\"],npL(\"Disable hidraw\",\"停用 hidraw\",\"Disable hidraw\"),\"1\",\"\")" \
+    "T([\"BRIDGEPLAY_DISABLE_HIDRAW\"],npL(\"Disable hidraw\",\"停用 hidraw\",\"Disable hidraw\"),\"1\",\"\")" \
     "]},\"ctl\")," \
     "fex&&(0," RT ".jsx)(" BARREL ".XY,{label:\"FEX\"," \
     "children:X(\"FEX_X87REDUCEDPRECISION\"," \
@@ -440,7 +446,7 @@ static int out_expand(np_out_t *o, const char *replace, const np_cap_t *caps) {
 #define NP_LAUNCH_MIGRATION_RULE \
     "o=>{const T=/(?:[^\\s\"'\\\\]|\\\\[^]|\"(?:[^\"\\\\]|\\\\[^])*\"|'[^']*')+/g," \
     "w=o.match(T)||[]," \
-    "k=x=>/^(CX_GRAPHICS|D3DM_|DXMT_|DXVK_|MTL_|NOTPROTON_|ROSETTA_|WINE)\\w*=/.test(x)," \
+    "k=x=>/^(BRIDGEPLAY_|CX_GRAPHICS|D3DM_|DXMT_|DXVK_|MTL_|NOTPROTON_|ROSETTA_|WINE)\\w*=/.test(x)," \
     "e=w.filter(k);" \
     "if(/%command%/i.test(o)||o.replace(T,\"\").trim()||!e.length)return null;" \
     "return e.map(x=>{const i=x.indexOf(\"=\"),v=x.slice(i+1);" \
@@ -725,31 +731,47 @@ int np_webpatch_should_patch(const char *path) {
 // gamefixes/native-default.conf with variable names as they are; those land in ng and na.
 #define NP_FX_MAX 16384
 
+// The panel's names for the variables Bridgeplay reads. The page also accepts the NOTPROTON_
+// spelling in launch options, but the defaults it is handed always use these.
+static const char *const fx_bridgeplay_keys[] = {
+    "BRIDGEPLAY_RETINA", "BRIDGEPLAY_FRAMEGEN", "BRIDGEPLAY_FRAMEGEN_QUALITY",
+    "BRIDGEPLAY_FRAMEGEN_UI", "BRIDGEPLAY_FRAMEGEN_FALLBACK", "BRIDGEPLAY_FRAMEGEN_ENGINE",
+};
+
+// The BRIDGEPLAY_ name whose suffix follows prefix in key ("" for the run script's short
+// conf keys), or NULL.
+static const char *fx_bridgeplay_key(const char *key, const char *prefix) {
+    size_t n = strlen(prefix);
+    if (strncmp(key, prefix, n) != 0) return NULL;
+    for (size_t i = 0; i < sizeof(fx_bridgeplay_keys) / sizeof(fx_bridgeplay_keys[0]); i++)
+        if (strcmp(key + n, fx_bridgeplay_keys[i] + sizeof("BRIDGEPLAY_") - 1) == 0)
+            return fx_bridgeplay_keys[i];
+    return NULL;
+}
+
 static const char *fx_panel_key(const char *key) {
     static const char *const same[] = {
         "MTL_HUD_ENABLED", "ROSETTA_ADVERTISE_AVX", "D3DM_ENABLE_METALFX", "DXMT_ENABLE_NVEXT",
     };
-    if (strcmp(key, "RETINA") == 0) return "NOTPROTON_RETINA";
     if (strcmp(key, "MSYNC") == 0) return "WINEMSYNC";
-    if (strcmp(key, "FRAMEGEN") == 0) return "NOTPROTON_FRAMEGEN";
-    if (strcmp(key, "FRAMEGEN_QUALITY") == 0) return "NOTPROTON_FRAMEGEN_QUALITY";
-    if (strcmp(key, "FRAMEGEN_UI") == 0) return "NOTPROTON_FRAMEGEN_UI";
-    if (strcmp(key, "FRAMEGEN_FALLBACK") == 0) return "NOTPROTON_FRAMEGEN_FALLBACK";
-    if (strcmp(key, "FRAMEGEN_ENGINE") == 0) return "NOTPROTON_FRAMEGEN_ENGINE";
+    // RETINA=1, which the run script also takes as BRIDGEPLAY_RETINA=1.
+    const char *bp = fx_bridgeplay_key(key, "");
+    if (!bp) bp = fx_bridgeplay_key(key, "BRIDGEPLAY_");
+    if (bp) return bp;
     for (size_t i = 0; i < sizeof(same) / sizeof(same[0]); i++)
         if (strcmp(key, same[i]) == 0) return same[i];
     return NULL;
 }
 
-// np-native confs name the variables themselves.
+// np-native confs name the variables themselves, in either spelling.
 static const char *fx_native_key(const char *key) {
-    static const char *const keys[] = {
-        "MTL_HUD_ENABLED", "NP_PAD_MODE", "NOTPROTON_FRAMEGEN", "NOTPROTON_FRAMEGEN_QUALITY",
-        "NOTPROTON_FRAMEGEN_UI", "NOTPROTON_FRAMEGEN_FALLBACK", "NOTPROTON_FRAMEGEN_ENGINE",
-    };
+    static const char *const keys[] = { "MTL_HUD_ENABLED", "NP_PAD_MODE" };
     for (size_t i = 0; i < sizeof(keys) / sizeof(keys[0]); i++)
         if (strcmp(key, keys[i]) == 0) return keys[i];
-    return NULL;
+    if (strncmp(key, "BRIDGEPLAY_FRAMEGEN", 19) != 0 && strncmp(key, "NOTPROTON_FRAMEGEN", 18) != 0)
+        return NULL;
+    const char *bp = fx_bridgeplay_key(key, "BRIDGEPLAY_");
+    return bp ? bp : fx_bridgeplay_key(key, "NOTPROTON_");
 }
 
 // Characters that go into a JSON string unescaped, up to max of them.
@@ -763,7 +785,7 @@ static int fx_word(const char *v, size_t max) {
     return 1;
 }
 
-// Values fit fx_pair_t.val. Tool names are longer ("notproton-winecx-11.17") and are
+// Values fit fx_pair_t.val. Tool names are longer ("bridgeplay-proton-winecx-11.17") and are
 // bounded by the fallback name they are compared against instead.
 static int fx_safe(const char *v) { return fx_word(v, 16); }
 
@@ -911,7 +933,7 @@ static int fx_build(char *buf, size_t cap) {
     const char *home = getenv("HOME");
     if (!home || !*home) return 0;
     char root[512], path[768];
-    snprintf(root, sizeof(root), "%s/Library/Application Support/notproton", home);
+    np_support_path(root, sizeof(root), home, NULL);
 
     // Steam's chunks end in "//# sourceMappingURL=..." with no newline after it, so the
     // assignment starts a line of its own or the browser reads it as part of that comment.
@@ -965,8 +987,8 @@ static int fx_build(char *buf, size_t cap) {
 
     // The run script reads controllers directly unless the launch options say otherwise, and
     // overlay-shim keeps the UI sharp and falls back on fast motion unless told not to.
-    n = snprintf(buf + len, cap - len, "},\"d\":{\"NOTPROTON_RAW_CONTROLLERS\":\"1\","
-                 "\"NOTPROTON_FRAMEGEN_UI\":\"1\",\"NOTPROTON_FRAMEGEN_FALLBACK\":\"1\"}");
+    n = snprintf(buf + len, cap - len, "},\"d\":{\"BRIDGEPLAY_RAW_CONTROLLERS\":\"1\","
+                 "\"BRIDGEPLAY_FRAMEGEN_UI\":\"1\",\"BRIDGEPLAY_FRAMEGEN_FALLBACK\":\"1\"}");
     if (n < 0 || (size_t)n >= cap - len) return 0;
     len += (size_t)n;
 

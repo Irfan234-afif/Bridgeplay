@@ -39,8 +39,8 @@ headers are obtained through the project's pinned `lsteamclient/fetch.sh`.
 The regular app payload includes `controllers/steam-input/rumble.dylib` and
 installs/removes it with the other Bridgeplay runtime components. The run script
 enables it for game sessions with direct controller access disabled. To opt
-out for a game, set `NOTPROTON_STEAM_RUMBLE=0 %command%` in Steam launch options.
-`NOTPROTON_RAW_CONTROLLERS=1` also bypasses it, preserving direct DualSense PCM.
+out for a game, set `BRIDGEPLAY_STEAM_RUMBLE=0 %command%` in Steam launch options.
+`BRIDGEPLAY_RAW_CONTROLLERS=1` also bypasses it, preserving direct DualSense PCM.
 A missing adapter leaves the previous launch behavior intact.
 
 ## Validation and limits

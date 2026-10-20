@@ -132,7 +132,7 @@ static int lookupSlot(void *joystick) {
             pthread_cond_signal(&wake);
         }
         pthread_mutex_unlock(&lock);
-        fprintf(stderr, "notproton-rumble: Steam virtual gamepad slot %d mapped (pid %d)\n", found,
+        fprintf(stderr, "bridgeplay-rumble: Steam virtual gamepad slot %d mapped (pid %d)\n", found,
                 getpid());
     }
     return found;
@@ -189,7 +189,7 @@ static void *worker(void *) {
                     active[i] = handle;
                     static bool logged;
                     if (!logged) {
-                        fprintf(stderr, "notproton-rumble: forwarding rumble via Steam\n");
+                        fprintf(stderr, "bridgeplay-rumble: forwarding rumble via Steam\n");
                         logged = true;
                     }
                 }
@@ -286,7 +286,7 @@ static void *resolve(void *library, const char *symbol) {
     if (getenv("NOTPROTON_STEAM_RUMBLE_TRACE") && !strcmp(symbol, "SDL_JoystickRumble")) {
         Dl_info diag{};
         dladdr(original, &diag);
-        fprintf(stderr, "notproton-rumble: resolve pid=%d enabled=%d source=%s root=%s app=%s\n",
+        fprintf(stderr, "bridgeplay-rumble: resolve pid=%d enabled=%d source=%s root=%s app=%s\n",
                 getpid(), enabled(), diag.dli_fname ? diag.dli_fname : "?",
                 getenv("CX_ROOT") ? getenv("CX_ROOT") : "?",
                 getenv("SteamAppId") ? getenv("SteamAppId") : "?");

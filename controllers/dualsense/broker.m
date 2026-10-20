@@ -745,9 +745,18 @@ int main(int argc, char **argv) {
             }
         }
         printf("{\"ready\":true,\"port\":%u,\"pid\":%d}\n", port, getpid());
-        NSString *calibrationPath = [NSHomeDirectory()
-            stringByAppendingPathComponent:
-                @"Library/Application Support/notproton/controllers/dualsense/calibration.json"];
+        // The notproton folder is read until the app moves it to bridgeplay.
+        NSString *supportPath = [NSHomeDirectory()
+            stringByAppendingPathComponent:@"Library/Application Support/bridgeplay"];
+        NSString *legacySupportPath = [NSHomeDirectory()
+            stringByAppendingPathComponent:@"Library/Application Support/notproton"];
+        BOOL isDirectory = NO;
+        if (![[NSFileManager defaultManager] fileExistsAtPath:supportPath isDirectory:&isDirectory]
+            && [[NSFileManager defaultManager] fileExistsAtPath:legacySupportPath isDirectory:&isDirectory]
+            && isDirectory)
+            supportPath = legacySupportPath;
+        NSString *calibrationPath = [supportPath
+            stringByAppendingPathComponent:@"controllers/dualsense/calibration.json"];
         float pcmGain = 1;
         double nextCalibration = 0;
         double start = CFAbsoluteTimeGetCurrent(), nextStatus = 0;

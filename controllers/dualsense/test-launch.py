@@ -12,7 +12,7 @@ import tempfile
 import time
 
 build = Path(os.environ["DSB_TEST_BUILD"]).resolve()
-with tempfile.TemporaryDirectory(prefix="notproton dualsense ") as tmp:
+with tempfile.TemporaryDirectory(prefix="bridgeplay dualsense ") as tmp:
     root = Path(tmp)
     shutil.copy2(build / "launch", root / "launch")
     (root / "bridge.dylib").touch()
