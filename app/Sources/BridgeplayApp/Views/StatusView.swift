@@ -354,7 +354,7 @@ struct StatusView: View {
             Section {
                 crossOverSection(snapshot)
             } header: {
-                Text("CrossOver")
+                Text("Engines")
             } footer: {
                 HStack {
                     Spacer()

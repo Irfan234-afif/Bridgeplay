@@ -3522,6 +3522,22 @@
         }
       }
     },
+    "Engines" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Motori"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "引擎"
+          }
+        }
+      }
+    },
     "Enter at least one verb, like vcrun2022." : {
       "localizations" : {
         "it" : {
