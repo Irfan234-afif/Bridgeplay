@@ -11,7 +11,7 @@
 //   BRIDGEPLAY_BUILD    +1 on every release, continuing the old "-ray.N" counter; Sparkle
 //                       orders updates by it (CFBundleVersion, sparkle:version)
 // Change both with scripts/bump-version.sh, see docs/RELEASING.md.
-#define BRIDGEPLAY_VERSION "3.2.0"
-#define BRIDGEPLAY_BUILD 37
+#define BRIDGEPLAY_VERSION "3.2.1"
+#define BRIDGEPLAY_BUILD 38
 
 #endif // NOTPROTON_VERSION_H
