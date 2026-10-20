@@ -1,6 +1,9 @@
 CC       := clang
 ARCH     := arm64
 MIN_VER  := 15.0
+# The oldest macOS the product supports. mincheck holds every binary in the bundle
+# to it, MIN_VER above is only what the dylib and helpers are compiled for.
+MINCHECK_VER := 26.0
 GLASS_SDK := 26.0
 AVAIL    := -Werror=unguarded-availability-new
 
@@ -141,7 +144,7 @@ launchercheck:
 
 .PHONY: mincheck
 mincheck:
-	@sh dylib/tests/mincheck.sh "$(APP_BUNDLE)" "$(MIN_VER)" "$(GLASS_SDK)"
+	@sh dylib/tests/mincheck.sh "$(APP_BUNDLE)" "$(MINCHECK_VER)" "$(GLASS_SDK)"
 
 .PHONY: l10ncheck
 l10ncheck:
@@ -828,3 +831,29 @@ $(NP_NATIVE): $(NP_NATIVE_SRC)
 np-native-tests: $(NP_NATIVE)
 	@if [ ! -f native-launch/tests/run.sh ]; then $(call SKIP,np-native-tests,native-launch/tests/run.sh); exit 0; fi; \
 	sh native-launch/tests/run.sh $(NP_NATIVE)
+
+.PHONY: native-shim-tests
+native-shim-tests:
+	@if [ ! -f native-shim/tests/run.sh ]; then $(call SKIP,native-shim-tests,native-shim/tests/run.sh); exit 0; fi; \
+	sh native-shim/tests/run.sh
+
+# Every check .github/workflows/app.yml runs, in its order, after `make app`.
+# scripts/build-local.sh --checks runs this same target, so a local release build
+# and CI gate on one list. Each check runs even when an earlier one failed.
+# overlay-shim-tests is left out: it needs a Metal GPU and real frame timing.
+CI_CHECKS := mincheck l10ncheck \
+	sigcheck callscheck webpatch-fixtures peicon-fixtures panel-behavior spawn-env \
+	activatecheck compatcheck compatsvc-check shortcutcheck launch-shell envcheck \
+	buildcheck settingscheck routecheck bridgecheck gamedrivecheck launchercheck \
+	seedcheck gamefixescheck padcheck np-native-tests native-shim-tests \
+	app-tests game-host-check dualsense-check steam-rumble-check
+
+.PHONY: ci-checks
+ci-checks:
+	@failed=""; \
+	for t in $(CI_CHECKS); do \
+		echo "==> [check] make -s $$t"; \
+		$(MAKE) -s $$t || failed="$$failed $$t"; \
+	done; \
+	if [ -n "$$failed" ]; then echo "==> ci-checks failed:$$failed" >&2; exit 1; fi; \
+	echo "==> ci-checks: all $(words $(CI_CHECKS)) checks passed"

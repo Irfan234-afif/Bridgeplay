@@ -72,6 +72,12 @@ for entry in $pending; do
 		exit 1
 	fi
 	theirs=$(git show "$ref:dylib/version.h" | version_of)
+	# It goes into a sed replacement below, so only a plain dotted version gets that far.
+	if ! printf '%s\n' "$theirs" | grep -Eqx '[0-9.]+'; then
+		git merge --abort
+		echo "==> $ref has NOTPROTON_VERSION \"$theirs\", not a dotted version; nothing was merged" >&2
+		exit 1
+	fi
 	git checkout -q --ours dylib/version.h
 	sed -i '' "s/^#define NOTPROTON_VERSION \".*\"/#define NOTPROTON_VERSION \"$theirs\"/" dylib/version.h
 	git add dylib/version.h

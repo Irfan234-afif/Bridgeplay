@@ -80,6 +80,22 @@ if gh release view "$tag" -R "$slug" >/dev/null 2>&1; then
 	check "$tag is already released; run scripts/bump-version.sh patch|minor|major"
 fi
 
+# SUFeedURL is releases/latest/download/appcast.xml, so the Latest release is the update
+# feed of every installed app. If it is not an app release (no appcast.xml, say a DXMT
+# build marked Latest), that feed is already down; stop rather than publish over a state
+# nobody has looked at. Fix which release is Latest on GitHub, then run this again.
+latest=$(gh release view -R "$slug" --json tagName,assets \
+	-q '.tagName + " " + ([.assets[].name] | join(" "))' 2>/dev/null || true)
+if [ -n "$latest" ]; then
+	latest_tag=${latest%% *}
+	case " ${latest#* } " in
+		*" appcast.xml "*) ;;
+		*) check "the Latest release $latest_tag has no appcast.xml, so the update feed is down; mark an app release Latest first" ;;
+	esac
+	echo "$latest_tag" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+$' \
+		|| check "the Latest release $latest_tag is not a vX.Y.Z app release; mark an app release Latest first"
+fi
+
 # Release notes: the commits since the previous app release, unless given. Other releases
 # in the repository (DXMT builds) have tags that are not vX.Y.Z and are skipped.
 previous=$(gh release list -R "$slug" --limit 100 --json tagName -q '.[].tagName' 2>/dev/null \
@@ -109,12 +125,15 @@ if [ "$dry_run" -eq 1 ]; then
 	# Never the keychain. SPARKLE_KEY_FILE (generate_keys -x) signs for real; otherwise a
 	# throwaway key stands in, and since it is not SUPublicEDKey's pair generate_appcast
 	# leaves the enclosure unsigned. generate_appcast's cache goes under out/, not ~/Library.
+	# The key copy lives in its own temp folder, removed on any exit, never under out/.
+	keydir=$(mktemp -d)
+	trap 'rm -rf "$keydir"' EXIT
 	if [ -n "${SPARKLE_KEY_FILE:-}" ]; then
-		cp "$SPARKLE_KEY_FILE" "$out/throwaway.key"
+		cp "$SPARKLE_KEY_FILE" "$keydir/throwaway.key"
 	else
-		openssl genpkey -algorithm ed25519 -outform DER 2>/dev/null | tail -c 32 | base64 >"$out/throwaway.key"
+		openssl genpkey -algorithm ed25519 -outform DER 2>/dev/null | tail -c 32 | base64 >"$keydir/throwaway.key"
 	fi
-	key_args="--ed-key-file $out/throwaway.key"
+	key_args="--ed-key-file $keydir/throwaway.key"
 	CFFIXED_USER_HOME=$repo/$out/home
 	export CFFIXED_USER_HOME
 	app=""
@@ -208,7 +227,6 @@ if [ "$legacy" -eq 1 ]; then
 fi
 
 if [ "$dry_run" -eq 1 ]; then
-	rm -f "$out/throwaway.key"
 	echo "==> dry run: nothing published; zips and appcasts in $out"
 	exit 0
 fi

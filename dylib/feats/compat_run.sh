@@ -40,11 +40,15 @@ fi
 if [ -n "$DSB_LIBRARY" ] && [ -f "$DSB_LIBRARY" ]; then
   export DYLD_INSERT_LIBRARIES="$DSB_LIBRARY${DYLD_INSERT_LIBRARIES:+:$DYLD_INSERT_LIBRARIES}"
 fi
+# Games read pads directly unless the launch options set BRIDGEPLAY_RAW_CONTROLLERS=0
+# (the controller block below). Settled once here, since the rumble adapter depends on it.
+: "${NOTPROTON_RAW_CONTROLLERS:=1}"
 # Steam's macOS virtual Xbox device has input but no SDL2 rumble backend.
-# The Wine-local adapter forwards only that device's rumble to native Steam.
+# The Wine-local adapter forwards only that device's rumble to native Steam, so it is
+# only inserted with direct controller access off (controllers/steam-input/README.md).
 steam_rumble="$np_support/controllers/steam-input/rumble.dylib"
 NOTPROTON_RUMBLE_LIBRARY=""
-if [ "$verb" = waitforexitandrun ] && [ "${NOTPROTON_RAW_CONTROLLERS:-0}" != 1 ] \
+if [ "$verb" = waitforexitandrun ] && [ "$NOTPROTON_RAW_CONTROLLERS" != 1 ] \
   && [ "${NOTPROTON_STEAM_RUMBLE:-1}" != 0 ] && [ -f "$steam_rumble" ]; then
   export NOTPROTON_STEAM_RUMBLE=1
   NOTPROTON_RUMBLE_LIBRARY="$steam_rumble"
@@ -324,8 +328,7 @@ echo "app_id=$app_id (STEAM_COMPAT_APP_ID=$STEAM_COMPAT_APP_ID)" >> "$log" 2>&1 
 # macOS Steam has no virtual gamepad Wine could read, so a pad Steam Input claims (and
 # lists in SDL_GAMECONTROLLER_IGNORE_DEVICES) would reach the game as nothing. Games read
 # pads directly unless the launch options set BRIDGEPLAY_RAW_CONTROLLERS=0.
-if [ "${NOTPROTON_RAW_CONTROLLERS:-1}" = "1" ]; then
-  NOTPROTON_RAW_CONTROLLERS=1
+if [ "$NOTPROTON_RAW_CONTROLLERS" = "1" ]; then
   SDL_GAMECONTROLLER_IGNORE_DEVICES=
   export NOTPROTON_RAW_CONTROLLERS SDL_GAMECONTROLLER_IGNORE_DEVICES
 fi

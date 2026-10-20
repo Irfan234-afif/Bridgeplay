@@ -5,7 +5,6 @@ on:
     branches: [main]
   pull_request:
   workflow_dispatch:
-  workflow_call:
 
 permissions:
   contents: read
@@ -20,7 +19,7 @@ jobs:
     runs-on: xcode-27
     timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
       - name: Record the toolchain
         run: |
@@ -39,7 +38,7 @@ jobs:
 
       - name: Restore Dobby build cache
         id: dobby-cache
-        uses: actions/cache@v4
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
         with:
           path: build/dobby
           key: dobby-xcode-27-${{ env.DOBBY_COMMIT }}-${{ runner.arch }}
@@ -50,7 +49,7 @@ jobs:
 
       - name: Restore the Wine trees
         id: wine-cache
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
         with:
           path: |
             scratch/wine
@@ -59,7 +58,7 @@ jobs:
           key: wine-xcode-27-${{ hashFiles('bridge/setup-wine-tree.sh', 'bridge/register-components.diff') }}
 
       - name: Restore Proton tarball cache
-        uses: actions/cache@v4
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
         with:
           path: scratch/proton-lsc
           key: proton-tarball-${{ hashFiles('lsteamclient/fetch.sh') }}
@@ -78,7 +77,7 @@ jobs:
 
       - name: Save the Wine trees
         if: steps.wine-cache.outputs.cache-hit != 'true'
-        uses: actions/cache/save@v4
+        uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
         with:
           path: |
             scratch/wine
@@ -102,43 +101,9 @@ jobs:
       - name: Build the app
         run: make app
 
-      - name: Check the minimum macOS version
-        run: make -s mincheck
-
-      - name: Check the translations
-        run: make -s l10ncheck
-
-      - name: Run the hermetic C suites
-        run: |
-          make -s sigcheck
-          make -s callscheck
-          make -s webpatch-fixtures
-          make -s peicon-fixtures
-          make -s panel-behavior
-          make -s spawn-env
-          make -s activatecheck
-          make -s compatcheck
-          make -s compatsvc-check
-          make -s shortcutcheck
-          make -s launch-shell
-          make -s envcheck
-          make -s buildcheck
-          make -s settingscheck
-          make -s routecheck
-          make -s bridgecheck
-          make -s gamedrivecheck
-          make -s launchercheck
-          make -s seedcheck
-          make -s gamefixescheck
-
-      - name: Run the Swift tests
-        run: make -s app-tests
-
-      - name: Check game identity and controller transports without hardware
-        run: |
-          make game-host-check
-          make dualsense-check
-          make steam-rumble-check
+      # The one check list, shared with scripts/build-local.sh --checks
+      - name: Run the checks
+        run: make ci-checks
 
       - name: Package the app bundle
         run: |
@@ -146,7 +111,7 @@ jobs:
           ditto -c -k --keepParent out/Bridgeplay.app out/artifact/Bridgeplay.zip
 
       - name: Upload the app bundle
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: Bridgeplay
           path: out/artifact

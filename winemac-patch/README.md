@@ -13,8 +13,14 @@ To rebuild `app/Sources/BridgeplayApp/Resources/winemac-winehq-11.15.so`:
     PATH="$(brew --prefix bison)/bin:$PATH" arch -x86_64 ./configure --enable-win64 \
         --enable-archs=x86_64 --without-x --without-freetype CC="clang -arch x86_64" \
         OBJC="clang -arch x86_64"
-    arch -x86_64 make dlls/winemac.drv/winemac.so
+    MACOSX_DEPLOYMENT_TARGET=26.0 arch -x86_64 make dlls/winemac.drv/winemac.so
     codesign -fs - dlls/winemac.drv/winemac.so
+
+`MACOSX_DEPLOYMENT_TARGET=26.0` keeps the driver loadable on macOS 26; without it the
+toolchain stamps its SDK version (27.0) as the minimum, which `make mincheck` refuses. The
+tree's own `ntdll.so` and `win32u.so` can stand in for the runtime's at link time (only their
+`@rpath/` install names and exports matter); built this way the result matches the previous
+pin in every section, all imports and every load command except the minimum version.
 
 Then update `macDriver` in `FreeEngine.swift` with its sha256.
 

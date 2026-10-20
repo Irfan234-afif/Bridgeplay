@@ -32,18 +32,6 @@ esac
 WINE_SRC_REL=${WINE_SRC_REL:-../wine}
 # Valve's sources with ours copied over, from fetch.sh.
 TREE=${TREE:-$repo/build/lsteamclient}
-# The runner clone, never the installed CrossOver.
-if [ -z "${CX_ROOT:-}" ]; then
-	for clone in "$HOME/Library/Application Support/bridgeplay/runners"/crossover-*/CrossOver; do
-		[ -d "$clone" ] || continue
-		if [ -n "${CX_ROOT:-}" ]; then
-			echo "==> more than one runner clone is set up, set CX_ROOT to one of them" >&2
-			exit 1
-		fi
-		CX_ROOT=$clone
-	done
-fi
-CX_ROOT=${CX_ROOT:-$HOME/Library/Application Support/bridgeplay/runners/(none set up)}
 BRIDGE_DIR=${BRIDGE_DIR:-$HOME/Library/Application Support/bridgeplay/bridge}
 
 install=0
@@ -172,6 +160,20 @@ if [ "$do_unix" -eq 1 ]; then
 fi
 
 [ "$install" -eq 1 ] || { echo "==> not installing, pass --install to deploy"; exit 0; }
+
+# The runner clone, never the installed CrossOver. Only resolved for --install, so a
+# plain build works with several runner clones set up.
+if [ -z "${CX_ROOT:-}" ]; then
+	for clone in "$HOME/Library/Application Support/bridgeplay/runners"/crossover-*/CrossOver; do
+		[ -d "$clone" ] || continue
+		if [ -n "${CX_ROOT:-}" ]; then
+			echo "==> more than one runner clone is set up, set CX_ROOT to one of them" >&2
+			exit 1
+		fi
+		CX_ROOT=$clone
+	done
+fi
+CX_ROOT=${CX_ROOT:-$HOME/Library/Application Support/bridgeplay/runners/(none set up)}
 
 [ -d "$CX_ROOT/lib/wine" ] || { echo "==> no CrossOver tree at $CX_ROOT"; exit 1; }
 

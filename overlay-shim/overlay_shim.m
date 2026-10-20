@@ -11,6 +11,7 @@
 #import <QuartzCore/CAMetalLayer.h>
 
 #import <dlfcn.h>
+#import <mach/mach.h>
 #import <mach-o/dyld.h>
 #import <mach-o/getsect.h>
 #import <objc/message.h>
@@ -794,16 +795,51 @@ struct interpose_pair {
 	const void *replacee;
 };
 
+// The protection a mapped page has now. dyld leaves __DATA_CONST and the GOT read-only
+// once it has bound them.
+static int page_protection(void *page, vm_prot_t *protection)
+{
+	vm_address_t address = (vm_address_t)page;
+	vm_size_t size = 0;
+	vm_region_basic_info_data_64_t info;
+	mach_msg_type_number_t count = VM_REGION_BASIC_INFO_COUNT_64;
+	mach_port_t object = MACH_PORT_NULL;
+
+	if (vm_region_64(mach_task_self(), &address, &size, VM_REGION_BASIC_INFO_64,
+	                 (vm_region_info_t)&info, &count, &object) != KERN_SUCCESS)
+		return 0;
+	if (address > (vm_address_t)page)
+		return 0;
+	*protection = info.protection;
+	return 1;
+}
+
+// Images can be added from several threads at once; one thread restoring a page's
+// protection must not land between another's mprotect and its store.
+static os_unfair_lock store_lock = OS_UNFAIR_LOCK_INIT;
+
+// Writes one pointer slot, then puts the page back to the protection it had, so a
+// read-only GOT does not stay writable for the life of the game.
 static int store_pointer(const void **slot, const void *value)
 {
 	long page_size = getpagesize();
 	void *page = (void *)((uintptr_t)slot & ~(uintptr_t)(page_size - 1));
+	vm_prot_t original;
+	int stored = 0;
 
-	if (mprotect(page, (size_t)page_size, PROT_READ | PROT_WRITE) != 0)
-		return 0;
-
-	*slot = value;
-	return 1;
+	os_unfair_lock_lock(&store_lock);
+	if (page_protection(page, &original)) {
+		int restore = (original & VM_PROT_WRITE) == 0;
+		if (!restore || mprotect(page, (size_t)page_size, PROT_READ | PROT_WRITE) == 0) {
+			*slot = value;
+			stored = 1;
+			if (restore)
+				mprotect(page, (size_t)page_size,
+				         original & (VM_PROT_READ | VM_PROT_WRITE | VM_PROT_EXECUTE));
+		}
+	}
+	os_unfair_lock_unlock(&store_lock);
+	return stored;
 }
 
 static int rebind_image(const struct mach_header *header, intptr_t slide,

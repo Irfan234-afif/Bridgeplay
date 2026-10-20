@@ -26,6 +26,15 @@ if [ $# -ne 1 ]; then
     exit 2
 fi
 COMMIT_ARG="$1"
+# A commit, never a branch or tag that can move: 7 to 40 hex digits, checked below to be
+# a prefix of what it resolves to.
+case "$COMMIT_ARG" in
+    *[!0-9a-f]*) echo "$0: $COMMIT_ARG is not a commit SHA (lowercase hex)" >&2; exit 2 ;;
+esac
+if [ "${#COMMIT_ARG}" -lt 7 ] || [ "${#COMMIT_ARG}" -gt 40 ]; then
+    echo "$0: $COMMIT_ARG is not a commit SHA (7 to 40 hex digits)" >&2
+    exit 2
+fi
 
 here="$(cd "$(dirname "$0")" && pwd)"
 repo="$(cd "$here/.." && pwd)"
@@ -48,6 +57,7 @@ GCENX_SHA256="3f8e89a4874953a69e7be3dcdcc262d0346e462a9374bd116770fffb9e2a99d2"
 GCENX_UNIX="Wine Devel.app/Contents/Resources/wine/lib/wine/x86_64-unix"
 # ci.yml: "pip3 install meson==1.10.0".
 MESON_VERSION="1.10.0"
+NINJA_VERSION="1.13.0"
 
 # The bison macOS ships is too old for wine's configure.
 export PATH="$WORK/venv/bin:/opt/homebrew/bin:/opt/homebrew/opt/bison/bin:$PATH"
@@ -80,10 +90,11 @@ mkdir -p "$WORK" "$OUT"
 start=$(date +%s)
 
 # --- meson + ninja, the versions CI uses ------------------------------------------------
-if [ "$("$WORK/venv/bin/meson" --version 2>/dev/null || true)" != "$MESON_VERSION" ]; then
-    log "creating python venv with meson $MESON_VERSION"
+if [ "$("$WORK/venv/bin/meson" --version 2>/dev/null || true)" != "$MESON_VERSION" ] \
+    || [ "$("$WORK/venv/bin/ninja" --version 2>/dev/null || true)" != "$NINJA_VERSION" ]; then
+    log "creating python venv with meson $MESON_VERSION and ninja $NINJA_VERSION"
     python3 -m venv "$WORK/venv"
-    "$WORK/venv/bin/pip" install --quiet "meson==$MESON_VERSION" ninja
+    "$WORK/venv/bin/pip" install --quiet "meson==$MESON_VERSION" "ninja==$NINJA_VERSION"
 fi
 
 # --- DXMT source -----------------------------------------------------------------------
@@ -96,6 +107,7 @@ if ! git -C "$SRC" cat-file -e "$COMMIT_ARG^{commit}" 2>/dev/null; then
     git -C "$SRC" fetch --quiet origin
 fi
 COMMIT="$(git -C "$SRC" rev-parse --verify "$COMMIT_ARG^{commit}")"
+case "$COMMIT" in "$COMMIT_ARG"*) ;; *) die "$COMMIT_ARG resolved to $COMMIT, a ref rather than that commit" ;; esac
 SHORT="$(git -C "$SRC" rev-parse --short=7 "$COMMIT")"
 git -C "$SRC" -c advice.detachedHead=false checkout --quiet --detach "$COMMIT"
 git -C "$SRC" submodule update --quiet --init --recursive

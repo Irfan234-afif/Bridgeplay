@@ -63,14 +63,27 @@ static const char TOOL_DECLARATION_FMT[] =
 
 #include "compat_run.h"  // RUN_SCRIPT, generated from compat_run.sh
 
+// Written to a temporary file next to path and renamed over it, so a game launched
+// while Steam starts never runs a half-written run script.
 static int write_file(const char *path, const char *content, int executable) {
-    FILE *f = fopen(path, "w");
-    if (!f) return -1;
-    fputs(content, f);
-    int err = fclose(f);
-    if (executable)
-        chmod(path, 0755);
-    return err ? -1 : 0;
+    char tmp[1024];
+    if (snprintf(tmp, sizeof tmp, "%s.XXXXXX", path) >= (int)sizeof tmp) return -1;
+    int fd = mkstemp(tmp);
+    if (fd < 0) return -1;
+    FILE *f = fdopen(fd, "w");
+    if (!f) {
+        close(fd);
+        unlink(tmp);
+        return -1;
+    }
+    int err = fputs(content, f) < 0;
+    err |= fchmod(fd, executable ? 0755 : 0644) != 0;
+    err |= fclose(f) != 0;
+    if (err || rename(tmp, path) != 0) {
+        unlink(tmp);
+        return -1;
+    }
+    return 0;
 }
 
 static int ensure_dir(const char *path) {

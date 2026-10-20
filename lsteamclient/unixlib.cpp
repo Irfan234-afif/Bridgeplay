@@ -1045,6 +1045,12 @@ char *steamclient_dos_to_unix_path( const char *src, int is_url )
     {
         if (strncmp( src, file_prot, 7 ) != 0)
         {
+            /* the URL comes from the game: refuse one that does not fit rather than overflow */
+            if (strlen( src ) + 1 > sizeof(buffer))
+            {
+                ERR( "URL is too long for the buffer.\n" );
+                goto done;
+            }
             strcpy( dst, src );
             goto done;
         }
@@ -1066,9 +1072,11 @@ char *steamclient_dos_to_unix_path( const char *src, int is_url )
         if (is_url && (p = strpbrk( src, "#?" ))) file_part_len = p - src;
         else                                      file_part_len = strlen( src );
         r = ntdll_umbstowcs( src, file_part_len, srcW + 4, PATH_MAX - 4 - 1 );
-        if (r)
+        /* r is what was written: a multibyte path converts to fewer WCHARs than bytes, and
+         * a full buffer may be a truncated path, which must not resolve to another file */
+        if (r && r < PATH_MAX - 4 - 1)
         {
-            srcW[4 + file_part_len] = 0;
+            srcW[4 + r] = 0;
             if (is_url) url_unescape( srcW + 4 );
             collapse_path( srcW, 4 );
             unix_path = get_unix_file_name( srcW );
@@ -1099,6 +1107,12 @@ char *steamclient_dos_to_unix_path( const char *src, int is_url )
         const char *s;
         char *d;
 
+        if (strlen( src ) + 1 > sizeof(buffer) - (dst - buffer))
+        {
+            ERR( "Path is too long for the buffer.\n" );
+            buffer[0] = 0;
+            goto done;
+        }
         for (s = src, d = dst; *s; ++s, ++d)
         {
             if (*s == '\\') *d = '/';

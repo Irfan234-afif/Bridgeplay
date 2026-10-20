@@ -1,5 +1,6 @@
---- /private/tmp/claude-501/sdlbuild/SDL2-2.32.8/src/joystick/darwin/SDL_iokitjoystick.c.orig	2026-10-10 23:49:11
-+++ /private/tmp/claude-501/sdlbuild/SDL2-2.32.8/src/joystick/darwin/SDL_iokitjoystick.c	2026-10-10 23:49:11
+diff --git a/src/joystick/darwin/SDL_iokitjoystick.c b/src/joystick/darwin/SDL_iokitjoystick.c
+--- a/src/joystick/darwin/SDL_iokitjoystick.c
++++ b/src/joystick/darwin/SDL_iokitjoystick.c
 @@ -264,6 +264,28 @@
      return SDL_FALSE;
  }
@@ -81,8 +82,9 @@
      }
  
      /* Make sure we retain the use of the IOKit-provided device-object,
---- /private/tmp/claude-501/sdlbuild/SDL2-2.32.8/src/joystick/darwin/SDL_iokitjoystick_c.h.orig	2026-10-10 23:49:11
-+++ /private/tmp/claude-501/sdlbuild/SDL2-2.32.8/src/joystick/darwin/SDL_iokitjoystick_c.h	2026-10-10 23:49:11
+diff --git a/src/joystick/darwin/SDL_iokitjoystick_c.h b/src/joystick/darwin/SDL_iokitjoystick_c.h
+--- a/src/joystick/darwin/SDL_iokitjoystick_c.h
++++ b/src/joystick/darwin/SDL_iokitjoystick_c.h
 @@ -73,6 +73,7 @@
      SDL_JoystickGUID guid;
      int steam_virtual_gamepad_slot;
