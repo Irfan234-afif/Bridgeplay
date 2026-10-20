@@ -283,6 +283,7 @@ static int stage_claimed(Class seen, Class *held, const char *stage)
 
 // Frame generation (NOTPROTON_FRAMEGEN=1), one translation unit with the shim
 #include "framegen.m"
+#include "quitkey.m"
 
 static void encoder_mark(id encoder, NSUInteger format, id<MTLCommandBuffer> buffer)
 {
@@ -1059,6 +1060,8 @@ __attribute__((visibility("default"))) void np_overlay_shim_install(void)
 
 __attribute__((constructor)) static void overlay_shim_load(void)
 {
+	quitkey_init();
+
 	Class layer = objc_getClass("CAMetalLayer");
 	if (layer == Nil) {
 		shim_log("overlay_shim_load: CAMetalLayer absent, nothing to correct\n");
