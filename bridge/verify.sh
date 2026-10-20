@@ -22,7 +22,7 @@ prune=0
 [ "${1:-}" = "--prune" ] && prune=1
 
 # The same manifest the app installs from.
-MANIFEST="${MANIFEST:-$repo/app/Sources/NotProtonApp/Resources/payload.manifest}"
+MANIFEST="${MANIFEST:-$repo/app/Sources/BridgeplayApp/Resources/payload.manifest}"
 if [ ! -f "$MANIFEST" ]; then
     echo "==> no payload manifest at $MANIFEST" >&2
     exit 1
