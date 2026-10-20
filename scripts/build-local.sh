@@ -226,18 +226,14 @@ if [ "$run_checks" -eq 1 ]; then
 	check_log=$LOG_DIR/checks.log
 	: >"$check_log"
 	start=$(date +%s)
-	for target in sigcheck callscheck webpatch-fixtures peicon-fixtures panel-behavior \
-		spawn-env compatcheck compatsvc-check launch-shell envcheck buildcheck \
-		settingscheck routecheck bridgecheck gamedrivecheck seedcheck padcheck np-native-tests app-tests; do
-		echo "==> [check] make -s $target" | tee -a "$check_log"
-		[ "$target" != app-tests ] || link_test_sparkle >>"$check_log" 2>&1 || true
-		if make -s "$target" >>"$check_log" 2>&1; then
-			tail -n 1 "$check_log" | sed 's/^/    /'
-		else
-			echo "    FAILED, see $check_log" >&2
-			check_failures="$check_failures $target"
-		fi
-	done
+	link_test_sparkle >>"$check_log" 2>&1 || true
+	# make ci-checks is the list app.yml runs; each check runs even after a failure
+	echo "==> [check] make ci-checks, log: $check_log"
+	if ! make ci-checks >>"$check_log" 2>&1; then
+		check_failures=$(sed -n 's/^==> ci-checks failed://p' "$check_log")
+		[ -n "$check_failures" ] || check_failures=" ci-checks"
+	fi
+	grep '^==> ' "$check_log" | sed 's/^/    /'
 	timings="$timings
 checks $(($(date +%s) - start))"
 fi

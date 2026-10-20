@@ -102,43 +102,9 @@ jobs:
       - name: Build the app
         run: make app
 
-      - name: Check the minimum macOS version
-        run: make -s mincheck
-
-      - name: Check the translations
-        run: make -s l10ncheck
-
-      - name: Run the hermetic C suites
-        run: |
-          make -s sigcheck
-          make -s callscheck
-          make -s webpatch-fixtures
-          make -s peicon-fixtures
-          make -s panel-behavior
-          make -s spawn-env
-          make -s activatecheck
-          make -s compatcheck
-          make -s compatsvc-check
-          make -s shortcutcheck
-          make -s launch-shell
-          make -s envcheck
-          make -s buildcheck
-          make -s settingscheck
-          make -s routecheck
-          make -s bridgecheck
-          make -s gamedrivecheck
-          make -s launchercheck
-          make -s seedcheck
-          make -s gamefixescheck
-
-      - name: Run the Swift tests
-        run: make -s app-tests
-
-      - name: Check game identity and controller transports without hardware
-        run: |
-          make game-host-check
-          make dualsense-check
-          make steam-rumble-check
+      # The one check list, shared with scripts/build-local.sh --checks
+      - name: Run the checks
+        run: make ci-checks
 
       - name: Package the app bundle
         run: |
