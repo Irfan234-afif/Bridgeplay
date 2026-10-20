@@ -341,7 +341,7 @@ struct StatusView: View {
                 if status.signingIdentityReady == false {
                     StatusRow(
                         title: String(localized: "Trust Bridgeplay on this Mac"),
-                        value: String(localized: "Keeps your controller working after Bridgeplay updates. Adds a certificate for this Mac to your login keychain."),
+                        value: String(localized: "Keeps your controller working after Bridgeplay updates. Adds a certificate for this Mac to your login keychain. If macOS then asks for your password, choose Always Allow."),
                         tone: .info,
                         action: StatusAction(
                             label: String(localized: "Trust"),

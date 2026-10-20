@@ -4770,18 +4770,18 @@
         }
       }
     },
-    "Keeps your controller working after Bridgeplay updates. Adds a certificate for this Mac to your login keychain." : {
+    "Keeps your controller working after Bridgeplay updates. Adds a certificate for this Mac to your login keychain. If macOS then asks for your password, choose Always Allow." : {
       "localizations" : {
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Mantiene il controller funzionante dopo gli aggiornamenti di Bridgeplay. Aggiunge un certificato per questo Mac al portachiavi di login."
+            "value" : "Mantiene il controller funzionante dopo gli aggiornamenti di Bridgeplay. Aggiunge un certificato per questo Mac al portachiavi di login. Se poi macOS chiede la password, scegli Consenti sempre."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "让控制器在 Bridgeplay 更新后仍可正常使用。会将此 Mac 的证书添加到你的登录钥匙串。"
+            "value" : "让控制器在 Bridgeplay 更新后仍可正常使用。会将此 Mac 的证书添加到你的登录钥匙串。如果 macOS 随后要求输入密码，请选择“始终允许”。"
           }
         }
       }
@@ -9819,6 +9819,22 @@
         }
       }
     },
+    "macOS asks for your Mac password once, so Steam keeps working with Bridgeplay. Type it and choose Always Allow, and it won't ask again." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "macOS chiede una volta la password del Mac, così Steam continua a funzionare con Bridgeplay. Inseriscila e scegli Consenti sempre: non te la chiederà più."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "macOS 会请你输入一次 Mac 密码，让 Steam 能继续配合 Bridgeplay 使用。输入后选择“始终允许”，之后就不会再询问。"
+          }
+        }
+      }
+    },
     "macOS did not add the certificate to your keychain." : {
       "localizations" : {
         "it" : {
@@ -9879,22 +9895,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "macOS 需要先获得你的许可。"
-          }
-        }
-      }
-    },
-    "macOS shows its usual confirmation while Steam is updated. Sign in as you do on your Mac and choose Always Allow." : {
-      "localizations" : {
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Durante l'aggiornamento di Steam macOS mostra la solita richiesta di conferma. Accedi come fai di solito sul Mac e scegli Consenti sempre."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Steam 更新时，macOS 会显示常规的确认窗口。请像平时在 Mac 上那样登录，并选择“始终允许”。"
           }
         }
       }

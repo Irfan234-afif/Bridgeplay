@@ -249,7 +249,7 @@ struct SetupAssistantView: View {
         switch model.trust {
         case .unknown, .needed:
             return StatusRow(title: title,
-                             value: String(localized: "Keeps your controller working after Bridgeplay updates. Adds a certificate for this Mac to your login keychain."),
+                             value: String(localized: "Keeps your controller working after Bridgeplay updates. Adds a certificate for this Mac to your login keychain. If macOS then asks for your password, choose Always Allow."),
                              tone: .info,
                              action: StatusAction(label: String(localized: "Trust"), isEnabled: !model.isWorking && model.trust == .needed) {
                                  Task { await model.trustThisMac() }
@@ -306,13 +306,15 @@ struct SetupAssistantView: View {
 
     // Told before Set Up is pressed, so the macOS dialogs that follow are expected. Signing
     // Steam with the step 3 certificate can make macOS ask for the login password, once per
-    // signed file (the add-on, Steam's executable, Steam.app); App Management can ask too.
+    // signed file (the add-on, Steam's executable, Steam.app), until the user picks Always
+    // Allow: that adds codesign to the key's partition list, which only the login password
+    // can change. App Management can ask too.
     @ViewBuilder
     private var approvals: some View {
         Card {
             if model.trust == .done {
                 WizardRow(row: StatusRow(title: String(localized: "Confirm the Steam update"),
-                          value: String(localized: "macOS shows its usual confirmation while Steam is updated. Sign in as you do on your Mac and choose Always Allow."),
+                          value: String(localized: "macOS asks for your Mac password once, so Steam keeps working with Bridgeplay. Type it and choose Always Allow, and it won't ask again."),
                           tone: .info))
                 Hairline()
             }
