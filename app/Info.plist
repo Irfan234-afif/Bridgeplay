@@ -13,15 +13,15 @@
 	<key>CFBundleExecutable</key>
 	<string>NotProtonApp</string>
 	<key>CFBundleIconFile</key>
-	<string>NotProton</string>
+	<string>Bridgeplay</string>
 	<key>CFBundleIconName</key>
-	<string>NotProton</string>
+	<string>Bridgeplay</string>
 	<key>CFBundleIdentifier</key>
-	<string>com.notproton.NotProton</string>
+	<string>com.bridgeplay.Bridgeplay</string>
 	<key>CFBundleInfoDictionaryVersion</key>
 	<string>6.0</string>
 	<key>CFBundleName</key>
-	<string>NotProton</string>
+	<string>Bridgeplay</string>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
@@ -36,8 +36,10 @@
 	<true/>
 	<key>NSPrincipalClass</key>
 	<string>NSApplication</string>
+	<key>SUEnableAutomaticChecks</key>
+	<false/>
 	<key>SUFeedURL</key>
-	<string>https://github.com/raymondchins/NotProton-WineHQ/releases/latest/download/appcast.xml</string>
+	<string>https://github.com/raymondchins/Bridgeplay/releases/latest/download/appcast.xml</string>
 	<key>SUPublicEDKey</key>
 	<string>KrO6vVqAJozBSnfrLuyhBU/Kfhg8klI8ftl7CQ2sV98=</string>
 </dict>

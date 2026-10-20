@@ -1,4 +1,4 @@
-// Prefix management UI inside NotProton, also see PrefixesModel
+// Prefix management UI inside Bridgeplay, also see PrefixesModel
 
 import SwiftUI
 
@@ -20,7 +20,7 @@ struct PrefixesView: View {
                     String(localized: "No Prefixes"),
                     systemImage: "externaldrive",
                     description: Text(
-                        String(localized: "A prefix appears here once a Windows game has been launched through NotProton.")
+                        String(localized: "A prefix appears here once a Windows game has been launched through Bridgeplay.")
                     )
                 )
                 .frame(maxWidth: .infinity, maxHeight: .infinity)

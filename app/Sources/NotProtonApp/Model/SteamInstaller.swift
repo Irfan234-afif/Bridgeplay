@@ -42,7 +42,7 @@ struct InstallOutcome: Sendable {
 }
 
 enum SteamInstaller {
-    static let step = String(localized: "Install NotProton")
+    static let step = String(localized: "Install Bridgeplay")
 
     typealias ClientStopper = @Sendable (URL, () -> Void) throws -> Bool
     typealias BundleRegistrar = @Sendable (URL) -> Void
@@ -92,7 +92,7 @@ enum SteamInstaller {
             ? nil : try DeploymentContent.acquireInstallationLock(in: lockFolder, steamFolder: app.deletingLastPathComponent())
         defer { installationLock?.release() }
         guard let dylibHashes = try MachOBuild.hashesIgnoringSignature(of: payload.dylib) else {
-            throw StepFailure(step: step, detail: String(localized: "The bundled NotProton dylib is invalid."))
+            throw StepFailure(step: step, detail: String(localized: "The bundled Bridgeplay dylib is invalid."))
         }
         let build = DeploymentContent.Build(version: version, builtAt: payload.builtAt,
                                             dylibHashes: dylibHashes)
@@ -109,11 +109,11 @@ enum SteamInstaller {
         let content = try DeploymentContent.inspect(files: files, bundled: build, installed: previousBuild,
                                                    legacyVersion: SteamBundle.deployedVersion(at: deployedVersion))
         guard content != .newerInstalled else {
-            throw StepFailure(step: step, detail: String(localized: "A newer NotProton build is installed. Use that build to update or repair the installed files."))
+            throw StepFailure(step: step, detail: String(localized: "A newer Bridgeplay build is installed. Use that build to update or repair the installed files."))
         }
         func refuseRunningRunners() throws {
             for id in RunnerStore.clonedBuilds(in: runners) where runnerIsRunning(SupportPaths.runnerRoot(forBuild: id, runners: runners)) {
-                throw StepFailure(step: step, detail: String(localized: "A game or Wine tool is running on build \(id). Quit it before updating NotProton."))
+                throw StepFailure(step: step, detail: String(localized: "A game or Wine tool is running on build \(id). Quit it before updating Bridgeplay."))
             }
         }
         try refuseRunningRunners()
@@ -194,7 +194,7 @@ enum SteamInstaller {
             AppLog.note("install: bundle declares \(landed ?? "no insert")")
             throw StepFailure(
                 step: step,
-                detail: String(localized: "Steam is set up to inject a different dylib. Please repair Steam before installing NotProton.")
+                detail: String(localized: "Steam is set up to inject a different dylib. Please repair Steam before installing Bridgeplay.")
             )
         }
 
@@ -276,7 +276,7 @@ enum SteamInstaller {
         guard foreign.isEmpty else {
             throw StepFailure(
                 step: step,
-                detail: String(localized: "Another dylib is present. Repair your Steam install before installing NotProton.")
+                detail: String(localized: "Another dylib is present. Repair your Steam install before installing Bridgeplay.")
             )
         }
     }
@@ -302,10 +302,10 @@ enum SteamInstaller {
     }
 
     private static let mismatchAcrossAccounts =
-        String(localized: "Steam has a different copy of NotProton, installed by another account on this Mac. Update NotProton from that account, then try again.")
+        String(localized: "Steam has a different copy of Bridgeplay, installed by another account on this Mac. Update Bridgeplay from that account, then try again.")
 
     private static let unpatchedAcrossAccounts =
-        String(localized: "Steam has not been set up for NotProton, and this account cannot change it. Install from the account that owns Steam.")
+        String(localized: "Steam has not been set up for Bridgeplay, and this account cannot change it. Install from the account that owns Steam.")
 
     static func assertBundleIsWritable(_ app: URL) throws {
         let directory = app.appending(path: "Contents/MacOS")
@@ -375,7 +375,7 @@ enum SteamInstaller {
 
     // A self-signed code signing identity in the login keychain. When it exists Steam is signed
     // with it instead of ad hoc, which keeps its designated requirement, and with it the user's
-    // Input Monitoring approval, the same across NotProton updates.
+    // Input Monitoring approval, the same across Bridgeplay updates.
     static let localSigningIdentity = "NotProton Local Signing"
 
     static func signingIdentity() -> String {

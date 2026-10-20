@@ -31,7 +31,7 @@ if "--hardware" not in sys.argv:
             DSB_RAW="1:pcm",
             DYLD_INSERT_LIBRARIES=str(root / "bridge.dylib"),
         )
-        env.pop("DSB_PCM", None)  # Exercise the environment field forwarded by NotProton.
+        env.pop("DSB_PCM", None)  # Exercise the environment field forwarded by Bridgeplay.
         result = subprocess.run(
             [str(root / ("audio-test-" + arch))], env=env, capture_output=True, text=True, timeout=5
         )

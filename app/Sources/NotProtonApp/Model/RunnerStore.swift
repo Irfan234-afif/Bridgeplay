@@ -178,7 +178,7 @@ enum CompatToolList {
             try? FileManager.default.removeItem(atPath: legacy)
         }
         // A tool whose build is gone (Remove Copy, a dropped engine) would stay in Steam's list
-        // and fail on launch, so every NotProton tool the list no longer names goes too.
+        // and fail on launch, so every Bridgeplay tool the list no longer names goes too.
         for tool in SupportPaths.Steam.notprotonTools(in: compatTools) where !tools.contains(tool.lastPathComponent) {
             try? FileManager.default.removeItem(at: tool)
         }

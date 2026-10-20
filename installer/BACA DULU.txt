@@ -1,15 +1,15 @@
-Cara pasang NotProton
+Cara pasang Bridgeplay
 
 Butuh: Mac Apple Silicon (M1 atau lebih baru), macOS 26 atau lebih baru, internet.
 
 1. Klik kanan "Install.command", pilih Open, lalu Open lagi.
    (Cuma pertama kali. Kalau macOS tetap memblokir: System Settings > Privacy & Security,
    scroll ke bawah, klik "Open Anyway".)
-2. NotProton terbuka dengan Setup Assistant. Ikuti saja:
+2. Bridgeplay terbuka dengan Setup Assistant. Ikuti saja:
    - Your Mac: klik Install di Rosetta kalau diminta (minta password Mac).
    - Graphics: sudah otomatis, klik Continue.
    - Steam: login ke akun Steam kamu.
-   - Set Up: klik Set Up. Kalau diminta izin App Management, nyalakan NotProton
+   - Set Up: klik Set Up. Kalau diminta izin App Management, nyalakan Bridgeplay
      di jendela Settings yang terbuka. Setup lanjut sendiri.
 3. Klik Open Steam, pilih game Windows, Install, Play.
 

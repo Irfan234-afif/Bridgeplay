@@ -12,7 +12,7 @@ struct FreeEngineRelease: Sendable {
     // Path of the Wine tree inside the archive.
     let wineTree: String
     let renderer: RendererRelease
-    // sha256 of the winemac.so NotProton ships for this build (winemac-patch/), which
+    // sha256 of the winemac.so Bridgeplay ships for this build (winemac-patch/), which
     // exports the macdrv entry points DXMT needs to put Metal into a window.
     let macDriver: String
     // arch/file -> sha256 of Wine's own file, which stays in lib/wine untouched.
@@ -112,7 +112,7 @@ enum FreeEngine {
         )
     )
 
-    // Shared by both free engines. Hosted on NotProton's own release, since upstream
+    // Shared by both free engines. Hosted on Bridgeplay's own release, since upstream
     // publishes no build of master; the per-file hashes are in docs/DXMT.md. d3d12.dll
     // (x86_64-windows-d3d12/ in the tarball) is the unfinished backend and is never staged.
     static let dxmt = RendererRelease(
@@ -210,7 +210,7 @@ enum FreeEngine {
         guard let source = Bundle.module.url(forResource: "winemac-\(build)", withExtension: "so"),
               Digest.sha256IfPresent(source) == sha256
         else {
-            throw StepFailure(step: step, detail: "NotProton is missing its winemac.so for \(build).")
+            throw StepFailure(step: step, detail: "Bridgeplay is missing its winemac.so for \(build).")
         }
         let destination = root.appending(path: macDriverPath)
         try? FileManager.default.removeItem(at: destination)
@@ -314,7 +314,7 @@ enum FreeEngine {
         guard case .supported(let build) = install.support, build.id == release.build else {
             throw StepFailure(
                 step: step,
-                detail: "The unpacked Wine loader is not the \(release.build) build NotProton was made for."
+                detail: "The unpacked Wine loader is not the \(release.build) build Bridgeplay was made for."
             )
         }
 

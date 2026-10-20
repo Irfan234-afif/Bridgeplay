@@ -19,7 +19,7 @@ enum SetupWinecxCommand {
             }
             if DeploymentContent.current(version: AppVersion.bundled).blocksInstallation {
                 throw StepFailure(step: FreeEngineWinecx.step,
-                                  detail: "Installation is blocked. Use the NotProton app that installed this build.")
+                                  detail: "Installation is blocked. Use the Bridgeplay app that installed this build.")
             }
             if RunnerStore.clonedBuilds().contains(where: {
                 RunnerInstaller.isRunning(from: SupportPaths.runnerRoot(forBuild: $0))

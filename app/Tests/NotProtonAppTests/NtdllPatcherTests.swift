@@ -335,7 +335,7 @@ struct NtdllPatcherTests {
     @Test("Patching the unpatched ntdll reproduces the recorded hashes", arguments: [
         URL(filePath: "/Applications/CrossOver Preview.app/Contents/SharedSupport/CrossOver"),
         URL(filePath: "/Applications/CrossOver.app/Contents/SharedSupport/CrossOver"),
-        // The free engine, once NotProton or NOTPROTON_WINEHQ_ROOT has provided one.
+        // The free engine, once Bridgeplay or NOTPROTON_WINEHQ_ROOT has provided one.
         ProcessInfo.processInfo.environment["NOTPROTON_WINEHQ_ROOT"].map { URL(filePath: $0) }
             ?? SupportPaths.crossOverRoot(inBundle: FreeEngine.bundle()),
     ])

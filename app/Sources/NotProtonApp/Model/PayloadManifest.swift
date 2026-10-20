@@ -1,4 +1,4 @@
-// NotProton payload manifest stuff
+// Bridgeplay payload manifest stuff
 
 import Foundation
 

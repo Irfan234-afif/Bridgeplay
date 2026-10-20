@@ -288,7 +288,7 @@ struct SteamInstallerTests {
             try String(contentsOf: fixture.deployedVersion, encoding: .utf8)
                 .trimmingCharacters(in: .whitespacesAndNewlines) == "2.0.0"
         )
-        // Taken by the first install, and not retaken: a backup of what NotProton itself
+        // Taken by the first install, and not retaken: a backup of what Bridgeplay itself
         // left behind is not a backup of the original.
         #expect(second.backedUpPlist == false)
     }
@@ -563,7 +563,7 @@ struct SteamInstallerTests {
 
         let error = try #require(throws: StepFailure.self) { try install(fixture, calls: calls, stopped: true) }
 
-        #expect(error.detail.contains("newer NotProton"))
+        #expect(error.detail.contains("newer Bridgeplay"))
         #expect(try Data(contentsOf: fixture.deployedDylib) == before)
         #expect(try DeploymentContent.readBuild(at: record) == newer)
         #expect(calls.registrations.isEmpty)

@@ -1,6 +1,6 @@
 import Foundation
 
-// What the Setup Assistant checks and installs before NotProton itself: the Mac, Rosetta,
+// What the Setup Assistant checks and installs before Bridgeplay itself: the Mac, Rosetta,
 // Steam and the user's Steam sign-in.
 enum SetupChecks {
     static let minimumMacOS = 26

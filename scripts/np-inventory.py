@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Inventory installed Steam games and rate them for NotProton.
+"""Inventory installed Steam games and rate them for Bridgeplay.
 
 Reads ~/Library/Application Support/Steam/steamapps/appmanifest_*.acf, queries the Steam store
 (native Mac?), PCGamingWiki (D3D/Vulkan, 64-bit) and AreWeAntiCheatYet (anti-cheat), writes

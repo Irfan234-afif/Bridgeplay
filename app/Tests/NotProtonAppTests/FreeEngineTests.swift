@@ -13,7 +13,7 @@ struct FreeEngineTests {
         return engines
     }
 
-    @Test("The pinned release names a free build NotProton knows how to patch")
+    @Test("The pinned release names a free build Bridgeplay knows how to patch")
     func releaseIsSupported() throws {
         let build = try #require(SupportedRunners.build(id: FreeEngine.current.build))
         #expect(build.isFree)
@@ -37,8 +37,8 @@ struct FreeEngineTests {
         #expect(!CrossOverLicense.check(crossOverRoot: root, searchDirs: []).licensed)
     }
 
-    // Runs against the real archive once it has been downloaded, by NotProton or by hand
-    // into the cache NotProton uses.
+    // Runs against the real archive once it has been downloaded, by Bridgeplay or by hand
+    // into the cache Bridgeplay uses.
     @Test("Unpacking the real archive yields a supported, license-free, patchable engine")
     func unpacksRealArchive() throws {
         let archive = FreeEngine.downloads.appending(path: FreeEngine.current.archive)
@@ -218,7 +218,7 @@ struct FreeEngineTests {
         }
     }
 
-    @Test("DXMT is the pinned master build on NotProton's release, shared by both free engines")
+    @Test("DXMT is the pinned master build on Bridgeplay's release, shared by both free engines")
     func dxmtPins() {
         let dxmt = FreeEngine.current.renderer
         #expect(dxmt.archive == "dxmt-e94c312.tar.gz")
@@ -267,7 +267,7 @@ struct FreeEngineTests {
         return url
     }
 
-    // Downloads the real tarball into NotProton's engine cache (where the app and the other
+    // Downloads the real tarball into Bridgeplay's engine cache (where the app and the other
     // real-archive tests look for it) unless it is already there. NOTPROTON_OFFLINE=1 skips
     // the download, and the test then runs only against a cached copy.
     @Test("The real DXMT master tarball downloads, matches every pin and installs as natives")

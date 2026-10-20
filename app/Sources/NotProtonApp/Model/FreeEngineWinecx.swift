@@ -17,7 +17,7 @@ struct WinecxBackendFile: Sendable, Equatable {
     let sha256: String
 }
 
-// A file NotProton ships in its own bundle and lays into the engine, checked against its pin.
+// A file Bridgeplay ships in its own bundle and lays into the engine, checked against its pin.
 struct WinecxBundledFile: Sendable, Equatable {
     // Resource name and extension in the app bundle.
     let resource: String
@@ -45,13 +45,13 @@ struct WinecxRelease: Sendable {
     // lib/wine/x86_64-windows/<name> -> sha256 of Wine's own copy, for the four DLLs a linked
     // Game Porting Toolkit replaces (WinecxD3DMetal.forwarders).
     let d3dStock: [String: String]
-    // sha256 of the winemac.so NotProton ships for this build: winecx's own with
+    // sha256 of the winemac.so Bridgeplay ships for this build: winecx's own with
     // winemac-patch/winecx-d3dmetal-retina.patch, so D3DMetal sizes a Retina-mode
     // swapchain in Win32 pixels rather than points.
     let macDriver: String
     // Controller support. The runtime's CI built winebus.so without SDL2, so a controller
     // only reached Wine through the IOHID bus, as a raw HID device XInput does not open.
-    // NotProton ships winecx's winebus.so rebuilt with SDL2 and the x86_64 libSDL2 it
+    // Bridgeplay ships winecx's winebus.so rebuilt with SDL2 and the x86_64 libSDL2 it
     // dlopens by leaf name, which dyld finds through winebus.so's @loader_path/../../
     // rpath, i.e. in lib/.
     let gamepad: [WinecxBundledFile]
@@ -370,7 +370,7 @@ enum FreeEngineWinecx {
         layoutProblems(root: root, release: release).isEmpty
     }
 
-    // Every pinned file NotProton lays out, relative to the engine root, with its sha256. The
+    // Every pinned file Bridgeplay lays out, relative to the engine root, with its sha256. The
     // four Direct3D DLLs D3DMetal can replace are not in here: WinecxD3DMetal.layoutProblems
     // checks them, since they are either Wine's own or links into a Game Porting Toolkit.
     static func expectedFiles(_ release: WinecxRelease = current) -> [String: String] {
@@ -505,7 +505,7 @@ enum FreeEngineWinecx {
         guard case .supported(let build) = install.support, build.id == release.build else {
             throw StepFailure(
                 step: step,
-                detail: "The unpacked Wine loader is not the \(release.build) build NotProton was made for."
+                detail: "The unpacked Wine loader is not the \(release.build) build Bridgeplay was made for."
             )
         }
 
@@ -528,7 +528,7 @@ enum FreeEngineWinecx {
             guard let source = Bundle.module.url(forResource: file.resource, withExtension: file.ext),
                   Digest.sha256IfPresent(source) == file.sha256
             else {
-                throw StepFailure(step: step, detail: "NotProton is missing its \(file.resource).\(file.ext).")
+                throw StepFailure(step: step, detail: "Bridgeplay is missing its \(file.resource).\(file.ext).")
             }
             let destination = root.appending(path: file.path)
             try fm.createDirectory(at: destination.deletingLastPathComponent(), withIntermediateDirectories: true)

@@ -30,7 +30,7 @@ struct RunnerBuild: Sendable, Equatable, Identifiable {
 
     var tools: [CompatTool] = []
 
-    // A free WineHQ engine NotProton downloads itself rather than a CrossOver
+    // A free WineHQ engine Bridgeplay downloads itself rather than a CrossOver
     // install. It has no license to check.
     var isFree = false
 

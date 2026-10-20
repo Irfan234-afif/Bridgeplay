@@ -1,9 +1,9 @@
-// Deploys core NotProton components into the copy of CrossOver that NotProton deploys to the Steam location
+// Deploys core Bridgeplay components into the copy of CrossOver that Bridgeplay deploys to the Steam location
 
 import Foundation
 
 enum InstallPayload {
-    static let step = String(localized: "Find NotProton's components")
+    static let step = String(localized: "Find Bridgeplay's components")
 
     static let runtimeFiles = [
         "prepare-game-loader", "game-host.dylib",
@@ -31,7 +31,7 @@ enum InstallPayload {
         guard let url = bundle.url(forResource: "payload", withExtension: nil) else {
             throw StepFailure(
                 step: step,
-                detail: String(localized: "This build of NotProton carries no components at all.")
+                detail: String(localized: "This build of Bridgeplay carries no components at all.")
             )
         }
         return url

@@ -1,5 +1,5 @@
 #!/bin/sh
-# Build NotProton from this checkout and publish it as this fork's latest GitHub release,
+# Build Bridgeplay from this checkout and publish it as this fork's latest GitHub release,
 # which is what the app's "Check for Updates…" (Sparkle, SUFeedURL in app/Info.plist)
 # reads.
 #
@@ -41,20 +41,20 @@ if [ -z "${CX_ROOT:-}" ]; then
 fi
 scripts/build-local.sh --checks
 
-built=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' build/NotProton.app/Contents/Info.plist)
+built=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' build/Bridgeplay.app/Contents/Info.plist)
 [ "$built" = "$version" ] || die "built $built, expected $version"
 
 out=$(mktemp -d)
 trap 'rm -rf "$out"' EXIT
-cp build/NotProton.zip "$out/NotProton.zip"
-printf '%s\n' "$notes" >"$out/NotProton.txt"
+cp build/Bridgeplay.zip "$out/Bridgeplay.zip"
+printf '%s\n' "$notes" >"$out/Bridgeplay.txt"
 "$sparkle/generate_appcast" \
 	--download-url-prefix "https://github.com/$slug/releases/download/v$version/" \
 	--embed-release-notes "$out"
 
-gh release create "v$version" "$out/NotProton.zip" "$out/appcast.xml" -R "$slug" \
+gh release create "v$version" "$out/Bridgeplay.zip" "$out/appcast.xml" -R "$slug" \
 	--target "$(git rev-parse HEAD)" --title "$version" --notes "$notes" --latest
 echo "==> released v$version: https://github.com/$slug/releases/tag/v$version"
 # The release is the zip; the built app copies would only show up in Spotlight next to
-# /Applications/NotProton.app.
-rm -rf build/NotProton.app out/NotProton.app
+# /Applications/Bridgeplay.app.
+rm -rf build/Bridgeplay.app out/Bridgeplay.app

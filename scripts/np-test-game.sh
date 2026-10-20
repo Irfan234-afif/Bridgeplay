@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# np-test-game.sh - launch one Steam game through NotProton, observe it, collect logs.
+# np-test-game.sh - launch one Steam game through Bridgeplay, observe it, collect logs.
 #
 #   scripts/np-test-game.sh <appid> [--seconds N] [--backend dxmt|dxvk|wined3d|d3dmetal] [--stop]
 #

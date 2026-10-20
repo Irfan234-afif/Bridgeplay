@@ -1,4 +1,4 @@
-"""Shared lookups for the NotProton compat tooling (stdlib only).
+"""Shared lookups for the Bridgeplay compat tooling (stdlib only).
 
 Sources: Steam store appdetails (platforms), PCGamingWiki page wikitext (API / middleware
 templates; its Cargo API is closed to anonymous queries), AreWeAntiCheatYet games.json.

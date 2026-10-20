@@ -1,7 +1,7 @@
 #!/bin/sh
 # Build the whole app on this Mac the way .github/workflows/app.yml does on CI.
 #
-#   scripts/build-local.sh            build build/NotProton.app and build/NotProton.zip
+#   scripts/build-local.sh            build build/Bridgeplay.app and build/Bridgeplay.zip
 #   scripts/build-local.sh --checks   the same, then the CI check targets and Swift tests
 #
 # Phases run in CI order: dobby, all, overlay-shim, iconmaker+appinfo, bridge,
@@ -195,10 +195,10 @@ phase fonts make fonts
 phase app-payload make app-payload
 phase app make app
 
-app_out=build/NotProton.app
-zip_out=build/NotProton.zip
+app_out=build/Bridgeplay.app
+zip_out=build/Bridgeplay.zip
 rm -rf "$app_out" "$zip_out"
-ditto out/NotProton.app "$app_out"
+ditto out/Bridgeplay.app "$app_out"
 ditto -c -k --keepParent "$app_out" "$zip_out"
 codesign --verify --strict "$app_out"
 
@@ -245,7 +245,7 @@ fi
 # --- summary -----------------------------------------------------------------------
 
 print_timings
-echo "==> NotProton $version"
+echo "==> Bridgeplay $version"
 echo "    app     $repo/$app_out (ad-hoc signed, codesign --verify --strict ok)"
 echo "    zip     $repo/$zip_out"
 echo "    sha256  $sha"

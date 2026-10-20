@@ -5,7 +5,7 @@ This adapter forwards the two motor values from Winebus's
 It fixes the missing rumble backend for Steam's macOS virtual Xbox gamepad.
 Games using the Steam Controller/Input API directly use their existing route.
 
-The adapter is a universal Mach-O library injected into NotProton's Wine
+The adapter is a universal Mach-O library injected into Bridgeplay's Wine
 processes. It intercepts Wine's dynamic SDL2 symbol lookup for symbols from
 the selected CrossOver runtime.
 
@@ -37,7 +37,7 @@ SDK interfaces and rejects unexpected calls, including LED changes. Steamworks
 headers are obtained through the project's pinned `lsteamclient/fetch.sh`.
 
 The regular app payload includes `controllers/steam-input/rumble.dylib` and
-installs/removes it with the other NotProton runtime components. The run script
+installs/removes it with the other Bridgeplay runtime components. The run script
 enables it for game sessions with direct controller access disabled. To opt
 out for a game, set `NOTPROTON_STEAM_RUMBLE=0 %command%` in Steam launch options.
 `NOTPROTON_RAW_CONTROLLERS=1` also bypasses it, preserving direct DualSense PCM.

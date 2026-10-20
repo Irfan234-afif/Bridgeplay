@@ -118,7 +118,7 @@ struct SetupAssistantView: View {
     private var macStep: some View {
         Section {
             checked(0, StatusRow(title: String(localized: "Apple silicon"),
-                      value: model.appleSilicon ? SetupChecks.chipName : String(localized: "NotProton doesn't run on Intel Macs."),
+                      value: model.appleSilicon ? SetupChecks.chipName : String(localized: "Bridgeplay doesn't run on Intel Macs."),
                       tone: model.appleSilicon ? .ok : .bad))
             checked(1, StatusRow(title: String(localized: "macOS \(SetupChecks.minimumMacOS) or later"),
                       value: model.macOSSupported ? SetupChecks.macOSDisplay : String(localized: "\(SetupChecks.macOSDisplay). Update macOS first."),
@@ -134,7 +134,7 @@ struct SetupAssistantView: View {
                       ) { Task { await model.installRosetta() } }))
         } header: {
             StepHeader(title: "Check your Mac",
-                       detail: "NotProton runs Windows games from your Steam library. First, a few quick checks.")
+                       detail: "Bridgeplay runs Windows games from your Steam library. First, a few quick checks.")
         }
     }
 
@@ -181,12 +181,12 @@ struct SetupAssistantView: View {
                         label: String(localized: "Install Steam"), isProminent: true, isEnabled: !model.isWorking
                       ) { Task { await model.installSteam() } }))
             checked(1, StatusRow(title: String(localized: "Steam account"),
-                      value: model.signedIn ? String(localized: "Signed in.") : String(localized: "Waiting for you to sign in. NotProton never sees your password."),
+                      value: model.signedIn ? String(localized: "Signed in.") : String(localized: "Waiting for you to sign in. Bridgeplay never sees your password."),
                       tone: model.signedIn ? .ok : .info,
                       action: model.signedIn || !model.steamInstalled ? nil : StatusAction(label: String(localized: "Open Steam")) { model.openSteam() }))
         } header: {
             StepHeader(title: "Sign in to Steam",
-                       detail: "Sign in with your account in Steam. NotProton continues on its own once you're in.")
+                       detail: "Sign in with your account in Steam. Bridgeplay continues on its own once you're in.")
         }
     }
 
@@ -204,8 +204,8 @@ struct SetupAssistantView: View {
                     .animation(Self.rowSpring, value: task.state)
             }
         } header: {
-            StepHeader(title: "Set up NotProton",
-                       detail: "NotProton adds itself to Steam, sets up the WineCX engine and makes it Steam's default. Steam closes for a moment.")
+            StepHeader(title: "Set up Bridgeplay",
+                       detail: "Bridgeplay adds itself to Steam, sets up the WineCX engine and makes it Steam's default. Steam closes for a moment.")
         } footer: {
             let done = model.tasks.filter { $0.state == .done }.count
             HStack(spacing: 12) {
@@ -223,7 +223,7 @@ struct SetupAssistantView: View {
         if model.needsAppManagement {
             Section {
                 StatusRow(title: String(localized: "App Management"),
-                          value: String(localized: "Turn on NotProton in Privacy & Security › App Management. Setup continues by itself once it's on."),
+                          value: String(localized: "Turn on Bridgeplay in Privacy & Security › App Management. Setup continues by itself once it's on."),
                           tone: .warning,
                           action: StatusAction(label: Remedy.settingsButton, isProminent: true) { model.openAppManagement() })
             }
@@ -233,7 +233,7 @@ struct SetupAssistantView: View {
     @ViewBuilder
     private var doneStep: some View {
         Section {
-            checked(0, StatusRow(title: String(localized: "NotProton"), value: String(localized: "Installed into Steam."), tone: .ok))
+            checked(0, StatusRow(title: String(localized: "Bridgeplay"), value: String(localized: "Installed into Steam."), tone: .ok))
             checked(1, StatusRow(title: String(localized: "WineCX Engine"), value: String(localized: "Steam's default for Windows games."), tone: .ok))
             checked(2, StatusRow(title: String(localized: "Game Porting Toolkit"),
                       value: model.gptk == nil ? String(localized: "Skipped. Games use DXMT; add it later from Status.") : String(localized: "Linked."),

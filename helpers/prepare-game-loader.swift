@@ -110,7 +110,7 @@ func prepare(_ target: URL, _ info: URL) throws {
         let name = app["CFBundleName"] as? String,
         target.lastPathComponent == "wine"
     else {
-        throw PrepareError.invalid("Not a staged NotProton game loader")
+        throw PrepareError.invalid("Not a staged Bridgeplay game loader")
     }
     var updated = old.filter {
         [

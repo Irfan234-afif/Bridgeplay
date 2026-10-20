@@ -14,13 +14,13 @@ enum InstallIntoSteamCommand {
         do {
             if DeploymentContent.current(version: AppVersion.bundled).blocksInstallation {
                 throw StepFailure(step: SteamInstaller.step,
-                                  detail: "Installation is blocked. Use the NotProton app that installed this build.")
+                                  detail: "Installation is blocked. Use the Bridgeplay app that installed this build.")
             }
             if RunnerStore.clonedBuilds().contains(where: {
                 RunnerInstaller.isRunning(from: SupportPaths.runnerRoot(forBuild: $0))
             }) {
                 throw StepFailure(step: SteamInstaller.step,
-                                  detail: "A game or Wine tool is running. Quit it before updating NotProton.")
+                                  detail: "A game or Wine tool is running. Quit it before updating Bridgeplay.")
             }
             let lock = try DeploymentContent.acquireInstallationLock()
             defer { lock.release() }
@@ -34,7 +34,7 @@ enum InstallIntoSteamCommand {
                 _ = try await ValveFetcher.run { say($0.label) }
             }
             try SteamInstaller.finish(result)
-            say("NotProton \(result.version) installed into Steam.")
+            say("Bridgeplay \(result.version) installed into Steam.")
             return 0
         } catch {
             FileHandle.standardError.write(Data("\(RemoveEverythingCommand.failureMessage(error))\n".utf8))

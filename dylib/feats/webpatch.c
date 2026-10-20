@@ -448,14 +448,14 @@ static int out_expand(np_out_t *o, const char *replace, const np_cap_t *caps) {
     "for(let i=0;i<A.length;i+=20)await Promise.all(A.slice(i,i+20).map(async a=>{const id=a.appid;" \
     "const t=await Promise.race([window.appDetailsStore.RequestAppDetails(id)," \
     "new Promise(r=>setTimeout(r,5e3))]);" \
-    "if(!t){console.warn(\"NotProton: no details for app \"+id+\", its launch options were not moved\");return}" \
+    "if(!t){console.warn(\"Bridgeplay: no details for app \"+id+\", its launch options were not moved\");return}" \
     "if(!(id<2147483648&&(t.vecPlatforms||[]).indexOf(\"osx\")>=0&&!t.strCompatToolName)){" \
     "const r=M(t.strLaunchOptions||\"\");" \
     "if(r!==null){SteamClient.Apps.SetAppLaunchOptions(id,r);n++;" \
-    "console.log(\"NotProton: moved the launch options of app \"+id)}}}));" \
-    "console.log(\"NotProton: checked the launch options of \"+A.length+\" apps, moved \"+n);" \
+    "console.log(\"Bridgeplay: moved the launch options of app \"+id)}}}));" \
+    "console.log(\"Bridgeplay: checked the launch options of \"+A.length+\" apps, moved \"+n);" \
     "localStorage.setItem(K,\"1\")" \
-    "}catch(e){console.error(\"NotProton: launch options migration failed\",e)}})()"
+    "}catch(e){console.error(\"Bridgeplay: launch options migration failed\",e)}})()"
 
 static const np_gate_t g_gates_forcetool[] = {
     // SteamPlay settings section
@@ -580,7 +580,7 @@ static const np_gate_t g_fixes[] = {
     // Pr means macOS, td means Windows.
     // Steam Play makes every game count as available, so the Apple filter goes by oslist.
     // Games missing from appinfo.vdf, and other platforms, keep Steam's check.
-    // NotProton forces is_invalid_os_type to false, so 32-bit Mac games are found through the per-client copy.
+    // Bridgeplay forces is_invalid_os_type to false, so 32-bit Mac games are found through the per-client copy.
     { "case " NP_C1 "." NP_C2 ":return!!(0," NP_C3 ".td)()||" NP_C4
       ".is_available_on_current_platform&&!" NP_C4 ".is_invalid_os_type;",
       NP_WINDOWS_ONLY_CASE(NP_C3, NP_C4) "case " NP_C1 "." NP_C2 ":return " NP_MAC_CHECK(NP_C3, NP_C4)

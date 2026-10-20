@@ -25,7 +25,7 @@ DerivedData/
 
 app/Sources/NotProtonApp/Resources/payload/
 __pycache__/
-installer/NotProton.app/
+installer/Bridgeplay.app/
 installer/gptk/
 installer/cache/
 installer/steam.dmg

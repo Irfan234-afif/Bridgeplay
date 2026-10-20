@@ -12,7 +12,7 @@ struct FreeEngineWinecxTests {
         return url
     }
 
-    @Test("Each pinned release names a free build NotProton knows how to patch",
+    @Test("Each pinned release names a free build Bridgeplay knows how to patch",
           arguments: FreeEngineWinecx.releases.map(\.build))
     func releaseIsSupported(id: String) throws {
         let release = try #require(FreeEngineWinecx.release(build: id))
@@ -117,7 +117,7 @@ struct FreeEngineWinecxTests {
     }
 
     // winemac-patch/winecx-d3dmetal-retina.patch: an engine with winecx's own winemac.so is
-    // outdated, and the copy NotProton installs is the one it pins.
+    // outdated, and the copy Bridgeplay installs is the one it pins.
     @Test("The patched winemac.so ships with the app and replaces winecx's own",
           arguments: FreeEngineWinecx.releases.map(\.build))
     func patchedMacDriver(id: String) throws {
@@ -565,7 +565,7 @@ struct FreeEngineWinecxTests {
 
     // MARK: - Against the real archive
 
-    // Runs once a release's archive is in NotProton's cache, or at NOTPROTON_WINECX_ARCHIVE.
+    // Runs once a release's archive is in Bridgeplay's cache, or at NOTPROTON_WINECX_ARCHIVE.
     private static func realArchive(_ release: WinecxRelease) -> URL? {
         let candidates = [
             ProcessInfo.processInfo.environment["NOTPROTON_WINECX_ARCHIVE"].map { URL(filePath: $0) },
@@ -654,7 +654,7 @@ struct FreeEngineWinecxTests {
 
     // MARK: - Against the user's own Game Porting Toolkit
 
-    // Runs only when a GPTK sits in NotProton's gptk folder. It is only read: the links go
+    // Runs only when a GPTK sits in Bridgeplay's gptk folder. It is only read: the links go
     // into a throwaway engine tree under the repository's scratch/.
     @Test("Linking the real Game Porting Toolkit resolves every link and leaves it untouched")
     func linksRealGameportingToolkit() throws {

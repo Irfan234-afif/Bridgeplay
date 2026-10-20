@@ -1,4 +1,4 @@
-// Path construction for the NotProton support directory and Steam
+// Path construction for the Bridgeplay support directory and Steam
 
 import Foundation
 
@@ -24,10 +24,10 @@ enum SupportPaths {
     static var runners: URL { support.appending(path: "runners") }
     static var backups: URL { support.appending(path: "backups") }
     static var launchers: URL { support.appending(path: "launchers") }
-    // Free WineHQ engines NotProton downloaded, laid out like a CrossOver bundle.
+    // Free WineHQ engines Bridgeplay downloaded, laid out like a CrossOver bundle.
     static var engines: URL { support.appending(path: "engines") }
-    // Per-game defaults NotProton ships. Replaced on every install; the user's own
-    // overrides live in the sibling "gamefixes" directory, which NotProton never writes.
+    // Per-game defaults Bridgeplay ships. Replaced on every install; the user's own
+    // overrides live in the sibling "gamefixes" directory, which Bridgeplay never writes.
     static var gamefixesDefault: URL { support.appending(path: "gamefixes-default") }
 
     static var signatures: URL {

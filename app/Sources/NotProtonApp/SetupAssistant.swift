@@ -58,7 +58,7 @@ final class SetupAssistant {
     @ObservationIgnored private var permissionWatch: Task<Void, Never>?
 
     static let plannedTasks = [
-        SetupTask(id: "steam", title: String(localized: "Add NotProton to Steam")),
+        SetupTask(id: "steam", title: String(localized: "Add Bridgeplay to Steam")),
         SetupTask(id: "engine", title: String(localized: "Set up the WineCX engine")),
         SetupTask(id: "default", title: String(localized: "Make WineCX Steam's default")),
     ]

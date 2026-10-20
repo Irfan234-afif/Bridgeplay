@@ -82,7 +82,7 @@ cat "$work/mac.txt" "$work/own.txt" | awk '
 kept=$(wc -l < "$work/merged.txt" | tr -d ' ')
 
 {
-	echo "# SDL controller mappings for NotProton, built by scripts/update-gamecontrollerdb.sh"
+	echo "# SDL controller mappings for Bridgeplay, built by scripts/update-gamecontrollerdb.sh"
 	echo "# on $(date -u +%Y-%m-%dT%H:%M:%SZ): $community Mac lines from $db, then $owned from $own;"
 	echo "# $kept after keeping the last line per GUID. Regenerate it rather than editing it."
 	cat "$work/merged.txt"

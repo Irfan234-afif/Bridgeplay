@@ -93,7 +93,7 @@ static const char *game_loader_for(const char *path, char *const argv[]) {
 static int game_execv(const char *path, char *const argv[]) {
     const char *loader = game_loader_for(path, argv);
     if (loader) {
-        fprintf(stderr, "NotProton Game Host: game executable stays inside game app (%s)\n",
+        fprintf(stderr, "Bridgeplay Game Host: game executable stays inside game app (%s)\n",
                 strrchr(path, '/') + 1);
         return execv(loader, argv);
     }
