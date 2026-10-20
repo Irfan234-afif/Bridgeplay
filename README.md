@@ -62,8 +62,10 @@ Also running on the same setup: Street Fighter 6, Mortal Kombat 1, The Last of U
 
 1. **Download the installer** from [bridgeplay.dev](https://bridgeplay.dev). About 570 MB, with the engine and graphics already inside.
 2. **Open `Install.command`.** macOS blocks it the first time: open **System Settings > Privacy & Security**, scroll down, click **Open Anyway** and confirm with your password or Touch ID. It needs an admin account, puts everything in place and downloads Steam from Valve if it is missing.
-3. **Follow the Setup Assistant**: Rosetta, graphics, Steam sign-in and one permission.
+3. **Follow the Setup Assistant**: Rosetta, graphics, Steam sign-in and a couple of standard macOS prompts.
 4. **Press Play** on any Windows game in Steam. The first time you use a controller, allow Steam's Input Monitoring request.
+
+Updates install themselves: Bridgeplay, its patch in Steam and the engine. **Refresh** on the Status page checks on demand.
 
 The installer includes Apple's Game Porting Toolkit redistributables under Apple's license, which allows non-commercial distribution only. Bridgeplay is free and non-commercial.
 
