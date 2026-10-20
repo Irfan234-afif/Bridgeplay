@@ -63,4 +63,85 @@ struct SteamDefaultToolTests {
     func refusesUnknownLayout() {
         #expect(SteamDefaultTool.updated("\"InstallConfigStore\"\n{\n}\n", tool: "t") == nil)
     }
+
+    // MARK: Writing, backing up and restoring
+
+    private static func config(_ entry: String?) -> String {
+        Self.head + "\n\t\t\t\t\"CompatToolMapping\"\n\t\t\t\t{\n" + (entry.map { $0 + "\n" } ?? "") + "\t\t\t\t}\n" + Self.tail
+    }
+
+    private func files(_ text: String) throws -> (dir: URL, config: URL, backup: URL) {
+        let dir = try scratchDirectory("default-tool")
+        let config = dir.appending(path: "config.vdf")
+        try Data(text.utf8).write(to: config)
+        return (dir, config, dir.appending(path: "backups/steam-default-tool.json"))
+    }
+
+    private func read(_ url: URL) throws -> String { try String(contentsOf: url, encoding: .utf8) }
+
+    @Test("Nothing is written while Steam runs, since Steam rewrites the file when it quits")
+    func refusesWhileSteamRuns() throws {
+        let f = try files(Self.config(Self.entry("GE-Proton9-1")))
+        defer { try? FileManager.default.removeItem(at: f.dir) }
+
+        #expect(throws: SteamDefaultTool.SteamRunning.self) {
+            try SteamDefaultTool.set("bridgeplay-proton-winecx-11.17", in: f.config, backup: f.backup, steamRunning: { true })
+        }
+        #expect(try read(f.config) == Self.config(Self.entry("GE-Proton9-1")))
+        #expect(!FileManager.default.fileExists(atPath: f.backup.path))
+    }
+
+    @Test("The user's own default is backed up and comes back on restore")
+    func backsUpAndRestoresTheUsersDefault() throws {
+        let original = Self.config(Self.entry("GE-Proton9-1"))
+        let f = try files(original)
+        defer { try? FileManager.default.removeItem(at: f.dir) }
+
+        try SteamDefaultTool.set("bridgeplay-proton-winecx-11.17", in: f.config, backup: f.backup, steamRunning: { false })
+        #expect(try read(f.config) == Self.config(Self.entry("bridgeplay-proton-winecx-11.17")))
+        // Setting another of ours keeps the backup of the user's choice, not of ours.
+        try SteamDefaultTool.set("bridgeplay-proton-winecx-11.18", in: f.config, backup: f.backup, steamRunning: { false })
+
+        #expect(try SteamDefaultTool.restore(in: f.config, backup: f.backup, steamRunning: { false }))
+        #expect(try read(f.config) == original)
+    }
+
+    @Test("A default that was not there is removed again on restore")
+    func restoreRemovesADefaultThatWasNotThere() throws {
+        let original = Self.config(nil)
+        let f = try files(original)
+        defer { try? FileManager.default.removeItem(at: f.dir) }
+
+        try SteamDefaultTool.set("bridgeplay-proton", in: f.config, backup: f.backup, steamRunning: { false })
+        #expect(try SteamDefaultTool.restore(in: f.config, backup: f.backup, steamRunning: { false }))
+        #expect(try read(f.config) == original)
+    }
+
+    @Test("Without a backup, a default naming one of our tools is removed")
+    func restoreWithoutBackupRemovesOurs() throws {
+        let f = try files(Self.config(Self.entry("notproton-winecx-11.17")))
+        defer { try? FileManager.default.removeItem(at: f.dir) }
+
+        #expect(try SteamDefaultTool.restore(in: f.config, backup: f.backup, steamRunning: { false }))
+        #expect(try read(f.config) == Self.config(nil))
+    }
+
+    @Test("A default the user chose since is left alone")
+    func restoreLeavesTheUsersNewChoice() throws {
+        let f = try files(Self.config(Self.entry("GE-Proton9-1")))
+        defer { try? FileManager.default.removeItem(at: f.dir) }
+        try FileManager.default.createDirectory(at: f.backup.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try JSONEncoder().encode(SteamDefaultTool.Backup(previous: nil)).write(to: f.backup)
+
+        // Steam running does not matter when there is nothing to put back.
+        #expect(try SteamDefaultTool.restore(in: f.config, backup: f.backup, steamRunning: { true }) == false)
+        #expect(try read(f.config) == Self.config(Self.entry("GE-Proton9-1")))
+    }
+
+    @Test("The default entry is read with its fields")
+    func readsTheDefault() {
+        #expect(SteamDefaultTool.current(in: Self.config(Self.entry("t")))
+            == SteamDefaultTool.Mapping(name: "t", config: "", priority: "75"))
+        #expect(SteamDefaultTool.current(in: Self.config(nil)) == nil)
+    }
 }
