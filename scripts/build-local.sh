@@ -221,6 +221,22 @@ link_test_sparkle() {
 	fi
 }
 
+# The checks depend on the source, not on the version number, so a tree that already
+# passed (a release right after its bump commit) skips them. Only a clean tree is stamped.
+# BRIDGEPLAY_FORCE_CHECKS=1 runs them anyway.
+checks_stamp=$repo/build/.checks-passed
+source_fingerprint() {
+	git -C "$repo" diff --quiet HEAD -- 2>/dev/null || return 1
+	git -C "$repo" ls-files -s | grep -v '	dylib/version.h$' | shasum | cut -d' ' -f1
+}
+fingerprint=$(source_fingerprint || true)
+if [ "$run_checks" -eq 1 ] && [ -n "$fingerprint" ] && [ "${BRIDGEPLAY_FORCE_CHECKS:-0}" != 1 ] \
+	&& [ "$(cat "$checks_stamp" 2>/dev/null)" = "$fingerprint" ]; then
+	echo "==> [check] skipped: these sources already passed make ci-checks (BRIDGEPLAY_FORCE_CHECKS=1 runs them)"
+	run_checks=0
+	checks_reused=1
+fi
+
 check_failures=""
 if [ "$run_checks" -eq 1 ]; then
 	check_log=$LOG_DIR/checks.log
@@ -249,4 +265,9 @@ if [ -n "$check_failures" ]; then
 	echo "==> checks failed:$check_failures" >&2
 	exit 1
 fi
-[ "$run_checks" -eq 0 ] || echo "==> all CI checks passed"
+if [ "$run_checks" -eq 1 ]; then
+	echo "==> all CI checks passed"
+	[ -z "$fingerprint" ] || printf '%s\n' "$fingerprint" >"$checks_stamp"
+elif [ "${checks_reused:-0}" -eq 1 ]; then
+	echo "==> all CI checks passed (earlier run, same sources)"
+fi

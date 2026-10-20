@@ -207,23 +207,41 @@ feed "$out/bridgeplay" Bridgeplay.zip Bridgeplay.app "$slug"
 # installs over /Applications/NotProton.app; later updates match by bundle identifier.
 [ "$legacy" -eq 0 ] || feed "$out/legacy" NotProton.zip NotProton.app "$legacy_slug"
 
-# bridgeplay.dev's Download links to releases/latest/download/Bridgeplay-Installer.zip, so
-# every release that becomes Latest must carry it, built from this same app.
-APP=$app scripts/package-installer.sh
-mv out/Bridgeplay-Installer.zip "$out/bridgeplay/Bridgeplay-Installer.zip"
-
 title="Bridgeplay $version"
 body=$(printf '%s\n\nBuild %s, based on NotProton %s.\n' "$notes" "$build" "$upstream")
 echo "==> $title (build $build), notes since ${previous:-the beginning}:"
 printf '%s\n' "$notes" | sed 's/^/    /'
 run gh release create "$tag" "$out/bridgeplay/Bridgeplay.zip" "$out/bridgeplay/appcast.xml" \
-	"$out/bridgeplay/Bridgeplay-Installer.zip" -R "$slug" \
-	--target "$(git rev-parse HEAD)" --title "$title" --notes "$body" --latest
+	-R "$slug" --target "$(git rev-parse HEAD)" --title "$title" --notes "$body" --latest
 if [ "$legacy" -eq 1 ]; then
 	# Only a carrier for the feed: the tag goes on that repository's default branch, since
 	# this commit need not exist there. --latest is what moves its feed.
 	run gh release create "$tag" "$out/legacy/NotProton.zip" "$out/legacy/appcast.xml" -R "$legacy_slug" \
 		--title "$title" --notes "NotProton is now Bridgeplay. $body" --latest
+fi
+
+# bridgeplay.dev's Download (vercel.json /download) points at the fixed "installer"
+# release. The installer carries no app (Install.command downloads the Bridgeplay.zip of
+# the Latest release, published just above), so it is uploaded only when its fingerprint,
+# every file it ships, differs from the one on that release.
+installer_tag=installer
+installer_fp=$(scripts/package-installer.sh --fingerprint-only | tail -n 1)
+published_fp=$(gh release view "$installer_tag" -R "$slug" --json body -q .body 2>/dev/null \
+	| sed -n 's/^Fingerprint: //p' || true)
+if [ -n "$installer_fp" ] && [ "$installer_fp" = "$published_fp" ]; then
+	echo "==> installer unchanged ($installer_fp), not uploaded"
+else
+	scripts/package-installer.sh
+	mv out/Bridgeplay-Installer.zip "$out/bridgeplay/Bridgeplay-Installer.zip"
+	installer_body=$(printf 'The one-click installer behind bridgeplay.dev/download. It downloads the latest Bridgeplay when it runs.\n\nFingerprint: %s\n' "$installer_fp")
+	if gh release view "$installer_tag" -R "$slug" >/dev/null 2>&1; then
+		run gh release upload "$installer_tag" "$out/bridgeplay/Bridgeplay-Installer.zip" -R "$slug" --clobber
+		run gh release edit "$installer_tag" -R "$slug" --notes "$installer_body"
+	else
+		run gh release create "$installer_tag" "$out/bridgeplay/Bridgeplay-Installer.zip" -R "$slug" \
+			--target "$(git rev-parse HEAD)" --title "Bridgeplay Installer" --notes "$installer_body" \
+			--prerelease --latest=false
+	fi
 fi
 
 if [ "$dry_run" -eq 1 ]; then

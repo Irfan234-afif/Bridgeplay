@@ -1,15 +1,20 @@
 #!/bin/sh
 # Assemble the one-click installer zip, out/Bridgeplay-Installer.zip.
 #
-#   scripts/package-installer.sh
+#   scripts/package-installer.sh [--fingerprint-only]
 #
-# Takes out/Bridgeplay.app (make app), the engine archives from this Mac's engine cache,
+# The installer carries no app: Install.command downloads the latest Bridgeplay.zip from
+# the GitHub releases, so the zip only changes with the engines, GPTK, the configs or the
+# installer itself, and release-local.sh uploads it only then. --fingerprint-only runs
+# every check and prints that fingerprint without writing the zip.
+#
+# Takes the engine archives from this Mac's engine cache,
 # Apple's Game Porting Toolkit from this Mac's support folder, and installer/ plus the
 # licence files from the repository. Engine archives are checked against the pins in
 # FreeEngine*.swift. Nothing else from the cache is shipped: Valve's packages and Steam
 # itself are downloaded on the user's Mac from Valve. GPTK is never committed.
 #
-# Overridable: APP (default out/Bridgeplay.app), ENGINE_CACHE (default
+# Overridable: ENGINE_CACHE (default
 # ~/Library/Caches/bridgeplay), GPTK_DIR (default ~/Library/Application Support/bridgeplay/gptk).
 # On a Mac the app has not migrated to 3.0.0 yet, the defaults fall back to the old
 # notproton folders when the bridgeplay ones are missing.
@@ -19,7 +24,8 @@ set -eu
 repo=$(cd "$(dirname "$0")/.." && pwd)
 cd "$repo"
 
-APP=${APP:-$repo/out/Bridgeplay.app}
+fingerprint_only=0
+[ "${1:-}" = "--fingerprint-only" ] && fingerprint_only=1
 if [ -z "${ENGINE_CACHE:-}" ]; then
 	ENGINE_CACHE=$HOME/Library/Caches/bridgeplay
 	[ -d "$ENGINE_CACHE" ] || [ ! -d "$HOME/Library/Caches/notproton" ] || ENGINE_CACHE=$HOME/Library/Caches/notproton
@@ -57,14 +63,6 @@ need_file() {
 	actual=$(shasum -a 256 "$1" | cut -d' ' -f1)
 	[ "$actual" = "$2" ] || die "$1 does not match its pin ($actual, want $2)"
 }
-
-# --- the app ----------------------------------------------------------------------
-
-[ -d "$APP" ] || die "missing $APP, run: make app"
-codesign --verify --strict "$APP" || die "$APP fails codesign --verify"
-for f in Assets.car Bridgeplay.icns LICENSE NOTICE; do
-	[ -s "$APP/Contents/Resources/$f" ] || die "$APP has no Contents/Resources/$f, rebuild with: make app"
-done
 
 # --- engine archives, from the pins -----------------------------------------------
 
@@ -129,7 +127,6 @@ echo "==> staging $stage"
 rm -rf "$stage_root" "$zip"
 mkdir -p "$stage/cache/engines/winecx-$runtime"
 
-ditto "$APP" "$stage/Bridgeplay.app"
 cp installer/Install.command "installer/BACA DULU.txt" installer/README.txt "$stage/"
 chmod 755 "$stage/Install.command"
 cp LICENSE LICENSE.* NOTICE "$stage/"
@@ -149,6 +146,16 @@ unwanted=$(find "$stage" \( -name valve-packages -o -name 'steam.dmg' -o -name '
 	-o -name '*.p12' -o -name '*.pem' -o -name '*.key' -o -name '.env*' \) -print)
 [ -z "$unwanted" ] || die "refusing to ship: $unwanted"
 
+# Every staged file's path and content, so the fingerprint moves when anything shipped does.
+fingerprint=$(cd "$stage" && find . -type f ! -name .DS_Store -print0 | LC_ALL=C sort -z \
+	| xargs -0 shasum -a 256 | shasum -a 256 | cut -d' ' -f1)
+if [ "$fingerprint_only" -eq 1 ]; then
+	rm -rf "$stage_root"
+	echo "$fingerprint"
+	exit 0
+fi
+printf '%s\n' "$fingerprint" >"$repo/out/Bridgeplay-Installer.fingerprint"
+
 # --- zip --------------------------------------------------------------------------
 
 echo "==> writing $zip"
@@ -156,12 +163,11 @@ echo "==> writing $zip"
 ditto -c -k --norsrc --noextattr --keepParent "$stage" "$zip"
 
 echo "==> contents"
-(cd "$stage_root" && find Bridgeplay -maxdepth 3 ! -path 'Bridgeplay/Bridgeplay.app/*' \
-	! -path 'Bridgeplay/gptk/*/*' | sort | sed 's/^/    /')
+(cd "$stage_root" && find Bridgeplay -maxdepth 3 ! -path 'Bridgeplay/gptk/*/*' | sort | sed 's/^/    /')
 echo "==> sizes"
 (cd "$stage" && du -sh -- * | sed 's/^/    /')
 echo "==> $zip $(du -h "$zip" | cut -f1) ($(stat -f %z "$zip") bytes)"
 
-# The staged copy holds a second Bridgeplay.app that Spotlight would list next to the
-# installed one; the zip is the deliverable.
+# The zip is the deliverable.
 rm -rf "$stage_root"
+echo "==> fingerprint $fingerprint"

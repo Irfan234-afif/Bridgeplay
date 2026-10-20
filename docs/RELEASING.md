@@ -1,8 +1,14 @@
 # Releasing Bridgeplay
 
-Every release is a GitHub release of `raymondchins/Bridgeplay` carrying `Bridgeplay.zip`,
-`appcast.xml` and `Bridgeplay-Installer.zip` (bridgeplay.dev's Download links to
-`releases/latest/download/Bridgeplay-Installer.zip`). Installed apps read
+Every release is a GitHub release of `raymondchins/Bridgeplay` carrying `Bridgeplay.zip` and
+`appcast.xml`. The one-click `Bridgeplay-Installer.zip` lives on its own prerelease, tag
+`installer` (bridgeplay.dev/download redirects to
+`releases/download/installer/Bridgeplay-Installer.zip`). It carries no app: `Install.command`
+downloads the Latest release's `Bridgeplay.zip` when it runs, so `release-local.sh` uploads
+the installer again only when its fingerprint (every file it ships) changes, which is when
+the engines, GPTK, the configs or the installer itself change. A release whose sources
+already passed `make ci-checks` (only the version bump differs) skips them;
+`BRIDGEPLAY_FORCE_CHECKS=1` runs them anyway. Installed apps read
 `https://github.com/raymondchins/Bridgeplay/releases/latest/download/appcast.xml`
 (`SUFeedURL`), so whatever release is marked **Latest** is the update feed.
 

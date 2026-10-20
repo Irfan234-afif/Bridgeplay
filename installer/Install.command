@@ -1,6 +1,7 @@
 #!/bin/bash
 # Bridgeplay one-click installer.
-# Copies Bridgeplay, Apple's Game Porting Toolkit (D3DMetal), the WineCX engine (no download)
+# Downloads the latest Bridgeplay from GitHub, copies Apple's Game Porting Toolkit
+# (D3DMetal), the WineCX engine (no download)
 # and the default configs, installs Steam from Valve's CDN when it is missing, then opens
 # Bridgeplay, whose Setup Assistant does the rest: Rosetta, sign-in, the App Management
 # permission and the Steam setup. Assembled into a zip by scripts/package-installer.sh.
@@ -33,10 +34,14 @@ steam_url="https://cdn.cloudflare.steamstatic.com/client/installer/steam.dmg"
 valve_team="MXGJJ98X76"
 steam_tmp=""
 steam_mnt=""
+# The installer carries no app, so it never goes stale: it installs the Latest release.
+app_url="https://github.com/raymondchins/Bridgeplay/releases/latest/download/Bridgeplay.zip"
+app_tmp=""
 # shellcheck disable=SC2329 # runs from the EXIT trap
 cleanup() {
     if [ -n "$steam_mnt" ]; then hdiutil detach -quiet "$steam_mnt" >/dev/null 2>&1; fi
     if [ -n "$steam_tmp" ]; then rm -rf "$steam_tmp"; fi
+    if [ -n "$app_tmp" ]; then rm -rf "$app_tmp"; fi
     return 0
 }
 trap cleanup EXIT
@@ -47,7 +52,21 @@ xattr -dr com.apple.quarantine "$here" 2>/dev/null || true
 major="$(sw_vers -productVersion | cut -d. -f1)"
 [ "$major" -ge 26 ] || die "Butuh macOS 26 atau lebih baru (sekarang $(sw_vers -productVersion)). Update macOS dulu."
 [ -w /Applications ] || die "Akun ini tidak bisa menulis ke folder Applications. Login dengan akun admin, lalu jalankan Install.command lagi."
-[ -d "$here/Bridgeplay.app" ] || die "Bridgeplay.app tidak ada di folder installer. Ekstrak ulang zip-nya, lalu coba lagi."
+# An installer from before the app was left out still carries Bridgeplay.app; use it.
+app_src="$here/Bridgeplay.app"
+if [ ! -d "$app_src" ]; then
+    say "Mengunduh Bridgeplay versi terbaru..."
+    app_tmp="$(mktemp -d)"
+    curl -fL --retry 3 --connect-timeout 20 --progress-bar -o "$app_tmp/Bridgeplay.zip" "$app_url" \
+        || die "Bridgeplay gagal diunduh. Cek koneksi internet, lalu jalankan Install.command lagi."
+    ditto -x -k "$app_tmp/Bridgeplay.zip" "$app_tmp" || die "File Bridgeplay yang diunduh rusak. Jalankan Install.command lagi."
+    app_src="$app_tmp/Bridgeplay.app"
+    [ -d "$app_src" ] || die "File Bridgeplay yang diunduh tidak berisi Bridgeplay.app. Jalankan Install.command lagi."
+    [ "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$app_src/Contents/Info.plist" 2>/dev/null)" = "com.bridgeplay.Bridgeplay" ] \
+        || die "File yang diunduh bukan Bridgeplay. Jalankan Install.command lagi."
+    codesign --verify --strict "$app_src" 2>/dev/null \
+        || die "Tanda tangan Bridgeplay yang diunduh tidak valid. Jalankan Install.command lagi."
+fi
 
 say "Memasang Bridgeplay..."
 # quit is asynchronous: wait until the app has gone before its bundle is removed.
@@ -59,7 +78,7 @@ while pgrep -qx BridgeplayApp; do
     waited=$((waited + 1))
 done
 rm -rf /Applications/Bridgeplay.app || die "Bridgeplay lama tidak bisa dihapus dari Applications."
-ditto "$here/Bridgeplay.app" /Applications/Bridgeplay.app || die "Bridgeplay gagal disalin ke Applications."
+ditto "$app_src" /Applications/Bridgeplay.app || die "Bridgeplay gagal disalin ke Applications."
 xattr -dr com.apple.quarantine /Applications/Bridgeplay.app 2>/dev/null || true
 
 if [ ! -d /Applications/Steam.app ]; then
