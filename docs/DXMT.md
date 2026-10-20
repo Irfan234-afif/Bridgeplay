@@ -14,7 +14,7 @@ fixes, the WIP D3D12 backend).
 ## In NotProton
 
 Both free engines download this tarball from
-`https://github.com/raymondchins/NotProton-WineHQ/releases/download/dxmt-e94c312/` into the
+`https://github.com/raymondchins/Bridgeplay/releases/download/dxmt-e94c312/` into the
 engine cache (`FreeEngine.dxmt`, also `FreeEngineWinecx.current.renderer`). `winemetal.so`
 and both `winemetal.dll` go into `lib/wine` as shipped. `d3d10core`, `d3d11` and `dxgi` go to
 `lib/notproton-backends/dxmt/` with the 16 bytes of the Wine builtin marker at 0x40

@@ -119,7 +119,7 @@ enum FreeEngine {
         name: "DXMT e94c312",
         archive: "dxmt-e94c312.tar.gz",
         sha256: "8de0d5b7eb2b96315f6ec8e259c05423ab43212e776196147b30d9f44927f7f0",
-        bases: [URL(string: "https://github.com/raymondchins/NotProton-WineHQ/releases/download/dxmt-e94c312")!],
+        bases: [URL(string: "https://github.com/raymondchins/Bridgeplay/releases/download/dxmt-e94c312")!],
         tree: "e94c312",
         // nvapi64 and nvngx are left out: they only serve DLSS to MetalFX, and an
         // nvapi that answers makes some games take NVIDIA-only paths.
