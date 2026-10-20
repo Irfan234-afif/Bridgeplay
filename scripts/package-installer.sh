@@ -110,7 +110,8 @@ unwanted=$(find "$stage" \( -name valve-packages -o -name 'steam.dmg' -o -name '
 # --- zip --------------------------------------------------------------------------
 
 echo "==> writing $zip"
-ditto -c -k --keepParent "$stage" "$zip"
+# --norsrc --noextattr: no AppleDouble ._ files in the zip.
+ditto -c -k --norsrc --noextattr --keepParent "$stage" "$zip"
 
 echo "==> contents"
 (cd "$stage_root" && find Bridgeplay -maxdepth 3 ! -path 'Bridgeplay/Bridgeplay.app/*' \
@@ -118,3 +119,7 @@ echo "==> contents"
 echo "==> sizes"
 (cd "$stage" && du -sh -- * | sed 's/^/    /')
 echo "==> $zip $(du -h "$zip" | cut -f1) ($(stat -f %z "$zip") bytes)"
+
+# The staged copy holds a second Bridgeplay.app that Spotlight would list next to the
+# installed one; the zip is the deliverable.
+rm -rf "$stage_root"
