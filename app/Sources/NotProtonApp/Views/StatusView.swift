@@ -62,6 +62,7 @@ struct StatusRow: View {
                     Image(systemName: tone.symbol)
                         .font(.system(size: 8))
                         .foregroundStyle(tone.color)
+                        .contentTransition(.symbolEffect(.replace))
                         .frame(width: StatusMetrics.symbolWidth)
                         .accessibilityHidden(true)
                 } else {
@@ -74,6 +75,7 @@ struct StatusRow: View {
                     if let value {
                         Text(value)
                             .foregroundStyle(.secondary)
+                            .contentTransition(.opacity)
                     }
                     if let detail {
                         Text(detail)

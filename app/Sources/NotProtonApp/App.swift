@@ -7,6 +7,7 @@ struct NotProtonApp: App {
     @State private var status = SystemStatus()
     @State private var prefixes = PrefixesModel()
     @State private var pane: Pane = .status
+    @State private var showsSetup = false
     private let updater = AppUpdater()
 
     init() {
@@ -22,6 +23,14 @@ struct NotProtonApp: App {
                 .onChange(of: pane) { prefixes.forgetOutcome() }
                 .onChange(of: status.snapshot?.installedRunners.map(\.id)) {
                     if prefixes.hasLoaded { Task { await prefixes.load() } }
+                }
+                .onChange(of: status.snapshot == nil, initial: true) {
+                    if SetupAssistant.shouldShow(status.snapshot) { showsSetup = true }
+                }
+                .sheet(isPresented: $showsSetup) {
+                    SetupAssistantView()
+                        .environment(status)
+                        .interactiveDismissDisabled()
                 }
         }
         .defaultSize(width: 900, height: 760)
@@ -61,6 +70,11 @@ struct NotProtonApp: App {
         }
 
         CommandMenu("Setup") {
+            Button("Setup Assistant…") { showsSetup = true }
+                .disabled(!status.isIdle)
+
+            Divider()
+
             Button("Install") { Task { await status.requestInstall() } }
                 .keyboardShortcut("i", modifiers: .command)
                 .disabled(!status.canInstall)

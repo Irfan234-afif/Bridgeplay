@@ -25,3 +25,8 @@ DerivedData/
 
 app/Sources/NotProtonApp/Resources/payload/
 __pycache__/
+installer/NotProton.app/
+installer/gptk/
+installer/cache/
+installer/steam.dmg
+installer/GPTK-License.rtf
