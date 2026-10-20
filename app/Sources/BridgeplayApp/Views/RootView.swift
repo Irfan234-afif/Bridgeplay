@@ -76,7 +76,9 @@ struct RootView: View {
                 }
             }
             .safeAreaInset(edge: .top, spacing: 0) {
-                if let banner = status.patchBanner {
+                if MigrationLaunch.shared.pending {
+                    MigrationBanner()
+                } else if let banner = status.patchBanner {
                     PatchBanner(banner: banner)
                 }
             }
@@ -112,5 +114,28 @@ struct RootView: View {
         .clipShape(RoundedRectangle(cornerRadius: BP.radius, style: .continuous))
         .overlay(RoundedRectangle(cornerRadius: BP.radius, style: .continuous).strokeBorder(BP.line, lineWidth: 1))
         .accessibilityHidden(true)
+    }
+}
+
+// Shown while the 3.0.0 folder move waits for Steam or a game to close.
+private struct MigrationBanner: View {
+    var body: some View {
+        HStack(alignment: .center, spacing: 12) {
+            ProgressView().controlSize(.small)
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Finishing the update to Bridgeplay 3")
+                    .font(BP.sans(13, .semibold))
+                Text(MigrationLaunch.shared.bannerMessage)
+                    .font(BP.sans(12))
+                    .foregroundStyle(BP.fg2)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 10)
+        .background(BP.raise)
+        .overlay(alignment: .bottom) { Rectangle().fill(BP.line).frame(height: 1) }
+        .accessibilityElement(children: .combine)
     }
 }

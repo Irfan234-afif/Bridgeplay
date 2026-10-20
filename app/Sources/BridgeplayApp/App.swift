@@ -12,6 +12,7 @@ struct BridgeplayApp: App {
 
     init() {
         AppLog.start()
+        MigrationLaunch.shared.logLaunchResult()
     }
 
     var body: some Scene {
@@ -24,7 +25,9 @@ struct BridgeplayApp: App {
                 .onChange(of: status.snapshot?.installedRunners.map(\.id)) {
                     if prefixes.hasLoaded { Task { await prefixes.load() } }
                 }
+                .task { await MigrationLaunch.shared.finishWhenPossible(status) }
                 .onChange(of: status.snapshot == nil, initial: true) {
+                    if MigrationLaunch.shared.pending { return }
                     if SetupAssistant.shouldShow(status.snapshot) {
                         showsSetup = true
                     } else if status.snapshot != nil {
@@ -55,7 +58,7 @@ struct BridgeplayApp: App {
     }
 
     private func checkSteamPatch(_ trigger: String) {
-        guard status.snapshot != nil else { return }
+        guard status.snapshot != nil, !MigrationLaunch.shared.pending else { return }
         Task { await status.checkSteamPatch(trigger: trigger, setupShowing: showsSetup) }
     }
 
@@ -128,7 +131,7 @@ struct BridgeplayApp: App {
     // After Sparkle relaunches into a newer build, bring the patch in Steam up to date
     // once it is safe to; the setup assistant handles a first install itself.
     private func refreshAfterUpdate() {
-        guard !showsSetup else { return }
+        guard !showsSetup, !MigrationLaunch.shared.pending else { return }
         Task { await PostUpdateRefresh.runIfNeeded(status) }
     }
 
