@@ -122,6 +122,30 @@ struct SteamRepairTests {
         #expect(throws: StepFailure.self) { try SteamRepair.verifyValveSignature(copy) }
     }
 
+    // Setup's download of steam.dmg goes through the same gate before Steam.app is copied.
+    @Test("Setup copies Steam out of the image only when Valve signed it")
+    func setupCopiesOnlyValveSignedSteam() async throws {
+        let work = try scratchDirectory("repair")
+        defer { try? FileManager.default.removeItem(at: work) }
+        let staged = try await stagedStockBundle(into: work)
+
+        let installed = work.appending(path: "apps/Steam.app")
+        try FileManager.default.createDirectory(at: installed.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try SetupChecks.copySteam(from: staged.deletingLastPathComponent(), to: installed)
+        #expect(throws: Never.self) { try SteamRepair.verifyValveSignature(installed) }
+
+        let forged = work.appending(path: "image/Steam.app")
+        try FileManager.default.createDirectory(at: forged.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try FileManager.default.copyItem(at: staged, to: forged)
+        try Shell.check("/usr/bin/codesign", ["-f", "-s", "-", forged.path(percentEncoded: false)])
+        let refused = work.appending(path: "refused/Steam.app")
+        let failure = try #require(throws: StepFailure.self) {
+            try SetupChecks.copySteam(from: forged.deletingLastPathComponent(), to: refused)
+        }
+        #expect(failure.step == SetupChecks.step)
+        #expect(!FileManager.default.fileExists(atPath: refused.path(percentEncoded: false)))
+    }
+
     @Test("A manifest with no bundle row cannot repair")
     func refusesManifestWithoutBundle() async throws {
         let real = try ValvePackageManifest.bundled()

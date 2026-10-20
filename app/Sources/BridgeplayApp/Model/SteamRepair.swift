@@ -41,7 +41,7 @@ enum SteamRepair {
     static let valveTeam = "MXGJJ98X76"
     static let valveIdentifier = "com.valvesoftware.steam"
 
-    private static let step = String(localized: "Repair Steam")
+    static let step = String(localized: "Repair Steam")
 
     static func run(
         manifest suppliedManifest: ValvePackageManifest? = nil,
@@ -148,7 +148,13 @@ enum SteamRepair {
         return staged
     }
 
-    static func verifyValveSignature(_ url: URL) throws {
+    // Requirements codesign evaluates against the certificate chain itself. Text that
+    // `codesign -dvv` prints can be claimed by any self-signed certificate; an anchor in
+    // Apple's root plus Valve's team in the leaf cannot.
+    static let valveRequirement = "=anchor apple generic and certificate leaf[subject.OU] = \"\(valveTeam)\""
+    static let steamRequirement = "=identifier \"\(valveIdentifier)\""
+
+    static func verifyValveSignature(_ url: URL, step: String = step) throws {
         let path = url.path(percentEncoded: false)
 
         let strict = try Shell.run("/usr/bin/codesign", ["--verify", "--strict", path])
@@ -160,22 +166,15 @@ enum SteamRepair {
             )
         }
 
-        let described = try Shell.run("/usr/bin/codesign", ["-dvv", path])
-        let text = described.stdout + described.stderr
-
-        let fields = Set(
-            text.split(separator: "\n").map {
-                $0.trimmingCharacters(in: .whitespacesAndNewlines)
-            }
-        )
-
-        guard fields.contains("TeamIdentifier=\(valveTeam)") else {
+        let signed = try Shell.run("/usr/bin/codesign", ["--verify", "-R", valveRequirement, path])
+        guard signed.succeeded else {
             throw StepFailure(
                 step: step,
                 detail: String(localized: "\(path) is not signed by Valve. Expected TeamIdentifier=\(valveTeam).")
             )
         }
-        guard fields.contains("Identifier=\(valveIdentifier)") else {
+        let named = try Shell.run("/usr/bin/codesign", ["--verify", "-R", steamRequirement, path])
+        guard named.succeeded else {
             throw StepFailure(
                 step: step,
                 detail: String(localized: "\(path) is not the Steam bundle. Expected Identifier=\(valveIdentifier).")
@@ -185,7 +184,7 @@ enum SteamRepair {
 
     static func replace(
         _ app: URL, with staged: URL,
-        verify: (URL) throws -> Void = verifyValveSignature
+        verify: (URL) throws -> Void = { try verifyValveSignature($0) }
     ) throws {
         let files = FileManager.default
         try WriteRefused.catching(app) {
