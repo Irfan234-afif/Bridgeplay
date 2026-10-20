@@ -17,6 +17,10 @@ struct BrandMigrationTests {
         var tools: URL { steam.appending(path: "compatibilitytools.d") }
         var config: URL { steam.appending(path: "config/config.vdf") }
         var localConfig: URL { steam.appending(path: "userdata/123/config/localconfig.vdf") }
+        var external: URL { root.appending(path: "External/SteamLibrary") }
+        var runLogGames: [URL] {
+            [steam.appending(path: "steamapps/compatdata/3764200"), external.appending(path: "steamapps/compatdata/570")]
+        }
 
         func path(_ url: URL) -> String { url.path(percentEncoded: false) }
         func read(_ url: URL) throws -> String { try String(contentsOf: url, encoding: .utf8) }
@@ -202,6 +206,32 @@ struct BrandMigrationTests {
         try Self.write(Self.configText, to: fixture.config)
         try Self.write(Self.localConfigText(home: fixture.path(home)), to: fixture.localConfig)
         try Self.write("\"platform_overrides\"\n{\n}\n", to: fixture.steam.appending(path: "userdata/123/config/compat.vdf"))
+
+        // Two mounted libraries with per-game run logs, and one on a volume that is gone.
+        try Self.write("""
+            "libraryfolders"
+            {
+            \t"0"
+            \t{
+            \t\t"path"\t\t"\(fixture.path(fixture.steam))"
+            \t}
+            \t"1"
+            \t{
+            \t\t"path"\t\t"\(fixture.path(fixture.external))"
+            \t}
+            \t"2"
+            \t{
+            \t\t"path"\t\t"\(fixture.path(root.appending(path: "unmounted")))"
+            \t}
+            }
+
+            """, to: fixture.steam.appending(path: "steamapps/libraryfolders.vdf"))
+        for game in fixture.runLogGames {
+            try Self.write("run log\n", to: game.appending(path: "notproton-run.log"))
+            try Self.write("", to: game.appending(path: "notproton-msync"))
+        }
+        try FileManager.default.createDirectory(
+            at: fixture.steam.appending(path: "steamapps/compatdata/0"), withIntermediateDirectories: true)
         return fixture
     }
 
@@ -227,8 +257,8 @@ struct BrandMigrationTests {
 
         // Support files.
         #expect(try f.read(new.appending(path: "tools")) == """
-            bridgeplay-winecx-11.17\twinecx-11.17\trosetta\tWineCX 11.17 (msync, D3DMetal)
-            bridgeplay\twinecx-11.17\trosetta\tLegacy
+            bridgeplay-proton-winecx-11.17\twinecx-11.17\trosetta\tWineCX 11.17 (msync, D3DMetal)
+            bridgeplay-proton\twinecx-11.17\trosetta\tLegacy
             other-tool\twinehq-11.15\trosetta\tNot ours
 
             """)
@@ -245,7 +275,7 @@ struct BrandMigrationTests {
         // Compatibility tools.
         #expect(!f.exists(f.tools.appending(path: "notproton-winecx-11.17")))
         #expect(!f.exists(f.tools.appending(path: "notproton")))
-        for name in ["bridgeplay-winecx-11.17", "bridgeplay"] {
+        for name in ["bridgeplay-proton-winecx-11.17", "bridgeplay-proton"] {
             let folder = f.tools.appending(path: name)
             #expect(try f.read(folder.appending(path: "compatibilitytool.vdf")) == Self.toolFiles(name)[1].1)
             #expect(try f.read(folder.appending(path: "toolmanifest.vdf")) == Self.toolFiles(name)[0].1)
@@ -268,12 +298,21 @@ struct BrandMigrationTests {
             #expect(permissions == 0o755)
             #expect(try f.read(folder.appending(path: "run.bak-tcc")) == Self.runScript)
         }
+        let ours = try FileManager.default.contentsOfDirectory(atPath: f.path(f.tools)).filter { $0.hasPrefix("bridgeplay") }
+        #expect(ours.sorted() == ["bridgeplay-proton", "bridgeplay-proton-winecx-11.17"])
+
+        // Per-game run logs in every library; prefix markers stay.
+        for game in f.runLogGames {
+            #expect(try f.read(game.appending(path: "bridgeplay-run.log")) == "run log\n")
+            #expect(!f.exists(game.appending(path: "notproton-run.log")))
+            #expect(f.exists(game.appending(path: "notproton-msync")))
+        }
         #expect(try f.read(f.tools.appending(path: "GE-Proton9/compatibilitytool.vdf")) == Self.toolFiles("GE-Proton9")[1].1)
 
         // config.vdf: only the two mappings that are ours.
         #expect(try f.read(f.config) == Self.configText
-            .replacingOccurrences(of: "\"notproton-winecx-11.17\"", with: "\"bridgeplay-winecx-11.17\"")
-            .replacingOccurrences(of: "\"name\"\t\t\"notproton\"\n", with: "\"name\"\t\t\"bridgeplay\"\n"))
+            .replacingOccurrences(of: "\"notproton-winecx-11.17\"", with: "\"bridgeplay-proton-winecx-11.17\"")
+            .replacingOccurrences(of: "\"name\"\t\t\"notproton\"\n", with: "\"name\"\t\t\"bridgeplay-proton\"\n"))
 
         // localconfig.vdf: only LaunchOptions values, only word-initial NOTPROTON_.
         #expect(try f.read(f.localConfig) == Self.localConfigText(home: home)
@@ -302,7 +341,7 @@ struct BrandMigrationTests {
         #expect(summary.mappingsRewritten == 2)
         #expect(summary.launchOptionsRewritten == 2)
         #expect(summary.symlinksFixed == 2)
-        #expect(summary.logsRenamed == 2)
+        #expect(summary.logsRenamed == 4)
         #expect(summary.notes.isEmpty)
         try expectMigrated(f)
 
@@ -327,7 +366,7 @@ struct BrandMigrationTests {
         try BrandMigration.merge(f.migration.legacyCaches, into: f.migration.caches, notes: &notes)
         try BrandMigration.merge(f.migration.legacyHome, into: f.migration.home, notes: &notes)
         // Half of step 5 too: one tool folder renamed but not rewritten.
-        try FileManager.default.moveItem(at: f.tools.appending(path: "notproton"), to: f.tools.appending(path: "bridgeplay"))
+        try FileManager.default.moveItem(at: f.tools.appending(path: "notproton"), to: f.tools.appending(path: "bridgeplay-proton"))
 
         #expect(!f.exists(f.legacySupport))
         #expect(f.migration.isNeeded)
@@ -356,19 +395,19 @@ struct BrandMigrationTests {
         #expect(summary.notes.first?.contains("app.log") == true)
         #expect(!f.exists(f.legacySupport.appending(path: BrandMigration.markerName)))
         #expect(!f.migration.isNeeded)
-        #expect(try f.read(f.support.appending(path: "tools")).hasPrefix("bridgeplay-winecx-11.17\t"))
+        #expect(try f.read(f.support.appending(path: "tools")).hasPrefix("bridgeplay-proton-winecx-11.17\t"))
     }
 
     @Test("A compatibility tool whose new name exists is left in place")
     func keepsToolWhenTargetExists() throws {
         let f = try fixture()
         defer { try? FileManager.default.removeItem(at: f.root) }
-        try Self.write("mine\n", to: f.tools.appending(path: "bridgeplay-winecx-11.17/run"))
+        try Self.write("mine\n", to: f.tools.appending(path: "bridgeplay-proton-winecx-11.17/run"))
 
         let summary = try f.migration.run()
         #expect(summary.toolsRenamed == 1)
         #expect(f.exists(f.tools.appending(path: "notproton-winecx-11.17/run")))
-        #expect(try f.read(f.tools.appending(path: "bridgeplay-winecx-11.17/run")) == "mine\n")
+        #expect(try f.read(f.tools.appending(path: "bridgeplay-proton-winecx-11.17/run")) == "mine\n")
         #expect(summary.notes.contains { $0.contains("notproton-winecx-11.17") })
     }
 
@@ -392,13 +431,33 @@ struct BrandMigrationTests {
             legacySupport: fresh.appending(path: "notproton"), support: fresh.appending(path: "bridgeplay")))
     }
 
+    @Test("Every migrated tool name contains \"proton\", so Steam maps Cloud save paths for it")
+    func migratedNamesContainProton() {
+        let names = ["notproton", "notproton-winecx-11.17", "notproton-winehq", "notproton-winecx",
+                     "notproton-fex-winecx-11.17", "notproton-x"]
+        for name in names {
+            let moved = BrandMigration.migratedToolName(name)
+            #expect(moved?.contains("proton") == true)
+            #expect(moved?.hasPrefix("bridgeplay-proton") == true)
+        }
+    }
+
+    @Test("Libraries come from libraryfolders.vdf, with Steam's own folder always first")
+    func readsLibraries() throws {
+        let f = try fixture()
+        defer { try? FileManager.default.removeItem(at: f.root) }
+        #expect(f.migration.libraries().map(f.path) == [
+            f.path(f.steam), f.path(f.external), f.path(f.root.appending(path: "unmounted")),
+        ])
+    }
+
     @Test("Tool names: only ours are renamed")
     func toolNames() {
-        #expect(BrandMigration.migratedToolName("notproton") == "bridgeplay")
-        #expect(BrandMigration.migratedToolName("notproton-winecx-11.17") == "bridgeplay-winecx-11.17")
-        #expect(BrandMigration.migratedToolName("notproton-fex-winecx-11.17") == "bridgeplay-fex-winecx-11.17")
+        #expect(BrandMigration.migratedToolName("notproton") == "bridgeplay-proton")
+        #expect(BrandMigration.migratedToolName("notproton-winecx-11.17") == "bridgeplay-proton-winecx-11.17")
+        #expect(BrandMigration.migratedToolName("notproton-fex-winecx-11.17") == "bridgeplay-proton-fex-winecx-11.17")
         #expect(BrandMigration.migratedToolName("notprotonx") == nil)
         #expect(BrandMigration.migratedToolName("proton_experimental") == nil)
-        #expect(BrandMigration.migratedToolName("bridgeplay-winehq") == nil)
+        #expect(BrandMigration.migratedToolName("bridgeplay-proton-winehq") == nil)
     }
 }

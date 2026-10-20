@@ -52,7 +52,7 @@ struct BrandMigration: Sendable {
 
     enum Step: String, CaseIterable, Sendable {
         case backup, move, symlinks, supportFiles = "support-files", compatTools = "compat-tools"
-        case compatMapping = "compat-mapping", launchOptions = "launch-options", done
+        case compatMapping = "compat-mapping", launchOptions = "launch-options", runLogs = "run-logs", done
     }
 
     struct Summary: Equatable, Sendable {
@@ -139,6 +139,10 @@ struct BrandMigration: Sendable {
                 summary.launchOptionsRewritten += try rewriteFile(file) { Self.migratedLaunchOptions($0) }
             }
             try record(.launchOptions)
+        }
+        if !done.contains(.runLogs) {
+            summary.logsRenamed += try renameRunLogs()
+            try record(.runLogs)
         }
         try record(.done)
         return summary
@@ -333,10 +337,10 @@ struct BrandMigration: Sendable {
         }
         // Rewriting is idempotent, so a crash between a rename and its rewrite is caught here.
         let current = (try? FileManager.default.contentsOfDirectory(atPath: directory.path(percentEncoded: false))) ?? []
-        for name in current.sorted() where name == "bridgeplay" || name.hasPrefix("bridgeplay-") {
+        for name in current.sorted() where name == Self.newToolPrefix || name.hasPrefix(Self.newToolPrefix + "-") {
             let folder = directory.appending(path: name)
             guard Self.isDirectory(folder) else { continue }
-            let oldName = "notproton" + name.dropFirst("bridgeplay".count)
+            let oldName = "notproton" + name.dropFirst(Self.newToolPrefix.count)
             for file in Self.textFiles(under: folder) {
                 if try rewriteFile(file, { text in
                     let result = rewrittenPaths(text)
@@ -412,12 +416,52 @@ struct BrandMigration: Sendable {
         return (lines.joined(separator: "\n"), count)
     }
 
+    // MARK: Step 8, per-game run logs
+
+    // Renames steamapps/compatdata/<appid>/notproton-run.log in every library Steam lists.
+    // One directory listing per library and one stat per game; a library on a volume that
+    // is not mounted is skipped.
+    private func renameRunLogs() throws -> Int {
+        var renamed = 0
+        for library in libraries() {
+            let compatdata = library.appending(path: "steamapps/compatdata")
+            let games = (try? FileManager.default.contentsOfDirectory(atPath: compatdata.path(percentEncoded: false))) ?? []
+            for game in games.sorted() {
+                let folder = compatdata.appending(path: game)
+                if try Self.renameIfFree(folder.appending(path: "notproton-run.log"),
+                                         to: folder.appending(path: "bridgeplay-run.log")) {
+                    renamed += 1
+                }
+            }
+        }
+        return renamed
+    }
+
+    // Library roots from steamapps/libraryfolders.vdf, always including Steam's own folder.
+    func libraries() -> [URL] {
+        let vdf = steamUserData.appending(path: "steamapps/libraryfolders.vdf")
+        let text = (try? String(contentsOf: vdf, encoding: .utf8)) ?? ""
+        var roots = [steamUserData]
+        for line in text.components(separatedBy: "\n") {
+            guard let (key, value, _) = Self.keyValue(line), key.caseInsensitiveCompare("path") == .orderedSame
+            else { continue }
+            let path = value.replacingOccurrences(of: "\\\\", with: "\\").replacingOccurrences(of: "\\\"", with: "\"")
+            roots.append(URL(filePath: path))
+        }
+        var seen: Set<String> = []
+        return roots.filter { seen.insert($0.path(percentEncoded: false).trimmingSuffix("/")).inserted }
+    }
+
     // MARK: Names
 
-    // notproton -> bridgeplay, notproton-<x> -> bridgeplay-<x>; nil when the tool is not ours.
+    // Steam maps Cloud save paths only for tool names containing "proton".
+    static let newToolPrefix = "bridgeplay-proton"
+
+    // notproton -> bridgeplay-proton, notproton-<x> -> bridgeplay-proton-<x>; nil when the
+    // tool is not ours.
     static func migratedToolName(_ name: String) -> String? {
         guard name == "notproton" || name.hasPrefix("notproton-") else { return nil }
-        return "bridgeplay" + name.dropFirst("notproton".count)
+        return newToolPrefix + name.dropFirst("notproton".count)
     }
 
     // MARK: Text helpers
