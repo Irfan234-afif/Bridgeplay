@@ -42,6 +42,10 @@ const char *np_home_dir(void) {
     return "/nonexistent";
 }
 
+void np_support_path(char *buf, size_t bufsz, const char *home, const char *rel) {
+    snprintf(buf, bufsz, "%s/Library/Application Support/bridgeplay/%s", home, rel ? rel : "");
+}
+
 int np_get_section_containing(const struct mach_header_64 *mh, intptr_t slide,
                               uintptr_t addr, uintptr_t *out_base, size_t *out_size) {
     (void)mh; (void)slide; (void)addr; (void)out_base; (void)out_size;
@@ -109,7 +113,7 @@ static void *checked_dlsym(void *handle, const char *name) {
 static void *first_fallback(void *arg) {
     int *ok = arg;
     const char *name = np_compat_fallback_tool_name();
-    *ok = atomic_load(&home_ready) && strcmp(name, "notproton") == 0;
+    *ok = atomic_load(&home_ready) && strcmp(name, "bridgeplay-proton") == 0;
     return NULL;
 }
 
@@ -336,7 +340,7 @@ static void registration_case(int shift, int mode) {
     partial_paths = mode == 6;
     build_manager(existing, -1);
     for (int i = 0; i < g_tool_count; i++) {
-        snprintf(tools[i].name, sizeof(tools[i].name), "notproton-%d", i);
+        snprintf(tools[i].name, sizeof(tools[i].name), "bridgeplay-proton-%d", i);
         snprintf(tools[i].display, sizeof(tools[i].display), "Tool %d", i);
         snprintf(tools[i].dir, sizeof(tools[i].dir), "/tools/tool%d", i);
         if (i < existing)
@@ -401,23 +405,24 @@ static void tool_list_cases(void) {
         check(0, "the tool list fixture can be written");
         return;
     }
-    fputs("notproton\t27.0.0.40921-fex\tfex\tCrossOver Preview (FEX)\n"
-          "notproton-fex-41069\t27.0.0.41069-fex\tfex\tCrossOver Preview 41069 (FEX)\n"
-          "notproton-fex-rosetta\t27.0.0.40921-fex\trosetta\tCrossOver Preview (Rosetta)\n"
+    fputs("bridgeplay-proton\t27.0.0.40921-fex\tfex\tCrossOver Preview (FEX)\n"
+          "bridgeplay-proton-fex-41069\t27.0.0.41069-fex\tfex\tCrossOver Preview 41069 (FEX)\n"
+          "bridgeplay-proton-fex-rosetta\t27.0.0.40921-fex\trosetta\tCrossOver Preview (Rosetta)\n"
           "notproton-26.3\t26.3.0.39832\trosetta\tCrossOver 26.3\n"
-          "notproton\t26.3.0.39832\trosetta\tDuplicate\n"
+          "bridgeplay-proton\t26.3.0.39832\trosetta\tDuplicate\n"
           "proton-other\t1\trosetta\tForeign\n"
-          "notproton-x\t1\tarm\tBad flavor\n"
-          "notproton-q\t1\trosetta\tQuote\"d\n"
-          "notproton-short\t1\trosetta\n"
+          "bridgeplay-other\t1\trosetta\tNo proton in the name\n"
+          "bridgeplay-proton-x\t1\tarm\tBad flavor\n"
+          "bridgeplay-proton-q\t1\trosetta\tQuote\"d\n"
+          "bridgeplay-proton-short\t1\trosetta\n"
           "\n", f);
     fclose(f);
 
     int kept = np_compat_load_tool_list(path, "/tools");
     unlink(path);
 
-    check(kept == 4, "only well-formed, unique, notproton-named lines are kept");
-    check(strcmp(g_tools[0].name, "notproton") == 0
+    check(kept == 4, "only well-formed, unique lines named bridgeplay-proton or notproton are kept");
+    check(strcmp(g_tools[0].name, "bridgeplay-proton") == 0
           && strcmp(g_tools[0].flavor, "fex") == 0, "the first line stays first");
     check(strcmp(g_tools[3].build, "26.3.0.39832") == 0
           && strcmp(g_tools[3].dir, "/tools/notproton-26.3") == 0,
@@ -427,16 +432,16 @@ static void tool_list_cases(void) {
     *(const char **)(entries + np_compat_tool_stride() + COMPAT_TOOL_NAME_OFF) = "notproton-26.3";
     check(np_compat_registered_tool(mgr) == entries + np_compat_tool_stride(),
           "the most preferred tool the manager holds is the default");
-    *(const char **)(entries + COMPAT_TOOL_NAME_OFF) = "notproton";
+    *(const char **)(entries + COMPAT_TOOL_NAME_OFF) = "bridgeplay-proton";
     check(np_compat_registered_tool(mgr) == entries,
           "the first listed tool wins when the manager holds it");
 
     const char *fex[3] = { NULL, NULL, NULL };
-    check(np_compat_fex_tools(fex, 3) == 2 && strcmp(fex[0], "notproton") == 0
-          && strcmp(fex[1], "notproton-fex-41069") == 0 && !fex[2],
+    check(np_compat_fex_tools(fex, 3) == 2 && strcmp(fex[0], "bridgeplay-proton") == 0
+          && strcmp(fex[1], "bridgeplay-proton-fex-41069") == 0 && !fex[2],
           "only the fex flavor counts as FEX, not a FEX build's Rosetta tool");
     fex[0] = fex[1] = NULL;
-    check(np_compat_fex_tools(fex, 1) == 1 && strcmp(fex[0], "notproton") == 0 && !fex[1],
+    check(np_compat_fex_tools(fex, 1) == 1 && strcmp(fex[0], "bridgeplay-proton") == 0 && !fex[1],
           "the FEX list stops at its limit, keeping the first listed");
 
     f = fopen(path, "w");
@@ -445,13 +450,13 @@ static void tool_list_cases(void) {
         return;
     }
     for (int i = 0; i < 40; i++)
-        fprintf(f, "notproton-%d\t1\trosetta\tTool %d\n", i, i);
+        fprintf(f, "bridgeplay-proton-%d\t1\trosetta\tTool %d\n", i, i);
     fclose(f);
     kept = np_compat_load_tool_list(path, "/tools");
     unlink(path);
-    check(kept == 40 && strcmp(g_tools[39].name, "notproton-39") == 0
-          && strcmp(g_tools[0].dir, "/tools/notproton-0") == 0, "a long list keeps every tool");
-    check(strcmp(np_compat_fallback_tool_name(), "notproton-0") == 0,
+    check(kept == 40 && strcmp(g_tools[39].name, "bridgeplay-proton-39") == 0
+          && strcmp(g_tools[0].dir, "/tools/bridgeplay-proton-0") == 0, "a long list keeps every tool");
+    check(strcmp(np_compat_fallback_tool_name(), "bridgeplay-proton-0") == 0,
           "the fallback is the first configured tool");
     check(np_compat_fex_tools(fex, 3) == 0, "a list with no FEX tool has no FEX names");
 
@@ -461,19 +466,24 @@ static void tool_list_cases(void) {
 
 static void tool_launch_cases(void) {
     static const char *tool[] = {
+        "'/tools/compatibilitytools.d/bridgeplay-proton/.'/run waitforexitandrun  '/g/game.exe'",
+        "A=1 '/tools/compatibilitytools.d/bridgeplay-proton-26.3/.'/run waitforexitandrun  '/g/game.exe' -x",
+        "'/tools/compatibilitytools.d/bridgeplay-proton-fex-rosetta/.'/run run ",
+        "'/tools/compatibilitytools.d/bridgeplay-proton'/run waitforexitandrun  '/g/game.exe'",
+        "'/Volumes/Ext/Steam/compatibilitytools.d/bridgeplay-proton/.'/run waitforexitandrun '/g/game.exe'",
         "'/tools/compatibilitytools.d/notproton/.'/run waitforexitandrun  '/g/game.exe'",
         "A=1 '/tools/compatibilitytools.d/notproton-26.3/.'/run waitforexitandrun  '/g/game.exe' -x",
-        "'/tools/compatibilitytools.d/notproton-fex-rosetta/.'/run run ",
-        "'/tools/compatibilitytools.d/notproton'/run waitforexitandrun  '/g/game.exe'",
-        "'/Volumes/Ext/Steam/compatibilitytools.d/notproton/.'/run waitforexitandrun '/g/game.exe'",
+        "'/tools/compatibilitytools.d/proton-other/.'/run x '/tools/compatibilitytools.d/notproton/.'/run run ",
     };
     static const char *native[] = {
         "'/g/Game.app' -windowed",
         "'/g/Game.app/Contents/MacOS/Game'",
         "'/tools/compatibilitytools.d/proton-other/.'/run waitforexitandrun '/g/game.exe'",
+        "'/tools/compatibilitytools.d/bridgeplay/.'/run waitforexitandrun '/g/game.exe'",
+        "'/tools/compatibilitytools.d/bridgeplay-proton/Game' -x",
+        "'/tools/compatibilitytools.d/bridgeplay-proton/sub/.'/run waitforexitandrun '/g/game.exe'",
+        "'/tools/compatibilitytools.d/bridgeplay-proton'/other '/g/game.exe'",
         "'/tools/compatibilitytools.d/notproton/Game' -x",
-        "'/tools/compatibilitytools.d/notproton/sub/.'/run waitforexitandrun '/g/game.exe'",
-        "'/tools/compatibilitytools.d/notproton'/other '/g/game.exe'",
         "",
     };
     for (size_t i = 0; i < sizeof(tool) / sizeof(tool[0]); i++)
@@ -502,27 +512,31 @@ static void stale_tool_cases(void) {
         check(0, "the tools directory fixture can be made");
         return;
     }
-    char current[700], legacy[700], user[700], lookalike[700];
-    snprintf(current, sizeof(current), "%s/notproton-26.3", root);
+    char current[700], renamed[700], legacy[700], user[700], lookalike[700];
+    snprintf(current, sizeof(current), "%s/bridgeplay-proton-26.3", root);
+    snprintf(renamed, sizeof(renamed), "%s/notproton-winehq", root);
     snprintf(legacy, sizeof(legacy), "%s/notproton", root);
     snprintf(user, sizeof(user), "%s/notproton-mine", root);
-    snprintf(lookalike, sizeof(lookalike), "%s/notproton-copy", root);
-    const char *dirs[] = { current, legacy, user, lookalike };
-    for (size_t i = 0; i < 4; i++) mkdir(dirs[i], 0755);
+    snprintf(lookalike, sizeof(lookalike), "%s/bridgeplay-proton-copy", root);
+    const char *dirs[] = { current, renamed, legacy, user, lookalike };
+    for (size_t i = 0; i < 5; i++) mkdir(dirs[i], 0755);
 
     put(current, "flavor", "rosetta\n");
-    put(current, "run", "#!/bin/sh\n# notproton CrossOver compatibility tool shim\n");
+    put(current, "run", "#!/bin/sh\n# bridgeplay CrossOver compatibility tool shim\n");
+    put(renamed, "flavor", "rosetta\n");
+    put(renamed, "run", "#!/bin/sh\n# notproton CrossOver compatibility tool shim\n");
     put(legacy, "run", "#!/bin/sh\n# notproton CrossOver compatibility tool shim\nset -e\n");
     put(legacy, "toolmanifest.vdf", "\"manifest\" {}\n");
     put(legacy, "compatibilitytool.vdf", "\"compatibilitytools\" {}\n");
     put(user, "run", "#!/bin/sh\nexec my-wine \"$@\"\n");
-    put(lookalike, "run", "#!/bin/sh\n# notproton CrossOver compatibility tool shim\n");
+    put(lookalike, "run", "#!/bin/sh\n# bridgeplay CrossOver compatibility tool shim\n");
     put(lookalike, "notes.txt", "mine\n");
 
     g_tool_count = 0;
     remove_unlisted_tools(root);
 
     check(!exists(current), "an unlisted tool with a flavor file is removed");
+    check(!exists(renamed), "an unlisted tool under the pre-3.0 name is removed");
     check(!exists(legacy), "the single-tool dylib's directory is removed");
     check(exists(user), "a notproton directory the user wrote stays");
     char notes[768];

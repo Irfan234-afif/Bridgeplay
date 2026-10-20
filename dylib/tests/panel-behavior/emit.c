@@ -2,6 +2,7 @@
 // Both forms come from one body, which is what makes the checks that run against
 // this output speak for both page shapes at once.
 #include "../../feats/webpatch.c"
+#include "../../util/file.c"
 
 #include <stdio.h>
 #include <string.h>

@@ -454,6 +454,16 @@ static void none_entry_cases(void) {
         if (strcmp(r.tools[i].name, NP_COMPAT_TOOL_NONE) == 0) has_none = 1;
     check(has_none, "the none entry appears when the app already holds it");
 
+    // The pre-3.0 none name is still the none choice, shown as selected.
+    stub_app_mapping_val = NP_COMPAT_TOOL_NONE_LEGACY;
+    rc = get_compat_tools(build_request(REQ_HAS_APPID, 7), (uintptr_t)response_buf);
+    decode_reply(&r);
+    has_none = 0;
+    for (int i = 0; i < r.count; i++)
+        if (strcmp(r.tools[i].name, NP_COMPAT_TOOL_NONE) == 0 && r.tools[i].is_active) has_none = 1;
+    check(has_none, "the legacy none name selects the none entry");
+    stub_app_mapping_val = NULL;
+
     // The none entry never appears for the global scope (appid 0).
     stub_wildcard_val = "crossover";
     rc = get_compat_tools(build_request(0, 0), (uintptr_t)response_buf);

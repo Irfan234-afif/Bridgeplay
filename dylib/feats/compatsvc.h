@@ -4,6 +4,7 @@
 
 #include <stdint.h>
 #include <stddef.h>
+#include <string.h>
 #include <mach-o/loader.h>
 
 // Registers on first route lookup rather than at install time
@@ -20,8 +21,15 @@ enum {
 };
 int np_compatsvc_routes(void);
 
-// Sentinel name for "no tool".
-#define NP_COMPAT_TOOL_NONE "notproton.none"
+// Sentinel name for "no tool", which Steam keeps in CompatToolMapping. Releases before
+// Bridgeplay 3.0 wrote the legacy one, and it means the same until the app rewrites it.
+#define NP_COMPAT_TOOL_NONE        "bridgeplay-proton.none"
+#define NP_COMPAT_TOOL_NONE_LEGACY "notproton.none"
+
+static inline int np_compat_is_none(const char *name) {
+    return name && (strcmp(name, NP_COMPAT_TOOL_NONE) == 0
+                    || strcmp(name, NP_COMPAT_TOOL_NONE_LEGACY) == 0);
+}
 
 // Tells the page the mapping changed.
 void np_compatsvc_state_changed(void);

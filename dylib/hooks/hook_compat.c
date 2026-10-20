@@ -77,7 +77,7 @@ static void *hook_FindToolForTargetApp(void *self, uint32_t appid) {
 
     // The NP_COMPAT_TOOL_NONE sentinel is honored as an explicit refusal.
     const char *mapping = np_compat_app_mapping(self, appid);
-    if (mapping && strcmp(mapping, NP_COMPAT_TOOL_NONE) == 0)
+    if (np_compat_is_none(mapping))
         return NULL;
 
     if (!np_compat_would_force(self, appid))

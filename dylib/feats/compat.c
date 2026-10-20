@@ -19,7 +19,10 @@
 // The client maps Cloud's Windows path roots into the compat prefix only when
 // the tool's name contains "proton" so without a match every AutoCloud rule silently
 // skips the app.
-#define TOOL_DIR_NAME "notproton"
+#define TOOL_DIR_NAME "bridgeplay-proton"
+// The prefix tools had before Bridgeplay 3.0. The app renames them, and until it has, a
+// tool under the old name is still ours.
+#define LEGACY_TOOL_DIR_NAME "notproton"
 #define TOOL_RUN      "/run"
 
 #define COMPAT_MANAGER_ENABLED_OFF  0x7B0
@@ -363,8 +366,13 @@ static int is_token(const char *s, const char *extra) {
     return 1;
 }
 
+static int has_tool_prefix(const char *s) {
+    return strncmp(s, TOOL_DIR_NAME, strlen(TOOL_DIR_NAME)) == 0
+        || strncmp(s, LEGACY_TOOL_DIR_NAME, strlen(LEGACY_TOOL_DIR_NAME)) == 0;
+}
+
 static int is_tool_name(const char *s) {
-    return s && strncmp(s, TOOL_DIR_NAME, strlen(TOOL_DIR_NAME)) == 0 && is_token(s, "._-");
+    return s && has_tool_prefix(s) && is_token(s, "._-");
 }
 
 static int is_display(const char *s) {
@@ -464,7 +472,7 @@ static void load_tool_list(void) {
     if (!home || tools_dir_path(tools_dir, sizeof(tools_dir)) != 0) return;
 
     char path[512];
-    snprintf(path, sizeof(path), "%s/Library/Application Support/notproton/tools", home);
+    np_support_path(path, sizeof(path), home, "tools");
     np_compat_load_tool_list(path, tools_dir);
 }
 
@@ -526,7 +534,8 @@ static int write_tool(const tool_entry_t *tool) {
     return 0;
 }
 
-#define RUN_SCRIPT_MARK "\n# notproton CrossOver compatibility tool shim\n"
+#define RUN_SCRIPT_MARK        "\n# bridgeplay CrossOver compatibility tool shim\n"
+#define LEGACY_RUN_SCRIPT_MARK "\n# notproton CrossOver compatibility tool shim\n"
 
 static int written_here(const char *tool_dir) {
     char path[768];
@@ -540,7 +549,7 @@ static int written_here(const char *tool_dir) {
     size_t got = fread(head, 1, sizeof(head) - 1, f);
     fclose(f);
     head[got] = '\0';
-    return strstr(head, RUN_SCRIPT_MARK) != NULL;
+    return strstr(head, RUN_SCRIPT_MARK) != NULL || strstr(head, LEGACY_RUN_SCRIPT_MARK) != NULL;
 }
 
 static void remove_tool(const char *tools_dir, const char *name) {
@@ -578,7 +587,7 @@ static void remove_unlisted_tools(const char *tools_dir) {
 
     struct dirent *e;
     while ((e = readdir(dir)) != NULL) {
-        if (strncmp(e->d_name, TOOL_DIR_NAME, strlen(TOOL_DIR_NAME)) != 0) continue;
+        if (!has_tool_prefix(e->d_name)) continue;
         if (is_listed(e->d_name)) continue;
         remove_tool(tools_dir, e->d_name);
     }
@@ -628,13 +637,14 @@ const char *np_compat_tool_dir(void) {
 }
 
 int np_compat_runs_tool(const char *cmd) {
-    static const char lead[]    = "/compatibilitytools.d/" TOOL_DIR_NAME;
+    static const char lead[]    = "/compatibilitytools.d/";
     static const char run[]     = "'" TOOL_RUN " ";
     static const char run_dot[] = "/.'" TOOL_RUN " ";
     if (!cmd) return 0;
 
     for (const char *at = strstr(cmd, lead); at; at = strstr(at + 1, lead)) {
         const char *p = at + sizeof(lead) - 1;
+        if (!has_tool_prefix(p)) continue;
         while (is_name_char(*p, "._-"))
             p++;
         if (strncmp(p, run, sizeof(run) - 1) == 0 || strncmp(p, run_dot, sizeof(run_dot) - 1) == 0)
@@ -901,8 +911,10 @@ void *np_compat_registered_tool(void *compat_mgr) {
         return NULL;
 
     load_tool_list_once();
-    if (g_tool_count == 0)
-        return find_tool(compat_mgr, TOOL_DIR_NAME);
+    if (g_tool_count == 0) {
+        void *entry = find_tool(compat_mgr, TOOL_DIR_NAME);
+        return entry ? entry : find_tool(compat_mgr, LEGACY_TOOL_DIR_NAME);
+    }
 
     for (int i = 0; i < g_tool_count; i++) {
         void *entry = find_tool(compat_mgr, g_tools[i].name);

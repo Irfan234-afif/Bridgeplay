@@ -34,7 +34,7 @@ for (const form of Object.keys(FORMS)) {
         'Lascia che i giochi leggano direttamente i controller (può interferire con Steam Input, sconsigliato)'));
       assert(nodes.some(n => n.props.label === t('Disable hidraw', '停用 hidraw', 'Disable hidraw')));
       raw.props.onChange(true);
-      assert.equal(written.at(-1).opts, 'NOTPROTON_RAW_CONTROLLERS=1 CX_GRAPHICS_BACKEND=dxmt %command%');
+      assert.equal(written.at(-1).opts, 'BRIDGEPLAY_RAW_CONTROLLERS=1 CX_GRAPHICS_BACKEND=dxmt %command%');
       const hud = nodes.find(n => n.props.label === t('Metal HUD', 'Metal 性能监视器', 'Metal HUD'));
       hud.props.onChange(true);
       assert.equal(written.at(-1).opts, 'MTL_HUD_ENABLED=1 CX_GRAPHICS_BACKEND=dxmt %command%');
