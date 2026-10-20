@@ -1010,6 +1010,26 @@ display alert "$1" message "$2" as critical
 APPLESCRIPT
 }
 
+# A game's first launch builds its prefix and then compiles its shaders into the Metal cache,
+# which can leave a black screen for minutes. Says so once, without holding up the launch.
+# First means no prefix yet, or neither our marker nor a Metal cache for the game's launcher
+# bundle (games from before the marker existed have the cache, so they stay quiet).
+first_launch_notice() {
+  [ "$verb" = waitforexitandrun ] && [ "$app_id" != 0 ] || return 0
+  marker="$STEAM_COMPAT_DATA_PATH/bridgeplay-first-launch"
+  [ -e "$marker" ] && return 0
+  : > "$marker" 2>/dev/null || true
+  if [ -f "$STEAM_COMPAT_DATA_PATH/pfx/system.reg" ]; then
+    metal_cache="$(getconf DARWIN_USER_CACHE_DIR 2>/dev/null)com.notproton.launcher.$app_id/com.apple.metal"
+    [ -d "$metal_cache" ] && return 0
+  fi
+  echo "=== first launch, notice shown ===" >> "$log" 2>&1 || true
+  (
+    exec 8>&- 9>&-
+    osascript -e 'display notification "The first launch sets the game up and prepares its graphics. It can take a few minutes, and the screen may stay black until it is ready." with title "Bridgeplay" subtitle "Getting this game ready"'
+  ) >/dev/null 2>&1 &
+}
+
 # A quote or backslash in the text would end the AppleScript string early.
 alert_safe() {
   # shellcheck disable=SC1003 # the pair deletes a literal backslash, not a quote
@@ -1885,6 +1905,7 @@ if [ -n "$STEAM_COMPAT_DATA_PATH" ]; then
     echo "avx: ROSETTA_ADVERTISE_AVX=$ROSETTA_ADVERTISE_AVX from $avx_from" >> "$log" 2>&1 || true
   fi
   without_lock_fds "$WINESERVER" -k >> "$log" 2>&1 || true
+  first_launch_notice
   stage_step="prefix seed"
   seed_prefix_from_template
   stage_step="profile layout"
