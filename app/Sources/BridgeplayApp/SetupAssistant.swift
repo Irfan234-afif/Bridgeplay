@@ -71,7 +71,7 @@ final class SetupAssistant {
     // so the assistant can be clicked through on a Mac that is already set up.
     let isPreview: Bool
 
-    init(preview: Preview? = nil) {
+    init(preview: Preview? = nil, startAt start: Step = .mac) {
         isPreview = preview != nil
         let located = preview == .fresh ? nil : WinecxD3DMetal.locate()
         gptk = located
@@ -80,6 +80,16 @@ final class SetupAssistant {
             rosettaInstalled = false
             signedIn = false
             trust = .needed
+        }
+        // The preview can open on a later step; the steps before it count as passed, so a
+        // fresh Mac shows step 4 as someone who pressed Trust in step 3 would see it.
+        if isPreview, start != .mac {
+            step = start
+            if start.rawValue > Step.steam.rawValue {
+                rosettaInstalled = true
+                signedIn = true
+                trust = .done
+            }
         }
     }
 

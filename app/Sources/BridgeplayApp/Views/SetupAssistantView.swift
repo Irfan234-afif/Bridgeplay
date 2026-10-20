@@ -270,6 +270,9 @@ struct SetupAssistantView: View {
     private var finishStep: some View {
         StepHeader(step: model.step, title: "Set up Bridgeplay",
                    detail: "Bridgeplay adds itself to Steam, sets up the WineCX engine and makes it Steam's default. Steam closes for a moment.")
+        if model.tasks.contains(where: { $0.state != .done }) {
+            approvals
+        }
         Card {
             ForEach(Array(model.tasks.enumerated()), id: \.element.id) { index, task in
                 if index > 0 { Hairline() }
@@ -298,6 +301,24 @@ struct SetupAssistantView: View {
                           detail: String(localized: "After a Bridgeplay update the switch can look on but no longer work. Turn it off and on again, or remove Bridgeplay from the list with − and add it back with +."),
                           action: StatusAction(label: Remedy.settingsButton, isProminent: true) { model.openAppManagement() }))
             }
+        }
+    }
+
+    // Told before Set Up is pressed, so the macOS dialogs that follow are expected. Signing
+    // Steam with the step 3 certificate can make macOS ask for the login password, once per
+    // signed file (the add-on, Steam's executable, Steam.app); App Management can ask too.
+    @ViewBuilder
+    private var approvals: some View {
+        Card {
+            if model.trust == .done {
+                WizardRow(row: StatusRow(title: String(localized: "Confirm the Steam update"),
+                          value: String(localized: "macOS shows its usual confirmation while Steam is updated. Sign in as you do on your Mac and choose Always Allow."),
+                          tone: .info))
+                Hairline()
+            }
+            WizardRow(row: StatusRow(title: String(localized: "Allow Bridgeplay in App Management"),
+                      value: String(localized: "If macOS shows the switch, turn it on. Setup carries on by itself."),
+                      tone: .info))
         }
     }
 

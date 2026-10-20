@@ -16,6 +16,14 @@ struct SetupPreviewApp: App {
     private static let mainFirst = CommandLine.arguments.contains("--main")
     private let preview: SetupAssistant.Preview =
         CommandLine.arguments.contains("--fresh") ? .fresh : .thisMac
+    // --step 4 opens on Set Up; numbers match the wizard's "Step N of 5".
+    private static let start: SetupAssistant.Step = {
+        let arguments = CommandLine.arguments
+        guard let index = arguments.firstIndex(of: "--step"), index + 1 < arguments.count,
+              let number = Int(arguments[index + 1]),
+              let step = SetupAssistant.Step(rawValue: number - 1) else { return .mac }
+        return step
+    }()
 
     init() {
         NSApplication.shared.setActivationPolicy(.regular)
@@ -24,7 +32,7 @@ struct SetupPreviewApp: App {
 
     var body: some Scene {
         Window("Bridgeplay Setup", id: "setup-preview") {
-            PreviewWizard(preview: preview)
+            PreviewWizard(preview: preview, start: Self.start)
                 .environment(status)
         }
         .windowStyle(.hiddenTitleBar)
@@ -46,11 +54,12 @@ struct SetupPreviewApp: App {
 
 private struct PreviewWizard: View {
     let preview: SetupAssistant.Preview
+    let start: SetupAssistant.Step
     @Environment(\.openWindow) private var openWindow
     @Environment(\.dismissWindow) private var dismissWindow
 
     var body: some View {
-        SetupAssistantView(model: SetupAssistant(preview: preview)) {
+        SetupAssistantView(model: SetupAssistant(preview: preview, startAt: start)) {
             openWindow(id: "main-preview")
             dismissWindow(id: "setup-preview")
         }
