@@ -38,12 +38,14 @@ KNOWN_MACHINES = (0x8664, 0x14c, 0xaa64)
 
 
 def default_payload(src):
+    """The payload for a known clean ntdll. Any other input is refused, also when a
+    payload is passed: a patched or unknown ntdll must not be patched again."""
     with open(src, "rb") as f:
         digest = hashlib.sha256(f.read()).hexdigest()
     if digest in PAYLOAD_BY_CLEAN_SHA:
         return PAYLOAD_BY_CLEAN_SHA[digest]
-    raise SystemExit(f"{src}: sha256 {digest} matches no known clean ntdll, "
-                     f"pass payload.bin as the third argument")
+    raise SystemExit(f"{src}: sha256 {digest} matches no known clean ntdll; "
+                     f"add a new build's hash to PAYLOAD_BY_CLEAN_SHA first")
 
 
 def append_section(pe, d, r):
@@ -71,8 +73,9 @@ def main():
     v = shell_vars(src)
     if r['machine'] not in KNOWN_MACHINES:
         raise SystemExit(f"{src}: machine {r['machine']:#x} carries no detour")
+    known_payload = default_payload(src)
     payload_path = sys.argv[3] if len(sys.argv) > 3 \
-        else os.path.join(here, default_payload(src))
+        else os.path.join(here, known_payload)
     detour = open(payload_path, "rb").read()
     payload_rva = int(v['NP_PAYLOAD_RVA'], 16)
     fill = r['fill']
