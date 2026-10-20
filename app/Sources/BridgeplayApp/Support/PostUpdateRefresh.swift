@@ -81,5 +81,7 @@ enum PostUpdateRefresh {
             if let build { defaults.set(build, forKey: lastBuildKey) }
             await status.requestInstall(unattended: true)
         }
+        // Engines whose files this build rebuilt or re-pinned follow, under the same rule.
+        if decision != .wait { await status.updateEverything(includingSteamPatch: false) }
     }
 }

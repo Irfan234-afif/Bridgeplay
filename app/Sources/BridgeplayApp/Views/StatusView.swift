@@ -462,9 +462,12 @@ struct StatusView: View {
     private var refreshButton: some View {
         Button("Refresh", systemImage: "arrow.clockwise") {
             AppUpdater.shared.check()
-            Task { await status.refresh() }
+            Task {
+                await status.refresh()
+                await status.updateEverything()
+            }
         }
-        .help(String(localized: "Check this Mac's setup again and look for a Bridgeplay update"))
+        .help(String(localized: "Check for a Bridgeplay update and bring Steam and the engines up to date"))
         .disabled(!status.isIdle)
     }
 

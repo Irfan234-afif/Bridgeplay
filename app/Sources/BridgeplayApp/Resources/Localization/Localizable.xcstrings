@@ -2287,6 +2287,22 @@
         }
       }
     },
+    "Check for a Bridgeplay update and bring Steam and the engines up to date" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cerca un aggiornamento di Bridgeplay e aggiorna Steam e i motori"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "检查 Bridgeplay 更新，并将 Steam 和引擎更新到最新"
+          }
+        }
+      }
+    },
     "Check installed files" : {
       "localizations" : {
         "it" : {
@@ -2315,22 +2331,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "请检查权限，确认当前用户拥有该文件夹。"
-          }
-        }
-      }
-    },
-    "Check this Mac's setup again and look for a Bridgeplay update" : {
-      "localizations" : {
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ricontrolla la configurazione di questo Mac e cerca un aggiornamento di Bridgeplay"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "重新检查这台 Mac 的设置，并检查 Bridgeplay 更新"
           }
         }
       }
