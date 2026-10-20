@@ -131,7 +131,7 @@ struct SteamInstallerTests {
             patchRunner: { _, _, _ in },
             stopClient: { _, onStopping in if stopped { onStopping() }; return stopped },
             register: { calls.register($0) },
-            resetInputAccess: { calls.resetInputAccess() }
+            resetInputAccess: { calls.resetInputAccess(); return [] }
         )
         if recordBuild {
             try SteamInstaller.finish(outcome, deployedVersion: fixture.deployedVersion, isCurrent: { _ in true })

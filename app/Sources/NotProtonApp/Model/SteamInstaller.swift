@@ -39,6 +39,8 @@ struct InstallOutcome: Sendable {
     let signatureDatabases: Int
     let backedUpPlist: Bool
     let bridgeStaged: Int
+    // Input access services macOS refused to reset after Steam's signature changed.
+    var failedInputResets: [String] = []
 }
 
 enum SteamInstaller {
@@ -76,7 +78,7 @@ enum SteamInstaller {
         },
         stopClient: ClientStopper = stopTheClient,
         register: BundleRegistrar = { SteamBundle.register($0) },
-        resetInputAccess: () -> Void = resetInputAccess,
+        resetInputAccess: () -> [String] = resetInputAccess,
         report: @escaping @Sendable (InstallPhase) -> Void = { _ in }
     ) throws -> InstallOutcome {
         report(.checkingPayload)
@@ -160,6 +162,7 @@ enum SteamInstaller {
         try removeStaleFonts(in: fonts, keeping: payload.fonts)
 
         var backedUp = false
+        var failedInputResets: [String] = []
         if patching {
             report(.settingInsert)
             backedUp = try backUpPlist(plist, into: backups)
@@ -182,7 +185,7 @@ enum SteamInstaller {
             // cdhash, which every new dylib changes; signed with the local identity it is the
             // certificate, so the approval survives updates and is only cleared on a change.
             if designatedRequirement(of: app) != priorRequirement {
-                resetInputAccess()
+                failedInputResets = resetInputAccess()
             }
         }
 
@@ -210,7 +213,8 @@ enum SteamInstaller {
             build: build,
             signatureDatabases: payload.signatures.count,
             backedUpPlist: backedUp,
-            bridgeStaged: bridgeResult.staged.count
+            bridgeStaged: bridgeResult.staged.count,
+            failedInputResets: failedInputResets
         )
     }
 
@@ -378,16 +382,9 @@ enum SteamInstaller {
     // Input Monitoring approval, the same across Bridgeplay updates.
     static let localSigningIdentity = "NotProton Local Signing"
 
+    // LocalSigning creates it from the Setup Assistant or the Status page.
     static func signingIdentity() -> String {
-        guard let result = try? Shell.run("/usr/bin/security", ["find-identity", "-p", "codesigning"]),
-              result.succeeded else { return "-" }
-        for line in result.stdout.split(separator: "\n") where line.contains("\"\(localSigningIdentity)\"") {
-            let fields = line.split(separator: " ")
-            if let hash = fields.first(where: { $0.count == 40 && $0.allSatisfy(\.isHexDigit) }) {
-                return String(hash)
-            }
-        }
-        return "-"
+        LocalSigning.existingHash() ?? "-"
     }
 
     static func sign(_ url: URL, identity: String, step: String = step) throws {
@@ -446,10 +443,13 @@ enum SteamInstaller {
     // or Steam Input will silently not work.
     static let inputAccessServices = ["Accessibility", "PostEvent", "ListenEvent"]
 
-    static func resetInputAccess() {
-        for service in failedInputAccessResets() {
+    // Returns what macOS refused to reset, so the Status page can say so.
+    static func resetInputAccess() -> [String] {
+        let failed = failedInputAccessResets()
+        for service in failed {
             AppLog.note("install: could not reset \(service) for Steam")
         }
+        return failed
     }
 
     static func failedInputAccessResets() -> [String] {
