@@ -304,13 +304,16 @@ enum PrefixTools {
         )
         return try winetricks(
             verbs, in: prefix, script: script,
-            runner: SupportPaths.clonedRoot(forBuild: chosen.build), flavor: chosen.tool.flavor
+            runner: SupportPaths.clonedRoot(forBuild: chosen.build), flavor: chosen.tool.flavor,
+            sha256: winetricksSHA256
         )
     }
 
+    // sha256: the pin the script must still match when it runs. The cached copy is the
+    // user's to write, so it is read once, checked, and the checked bytes are what runs.
     static func winetricks(
         _ verbs: [String], in prefix: WinePrefix, script: URL, runner: URL,
-        flavor: CompatTool.Flavor = .fex
+        flavor: CompatTool.Flavor = .fex, sha256: String? = nil
     ) throws -> URL {
         let step = String(localized: "Run Winetricks")
         guard !verbs.isEmpty else {
@@ -341,9 +344,12 @@ enum PrefixTools {
         // Winetricks reads the architecture from WINE_BIN, which would otherwise be the wrapper.
         environment["WINE_BIN"] = loader.path(percentEncoded: false)
 
+        let checked = try sha256.map { try verifiedCopy(of: script, sha256: $0, step: step) }
+        defer { if let checked { try? FileManager.default.removeItem(at: checked.deletingLastPathComponent()) } }
+
         let log = prefix.root.appending(path: winetricksLogName)
         let status = try Shell.logged(
-            "/bin/sh", [script.path(percentEncoded: false), "-q"] + verbs,
+            "/bin/sh", [(checked ?? script).path(percentEncoded: false), "-q"] + verbs,
             environment: environment, to: log
         )
         // Until the wineserver exits, the prefix still counts as in use.
@@ -355,6 +361,33 @@ enum PrefixTools {
             )
         }
         return log
+    }
+
+    // Reads the script once, checks those bytes against the pin and writes them to a new
+    // private folder, so what runs is what was checked.
+    static func verifiedCopy(of script: URL, sha256: String, step: String) throws -> URL {
+        let data: Data
+        do {
+            data = try Data(contentsOf: script)
+        } catch {
+            throw StepFailure(step: step, detail: error.localizedDescription)
+        }
+        guard Digest.sha256(of: data) == sha256 else {
+            AppLog.note("winetricks: \(script.path(percentEncoded: false)) no longer matches its pin")
+            try? FileManager.default.removeItem(at: script)
+            throw StepFailure(step: step, detail: String(localized: "The downloaded Winetricks changed after it was checked, so it was not run. Try again to download it afresh."))
+        }
+        let folder = FileManager.default.temporaryDirectory.appending(path: "bridgeplay-winetricks-\(UUID().uuidString)")
+        do {
+            try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true,
+                                                    attributes: [.posixPermissions: 0o700])
+            let copy = folder.appending(path: "winetricks")
+            try data.write(to: copy, options: .withoutOverwriting)
+            return copy
+        } catch {
+            try? FileManager.default.removeItem(at: folder)
+            throw StepFailure(step: step, detail: error.localizedDescription)
+        }
     }
 
     static func arguments(for executable: URL) -> [String]? {

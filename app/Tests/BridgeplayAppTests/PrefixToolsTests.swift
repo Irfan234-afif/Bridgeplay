@@ -292,6 +292,38 @@ struct PrefixToolsTests {
         #expect(output.contains("bin \(unix.appending(path: "wine").path(percentEncoded: false))"))
     }
 
+    // The script is hashed when downloaded but runs later from a cache the user can write to.
+    @Test("Winetricks runs only the bytes that match its pin")
+    func winetricksRunsOnlyThePinnedScript() throws {
+        let dir = FileManager.default.temporaryDirectory.appending(path: "np-winetricks-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let library = SteamLibrary(root: dir.appending(path: "library"))
+        let prefix = WinePrefix(appID: "2075800", name: "Game", library: library, lastUsed: nil)
+        let runner = dir.appending(path: "runner")
+        let unix = runner.appending(path: "lib/wine/x86_64-unix")
+        for folder in [prefix.pfx, unix, dir.appending(path: "cache")] {
+            try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        }
+        try Data("#!/bin/sh\nexit 0\n".utf8).write(to: unix.appending(path: "wine"))
+        try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: unix.appending(path: "wine").path(percentEncoded: false))
+        let script = dir.appending(path: "cache/winetricks")
+        let pinned = Data("#!/bin/sh\necho pinned\n".utf8)
+        try pinned.write(to: script)
+        let pin = Digest.sha256(of: pinned)
+
+        let log = try PrefixTools.winetricks(["vcrun2022"], in: prefix, script: script, runner: runner, sha256: pin)
+        #expect(try String(contentsOf: log, encoding: .utf8).contains("pinned"))
+        try FileManager.default.removeItem(at: log)
+
+        try Data("#!/bin/sh\necho swapped\n".utf8).write(to: script)
+        let failure = try #require(throws: StepFailure.self) {
+            try PrefixTools.winetricks(["vcrun2022"], in: prefix, script: script, runner: runner, sha256: pin)
+        }
+        #expect(failure.detail.contains("changed after it was checked"))
+        #expect(!FileManager.default.fileExists(atPath: log.path(percentEncoded: false)), "the swapped script ran")
+        #expect(!FileManager.default.fileExists(atPath: script.path(percentEncoded: false)), "the swapped script stays cached")
+    }
+
     @Test("Every kind offered by the file picker is a kind that can be run")
     func pickerTypesMatchWhatRuns() {
         let extensions = PrefixTools.runnableTypes.compactMap(\.preferredFilenameExtension)
