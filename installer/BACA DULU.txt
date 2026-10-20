@@ -20,6 +20,10 @@ Butuh:
      Bridgeplay di jendela Settings yang terbuka. Setup lanjut sendiri.
 5. Klik Open Steam, pilih game Windows, Install, Play.
 
+Update dari Bridgeplay 2.x: saat pertama dibuka, 3.0.0 memindahkan file-nya dari
+folder lama "notproton" ke "bridgeplay" dan menyimpan backup. Tutup Steam dan
+game dulu; Bridgeplay menunggu sampai keduanya tertutup.
+
 Controller: pertama kali controller dipakai, Steam minta izin Input
 Monitoring. Klik Allow (atau nyalakan Steam di System Settings > Privacy &
 Security > Input Monitoring).

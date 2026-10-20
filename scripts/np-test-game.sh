@@ -39,7 +39,10 @@ command -v jq >/dev/null || { echo "jq required" >&2; exit 64; }
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 SUP="$HOME/Library/Application Support"
 STEAMAPPS="$SUP/Steam/steamapps"
-NP="$SUP/notproton"
+# The support folder and log names moved to bridgeplay in 3.0.0; fall back to the old
+# ones on a Mac the app has not migrated yet.
+NP="$SUP/bridgeplay"
+[ -d "$NP" ] || [ ! -d "$SUP/notproton" ] || NP="$SUP/notproton"
 MANIFEST="$STEAMAPPS/appmanifest_${APPID}.acf"
 [ -f "$MANIFEST" ] || { echo "app $APPID is not installed (no $MANIFEST)" >&2; exit 64; }
 
@@ -47,9 +50,10 @@ acf() { sed -n "s/^[[:space:]]*\"$1\"[[:space:]]*\"\(.*\)\"[[:space:]]*$/\1/p" "
 NAME="$(acf name)"
 INSTALLDIR="$STEAMAPPS/common/$(acf installdir)"
 PFX="$STEAMAPPS/compatdata/$APPID/pfx"
-RUNLOG="$STEAMAPPS/compatdata/$APPID/notproton-run.log"
-WINELOG="$NP/launchers/$APPID/notproton-wine.log"
-NPLOG="$NP/notproton.log"
+# Each log is read under both names (see legacy_of below).
+RUNLOG="$STEAMAPPS/compatdata/$APPID/bridgeplay-run.log"
+WINELOG="$NP/launchers/$APPID/bridgeplay-wine.log"
+NPLOG="$NP/bridgeplay.log"
 FIXDIR="$NP/gamefixes"
 FIX="$FIXDIR/$APPID.conf"
 
@@ -118,6 +122,16 @@ size_of() { [ -f "$1" ] && stat -f %z "$1" || echo 0; }
 since() { # $1 file, $2 offset -> bytes after offset
   [ -f "$1" ] && tail -c +"$(( $2 + 1 ))" "$1" || true
 }
+# Before 3.0.0 the logs were notproton-*.log. Reading both names keeps runs against a
+# build or prefix from before the rename working; the old file just stops growing.
+legacy_of() { echo "${1%/*}/notproton${1##*/bridgeplay}"; }
+latest_of() { if [ -f "$1" ]; then echo "$1"; else legacy_of "$1"; fi; }
+size2() { echo "$(size_of "$1") $(size_of "$(legacy_of "$1")")"; }
+since2() { # $1 file, $2 "offset legacy_offset" -> new bytes of both names
+  # shellcheck disable=SC2086 # split "offset legacy_offset" into $2 $3
+  set -- "$1" $2
+  since "$1" "$2"; since "$(legacy_of "$1")" "$3"
+}
 
 if [ -n "$(ps_game)" ]; then
   echo "game exe already running under wine; run with --stop first or: scripts/np-test-game.sh $APPID --stop" >&2
@@ -125,7 +139,7 @@ if [ -n "$(ps_game)" ]; then
 fi
 pgrep -xq steam_osx || echo "warning: Steam does not appear to be running; 'open steam://' will start it" >&2
 
-OFF_RUN=$(size_of "$RUNLOG"); OFF_WINE=$(size_of "$WINELOG"); OFF_NP=$(size_of "$NPLOG")
+OFF_RUN=$(size2 "$RUNLOG"); OFF_WINE=$(size2 "$WINELOG"); OFF_NP=$(size2 "$NPLOG")
 T0=$(now)
 echo "[$APPID] $NAME  backend=$BACKEND  max=${SECONDS_MAX}s  -> $OUT" >&2
 open "steam://rungameid/$APPID"
@@ -135,7 +149,7 @@ FIRST=""; LAST=""; MISSES=0; WINE_SEEN=0; DEADLINE=$(( T0 + SECONDS_MAX )); CRAS
 while :; do
   sleep "$INTERVAL"
   t=$(now)
-  since "$RUNLOG" "$OFF_RUN" > "$WORK/run.new"; add_exes_from_runlog "$WORK/run.new"
+  since2 "$RUNLOG" "$OFF_RUN" > "$WORK/run.new"; add_exes_from_runlog "$WORK/run.new"
   [ -n "$(wine_procs)" ] && WINE_SEEN=1
   hit="$(ps_game)"
   if [ -n "$hit" ]; then
@@ -155,10 +169,10 @@ done
 # ---- collect ----
 ps -axww -o pid=,etime=,command= > "$OUT/ps-end.txt" 2>/dev/null
 [ -n "$(ps_game)" ] && ALIVE=true || ALIVE=false
-since "$RUNLOG" "$OFF_RUN" > "$OUT/notproton-run.log"
-since "$WINELOG" "$OFF_WINE" | tail -n 2000 > "$OUT/notproton-wine.log"
-since "$NPLOG" "$OFF_NP" > "$OUT/notproton.log"
-[ -f "$RUNLOG" ] && tail -n 200 "$RUNLOG" > "$OUT/notproton-run.tail.log"
+since2 "$RUNLOG" "$OFF_RUN" > "$OUT/bridgeplay-run.log"
+since2 "$WINELOG" "$OFF_WINE" | tail -n 2000 > "$OUT/bridgeplay-wine.log"
+since2 "$NPLOG" "$OFF_NP" > "$OUT/bridgeplay.log"
+[ -f "$(latest_of "$RUNLOG")" ] && tail -n 200 "$(latest_of "$RUNLOG")" > "$OUT/bridgeplay-run.tail.log"
 
 # engine
 ENGINE="$(grep -h 'state crossOver' "$NP/app.log" 2>/dev/null | tail -1 | sed -n 's/.*state crossOver \(.*\) version=.*/\1/p')"
@@ -167,7 +181,7 @@ ENGINE="$(grep -h 'state crossOver' "$NP/app.log" 2>/dev/null | tail -1 | sed -n
 
 # error signatures
 SIG='err:module|err:seh|err:virtual|err:d3d|err:ntdll|DXGI_ERROR|DXMT.*(error|fail)|vkd3d.*(error|fail)|Unhandled exception|wine: could not load|wine: cannot find|No such file|Bad CPU type|Assertion failed|Segmentation fault|page fault|fixme:.*not implemented|cannot open|failed to'
-cat "$OUT/notproton-run.log" "$OUT/notproton-wine.log" "$OUT/notproton.log" 2>/dev/null \
+cat "$OUT/bridgeplay-run.log" "$OUT/bridgeplay-wine.log" "$OUT/bridgeplay.log" 2>/dev/null \
   | grep -Ei "$SIG" \
   | sed -E 's/^[0-9]{4}-[0-9]{2}-[0-9]{2}[ T][0-9:]+Z? //; s/^[0-9a-f]{4}:(err|fixme)/\1/; s/0x[0-9a-fA-F]+/0xN/g' \
   | cut -c1-200 | sort | uniq -c | sort -rn | head -10 \
@@ -193,7 +207,7 @@ restore_fix
 # ---- stop ----
 stop_game() {
   local ws=""
-  ws="$(sed -n 's/^WINESERVER=//p' "$RUNLOG" 2>/dev/null | tail -1)"
+  ws="$(sed -n 's/^WINESERVER=//p' "$(latest_of "$RUNLOG")" 2>/dev/null | tail -1)"
   [ -x "$ws" ] || ws="$(ls -d "$NP"/engines/*/Contents/SharedSupport/CrossOver/bin/wineserver 2>/dev/null | head -1)"
   [ -x "$ws" ] || ws="$(ls "$NP"/runners/*/CrossOver/bin/wineserver "$NP"/runners/current/bin/wineserver 2>/dev/null | head -1)"
   if [ -x "$ws" ] && [ -d "$PFX" ]; then

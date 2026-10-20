@@ -17,9 +17,14 @@ archive does not match its pin in `FreeEngine*.swift`:
 | `Bridgeplay.app` | `out/Bridgeplay.app` from `make app` |
 | `Install.command`, `BACA DULU.txt`, `README.txt`, `config/` | this folder |
 | `LICENSE`, `LICENSE.*`, `NOTICE` | repository root |
-| `gptk/` | `~/Library/Application Support/notproton/gptk` (`redist/lib` of Apple's Game Porting Toolkit DMG) |
+| `gptk/` | `~/Library/Application Support/bridgeplay/gptk` (`redist/lib` of Apple's Game Porting Toolkit DMG) |
 | `GPTK-License.rtf` | `gptk/License.rtf` from the same DMG |
-| `cache/engines/` | the pinned WineCX runtime, DXMT and DXVK archives from `~/Library/Caches/notproton/engines` |
+| `cache/engines/` | the pinned WineCX runtime, DXMT and DXVK archives from `~/Library/Caches/bridgeplay/engines` |
+
+On a Mac the app has not migrated to 3.0.0 yet, the script falls back to the old
+`notproton` folders. `Install.command` installs into the `bridgeplay` folders. When only the
+old `notproton` folders exist, it writes into those instead and leaves the move to the app,
+which migrates them on first launch.
 
 Never shipped: Valve's Steam client and the Steam packages in `valve-packages/` (the app
 downloads those from Valve's CDN), and GPTK is never committed. GPTK's `/redist` files are
