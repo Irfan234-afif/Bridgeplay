@@ -11,7 +11,7 @@
 		<string>zh-Hans</string>
 	</array>
 	<key>CFBundleExecutable</key>
-	<string>NotProtonApp</string>
+	<string>BridgeplayApp</string>
 	<key>CFBundleIconFile</key>
 	<string>Bridgeplay</string>
 	<key>CFBundleIconName</key>

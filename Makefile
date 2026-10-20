@@ -73,7 +73,7 @@ DEPS := $(OBJS:.o=.d)
         compatsvc-check shortcutcheck scriptcheck envcheck buildcheck settingscheck routecheck bridgecheck gamedrivecheck \
         gamefixescheck launchercheck padcheck launch-shell activatecheck FORCE
 
-APP_PAYLOAD := app/Sources/NotProtonApp/Resources/payload
+APP_PAYLOAD := app/Sources/BridgeplayApp/Resources/payload
 
 all: $(TARGET) $(APP_PAYLOAD)
 
@@ -146,8 +146,8 @@ mincheck:
 .PHONY: l10ncheck
 l10ncheck:
 	@bin=$$(swift build --package-path app -c release --show-bin-path); \
-	python3 dylib/tests/l10ncheck.py app/Sources/NotProtonApp/Resources/Localization/Localizable.xcstrings \
-		"$$bin/../../Intermediates.noindex/NotProtonApp.build/$$(basename "$$bin")" zh-Hans it
+	python3 dylib/tests/l10ncheck.py app/Sources/BridgeplayApp/Resources/Localization/Localizable.xcstrings \
+		"$$bin/../../Intermediates.noindex/BridgeplayApp.build/$$(basename "$$bin")" zh-Hans it
 
 # runcheck owns compat_run.sh, whose warnings wait for a change that can move
 # the embedded __text baseline
@@ -425,7 +425,7 @@ $(RUN_SCRIPT_H): dylib/feats/compat_run.sh dylib/embed_script.py
 
 $(OUT_DIR)/dylib/feats/compat.o: $(RUN_SCRIPT_H)
 
-SUPPORT_DIR        := $(HOME)/Library/Application Support/notproton
+SUPPORT_DIR        := $(HOME)/Library/Application Support/bridgeplay
 OVERLAY_SHIM_SRC   := overlay-shim/overlay_shim.m
 OVERLAY_SHIM_ARM   := $(OUT_DIR)/overlay-shim.arm64.dylib
 OVERLAY_SHIM_X86   := $(OUT_DIR)/overlay-shim.x86_64.dylib
@@ -710,7 +710,7 @@ app-payload: $(TARGET) $(OVERLAY_SHIM) $(ICONMAKER) $(APPINFO) $(GAME_HOST) $(GA
 	@echo "==> Staged app payload in $(APP_PAYLOAD)"
 
 APP_BUNDLE  := $(OUT_DIR)/Bridgeplay.app
-APP_BUNDLE_PAYLOAD := $(APP_BUNDLE)/Contents/Resources/NotProtonApp_NotProtonApp.bundle/Contents/Resources/payload
+APP_BUNDLE_PAYLOAD := $(APP_BUNDLE)/Contents/Resources/BridgeplayApp_BridgeplayApp.bundle/Contents/Resources/payload
 APP_ZIP     := $(OUT_DIR)/Bridgeplay.zip
 # dylib/version.h: Bridgeplay semver for CFBundleShortVersionString, the release counter
 # for CFBundleVersion (Sparkle orders updates by it; 32 is newer than the old 1.1.9.31),
@@ -762,19 +762,19 @@ app: app-payload $(ICON_CAR)
 		"Set :CFBundleVersion $(APP_BUILD)" -c \
 		"Set :NotProtonVersion $(APP_UPSTREAM)" \
 		"$(APP_BUNDLE)/Contents/Info.plist"
-	cp "$$(swift build --package-path app -c release --show-bin-path)/NotProtonApp" \
-		"$(APP_BUNDLE)/Contents/MacOS/NotProtonApp"
+	cp "$$(swift build --package-path app -c release --show-bin-path)/BridgeplayApp" \
+		"$(APP_BUNDLE)/Contents/MacOS/BridgeplayApp"
 	@mkdir -p "$(APP_BUNDLE)/Contents/Frameworks"
 	ditto "$$(swift build --package-path app -c release --show-bin-path)/Sparkle.framework" \
 		"$(APP_BUNDLE)/Contents/Frameworks/Sparkle.framework"
 	install_name_tool -add_rpath @executable_path/../Frameworks \
-		"$(APP_BUNDLE)/Contents/MacOS/NotProtonApp"
+		"$(APP_BUNDLE)/Contents/MacOS/BridgeplayApp"
 	xcrun vtool -set-build-version macos $(MIN_VER) "$$(xcrun --sdk macosx --show-sdk-version)" \
-		-replace -output "$(APP_BUNDLE)/Contents/MacOS/NotProtonApp" \
-		"$(APP_BUNDLE)/Contents/MacOS/NotProtonApp"
-	cp -R "$$(swift build --package-path app -c release --show-bin-path)/NotProtonApp_NotProtonApp.bundle" \
+		-replace -output "$(APP_BUNDLE)/Contents/MacOS/BridgeplayApp" \
+		"$(APP_BUNDLE)/Contents/MacOS/BridgeplayApp"
+	cp -R "$$(swift build --package-path app -c release --show-bin-path)/BridgeplayApp_BridgeplayApp.bundle" \
 		"$(APP_BUNDLE)/Contents/Resources/"
-	cp -R "$(APP_BUNDLE)/Contents/Resources/NotProtonApp_NotProtonApp.bundle/Contents/Resources/"*.lproj \
+	cp -R "$(APP_BUNDLE)/Contents/Resources/BridgeplayApp_BridgeplayApp.bundle/Contents/Resources/"*.lproj \
 		"$(APP_BUNDLE)/Contents/Resources/"
 	cp "$(ICON_DIR)/Assets.car" "$(ICON_DIR)/$(ICON_NAME).icns" \
 		"$(APP_BUNDLE)/Contents/Resources/"
@@ -792,7 +792,7 @@ app: app-payload $(ICON_CAR)
 	@echo "==> Payload complete in the bundle"
 	codesign -f -s "$(APP_SIGN_ID)" "$(APP_BUNDLE)"
 	codesign --verify --strict "$(APP_BUNDLE)"
-	@echo "==> Built $(APP_BUNDLE) ($(APP_VERSION) build $(APP_BUILD), NotProton $(APP_UPSTREAM))"
+	@echo "==> Built $(APP_BUNDLE) ($(APP_VERSION) build $(APP_BUILD), based on NotProton $(APP_UPSTREAM))"
 
 app-zip: app
 	rm -f "$(APP_ZIP)"
@@ -810,7 +810,7 @@ FORCE:
 
 # np-native: Steam launch-option wrapper for native macOS games (arm64
 # preferred, Steam's DYLD_INSERT_LIBRARIES kept). Installed later to
-# ~/.notproton/np-native.
+# ~/.bridgeplay/np-native.
 NP_NATIVE     := $(OUT_DIR)/np-native/np-native
 NP_NATIVE_SRC := native-launch/np-native.c
 
