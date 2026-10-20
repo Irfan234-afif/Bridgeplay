@@ -28,18 +28,18 @@ jobs:
 
       - uses: actions/download-artifact@v4
         with:
-          name: NotProton
+          name: Bridgeplay
           path: release
 
       - name: Verify the archive
         env:
           VERSION: ${{ inputs.version }}
         run: |
-          ditto -x -k release/NotProton.zip release/extracted
-          codesign --verify --strict release/extracted/NotProton.app
-          actual=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' release/extracted/NotProton.app/Contents/Info.plist)
+          ditto -x -k release/Bridgeplay.zip release/extracted
+          codesign --verify --strict release/extracted/Bridgeplay.app
+          actual=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' release/extracted/Bridgeplay.app/Contents/Info.plist)
           test "$actual" = "$VERSION"
-          make -s mincheck APP_BUNDLE=release/extracted/NotProton.app
+          make -s mincheck APP_BUNDLE=release/extracted/Bridgeplay.app
 
       - name: Resolve Sparkle tools
         run: swift package resolve --package-path app
@@ -51,7 +51,7 @@ jobs:
           SPARKLE_PRIVATE_KEY: ${{ secrets.SPARKLE_PRIVATE_KEY }}
           VERSION: ${{ inputs.version }}
         run: |
-          gh api markdown -f text="$RELEASE_NOTES" -f mode=gfm -f context="$GITHUB_REPOSITORY" > release/NotProton.html
+          gh api markdown -f text="$RELEASE_NOTES" -f mode=gfm -f context="$GITHUB_REPOSITORY" > release/Bridgeplay.html
           printf '%s' "$SPARKLE_PRIVATE_KEY" | app/.build/artifacts/sparkle/Sparkle/bin/generate_appcast \
             --ed-key-file - \
             --download-url-prefix "https://github.com/$GITHUB_REPOSITORY/releases/download/v$VERSION/" \
@@ -70,7 +70,7 @@ jobs:
           git push --force origin "v$VERSION"
           gh release delete "v$VERSION" --yes || true
           gh release create "v$VERSION" \
-            release/NotProton.zip \
+            release/Bridgeplay.zip \
             release/appcast.xml \
             --title "$VERSION" \
             --notes "$RELEASE_NOTES"
