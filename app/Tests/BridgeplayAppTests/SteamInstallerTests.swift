@@ -322,6 +322,21 @@ struct SteamInstallerTests {
         #expect(!FileManager.default.fileExists(atPath: fixture.deployedVersion.path))
     }
 
+    // Both halves used to be try?, so a Steam left with the insert reported nothing.
+    @Test("Putting the plist back reports a write it could not make")
+    func revertReportsItsOwnFailure() throws {
+        let work = try scratchDirectory("install")
+        defer { try? FileManager.default.removeItem(at: work) }
+        let missing = work.appending(path: "gone/Steam.app")
+
+        #expect(throws: (any Error).self) {
+            try SteamInstaller.revertPlist(Data("plist".utf8), at: missing.appending(path: "Contents/Info.plist"), app: missing)
+        }
+        #expect(throws: Never.self) {
+            try SteamInstaller.revertPlist(nil, at: missing.appending(path: "Contents/Info.plist"), app: missing)
+        }
+    }
+
     @Test("The plist backup records the state before the first install only")
     func backsUpOriginalPlistOnce() async throws {
         let work = try scratchDirectory("install")

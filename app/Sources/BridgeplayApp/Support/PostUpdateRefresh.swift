@@ -54,14 +54,16 @@ enum PostUpdateRefresh {
         handled = true
 
         let build = ProductVersion.build
-        let workloadRunning = await Task.detached(priority: .utility) {
-            RunnerStore.clonedBuilds().contains {
-                RunnerInstaller.isRunning(from: SupportPaths.runnerRoot(forBuild: $0))
-            }
+        // pgrep and ps can take seconds, so neither runs on the main actor.
+        let (steamRunning, workloadRunning) = await Task.detached(priority: .utility) {
+            (SteamBundle.isRunning,
+             RunnerStore.clonedBuilds().contains {
+                 RunnerInstaller.isRunning(from: SupportPaths.runnerRoot(forBuild: $0))
+             })
         }.value
         let decision = decide(
             steam: snapshot.steam,
-            steamRunning: snapshot.steamRunning || SteamBundle.isRunning,
+            steamRunning: snapshot.steamRunning || steamRunning,
             workloadRunning: workloadRunning,
             contentBlocks: snapshot.installContent.blocksInstallation,
             hasRunner: snapshot.runner != .none,
@@ -77,7 +79,7 @@ enum PostUpdateRefresh {
         case .install:
             AppLog.note("post-update: re-applying the Steam patch for \(ProductVersion.display)")
             if let build { defaults.set(build, forKey: lastBuildKey) }
-            await status.requestInstall()
+            await status.requestInstall(unattended: true)
         }
     }
 }

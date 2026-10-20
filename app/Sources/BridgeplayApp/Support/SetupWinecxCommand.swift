@@ -8,13 +8,13 @@ enum SetupWinecxCommand {
     static let flag = "--setup-winecx"
 
     static func run() -> Never {
-        Task.detached { exit(await perform()) }
+        Task.detached { exit(AppLog.finished(await perform())) }
         dispatchMain()
     }
 
     private static func perform() async -> Int32 {
         do {
-            if SteamBundle.isRunning {
+            if SteamBundle.isRunningForThisUser {
                 throw StepFailure(step: FreeEngineWinecx.step, detail: "Steam is running. Quit Steam and run this again.")
             }
             if DeploymentContent.current(version: AppVersion.bundled).blocksInstallation {
@@ -36,12 +36,19 @@ enum SetupWinecxCommand {
                 ?? "Game Porting Toolkit not found; games use DXMT.")
 
             if let tool = FreeEngineWinecx.current.runner.tools.first?.name {
-                try SteamDefaultTool.set(tool)
+                do {
+                    try SteamDefaultTool.set(tool)
+                } catch is SteamDefaultTool.SteamRunning {
+                    // Steam opened while the engine was set up; everything but the default is done.
+                    throw StepFailure(step: SteamDefaultTool.step,
+                                      detail: "WineCX is set up, but Steam opened in the meantime, so its default compatibility tool was not changed. Quit Steam and run this again.")
+                }
                 say("Steam's default compatibility tool is \(tool).")
             }
             say("WineCX is set up.")
             return 0
         } catch {
+            AppLog.note("command line failed: \(RemoveEverythingCommand.failureMessage(error))")
             FileHandle.standardError.write(Data("\(RemoveEverythingCommand.failureMessage(error))\n".utf8))
             return 1
         }

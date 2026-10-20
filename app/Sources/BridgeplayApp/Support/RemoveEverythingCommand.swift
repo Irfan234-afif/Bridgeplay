@@ -4,12 +4,12 @@ enum RemoveEverythingCommand {
     static let flag = "--remove-everything"
 
     static func run() -> Never {
-        Task.detached { exit(await perform()) }
+        Task.detached { exit(AppLog.finished(await perform())) }
         dispatchMain()
     }
 
     static func perform(remove: @Sendable (@escaping @Sendable (UninstallPhase) -> Void) async throws -> UninstallOutcome = {
-        try await Uninstall.run(report: $0)
+        try await Uninstall.run(leftovers: .live, report: $0)
     }) async -> Int32 {
         do {
             let output = Output()
@@ -23,8 +23,12 @@ enum RemoveEverythingCommand {
                         + "Reinstall Steam from steampowered.com before using it again."
                     : "Bridgeplay has been removed.")
             )
+            if let kept = result.keptGamefixes {
+                output.say("Your own game fixes were kept in \(kept.path(percentEncoded: false)).")
+            }
             return result.partialRemoval == nil ? 0 : 1
         } catch {
+            AppLog.note("command line failed: \(failureMessage(error))")
             FileHandle.standardError.write(Data("\(failureMessage(error))\n".utf8))
             return 1
         }

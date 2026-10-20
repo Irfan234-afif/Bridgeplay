@@ -6,7 +6,7 @@ enum InstallIntoSteamCommand {
     static let flag = "--install-into-steam"
 
     static func run() -> Never {
-        Task.detached { exit(await perform()) }
+        Task.detached { exit(AppLog.finished(await perform())) }
         dispatchMain()
     }
 
@@ -37,6 +37,7 @@ enum InstallIntoSteamCommand {
             say("Bridgeplay \(result.version) installed into Steam.")
             return 0
         } catch {
+            AppLog.note("command line failed: \(RemoveEverythingCommand.failureMessage(error))")
             FileHandle.standardError.write(Data("\(RemoveEverythingCommand.failureMessage(error))\n".utf8))
             return 1
         }

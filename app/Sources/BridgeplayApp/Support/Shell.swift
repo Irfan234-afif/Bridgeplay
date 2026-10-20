@@ -147,11 +147,14 @@ enum Shell {
         return process.terminationStatus
     }
 
+    // This account's processes only, unless allUsers: Steam.app is shared by every account
+    // on the Mac, so a Steam another account runs still holds the bundle open.
     static func processIsRunning(
-        named name: String, pgrep: String = "/usr/bin/pgrep",
+        named name: String, allUsers: Bool = false, pgrep: String = "/usr/bin/pgrep",
         drainTimeout: DispatchTimeInterval = outputDrainTimeout
     ) -> Bool {
-        guard let result = try? run(pgrep, ["-x", "-U", String(getuid()), name], drainTimeout: drainTimeout)
+        let owner = allUsers ? [] : ["-U", String(getuid())]
+        guard let result = try? run(pgrep, ["-x"] + owner + [name], drainTimeout: drainTimeout)
         else { return false }
         return result.succeeded
     }

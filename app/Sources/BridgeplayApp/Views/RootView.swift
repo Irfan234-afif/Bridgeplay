@@ -76,7 +76,8 @@ struct RootView: View {
                 }
             }
             .safeAreaInset(edge: .top, spacing: 0) {
-                if MigrationLaunch.shared.pending {
+                // A failed move is reported on the Status page, with its buttons, instead.
+                if MigrationLaunch.shared.pending, MigrationLaunch.shared.failure == nil {
                     MigrationBanner()
                 } else if let banner = status.patchBanner {
                     PatchBanner(banner: banner)

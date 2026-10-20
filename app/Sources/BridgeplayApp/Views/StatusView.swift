@@ -288,6 +288,8 @@ struct StatusView: View {
 
     private func form(_ snapshot: StatusSnapshot) -> some View {
         Form {
+            migrationRows
+
             if let failure = status.failure {
                 StatusRow(
                     title: String(localized: "Failed"),
@@ -368,6 +370,38 @@ struct StatusView: View {
         }
         .formStyle(.grouped)
         .safeAreaInset(edge: .top, spacing: 0) { StatusHero(snapshot: snapshot) }
+    }
+
+    // The 3.0 folder move: a failure blocks installing until it is tried again or skipped,
+    // and files it could not move are named so they are not lost track of.
+    @ViewBuilder
+    private var migrationRows: some View {
+        let migration = MigrationLaunch.shared
+        if let failure = migration.failure {
+            StatusRow(
+                title: String(localized: "Moving to the Bridgeplay folders failed"),
+                value: failure,
+                tone: .bad,
+                detail: String(localized: "Installing and setting up wait until the move is done. Skipping leaves your files in the old notproton folders and tries again at the next launch."),
+                secondaryAction: StatusAction(
+                    label: String(localized: "Skip"),
+                    isEnabled: !migration.isRunning
+                ) { migration.skip() },
+                action: StatusAction(
+                    label: String(localized: "Try Again"),
+                    isProminent: true,
+                    isEnabled: !migration.isRunning
+                ) { Task { await migration.retry(status) } }
+            )
+        }
+        if !migration.keptNotes.isEmpty {
+            StatusRow(
+                title: String(localized: "Some files stayed in the old folders"),
+                value: String(localized: "The new Bridgeplay folders already had files with these names, so nothing was overwritten."),
+                tone: .warning,
+                detail: migration.keptNotes.joined(separator: "\n")
+            )
+        }
     }
 
     // A reset macOS refused leaves Steam's old approval in place, and macOS then blocks the

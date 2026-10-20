@@ -79,9 +79,19 @@ enum SetupChecks {
         }
         report(String(localized: "Installing Steam"))
         try DiskImage.withMounted(download) { volume in
-            try Shell.check("/usr/bin/ditto", [volume.appending(path: "Steam.app").path(percentEncoded: false),
-                                               app.path(percentEncoded: false)])
+            try copySteam(from: volume, to: app)
         }
+    }
+
+    // The download carries no quarantine, so nothing else looks at it before it runs: the
+    // copy in the image has to carry Valve's signature before it reaches /Applications.
+    static func copySteam(
+        from volume: URL, to app: URL,
+        verify: (URL) throws -> Void = { try SteamRepair.verifyValveSignature($0, step: step) }
+    ) throws {
+        let mounted = volume.appending(path: "Steam.app")
+        try verify(mounted)
+        try Shell.check("/usr/bin/ditto", [mounted.path(percentEncoded: false), app.path(percentEncoded: false)])
     }
 
     static let step = String(localized: "Install Steam")

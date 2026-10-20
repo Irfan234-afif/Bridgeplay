@@ -145,6 +145,11 @@ final class SetupAssistant {
     // MARK: Graphics
 
     func importGPTK(_ image: URL) async {
+        // The toolkit is copied into the support folder, which the 3.0 move has to find untouched.
+        if let refusal = MigrationLaunch.shared.refusal {
+            message = refusal
+            return
+        }
         isWorking = true
         defer { isWorking = false }
         message = nil
@@ -234,6 +239,10 @@ final class SetupAssistant {
             step = .done
             return
         }
+        if let refusal = MigrationLaunch.shared.refusal {
+            message = refusal
+            return
+        }
 
         set("steam", .running)
         await status.installIntoSteam()
@@ -258,15 +267,15 @@ final class SetupAssistant {
         set("engine", .done)
 
         set("default", .running)
-        if SteamBundle.isRunning {
-            set("default", .failed(String(localized: "Quit Steam, then press Try Again.")))
-            return
-        }
+        // pgrep and the config.vdf write stay off the main actor.
         do {
             if let tool = FreeEngineWinecx.current.runner.tools.first?.name {
-                try SteamDefaultTool.set(tool)
+                try await Task.detached(priority: .userInitiated) { try SteamDefaultTool.set(tool) }.value
             }
             set("default", .done)
+        } catch is SteamDefaultTool.SteamRunning {
+            set("default", .failed(String(localized: "Quit Steam, then press Try Again.")))
+            return
         } catch {
             set("default", .failed(error.localizedDescription))
             return

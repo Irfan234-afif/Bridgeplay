@@ -67,20 +67,24 @@ enum PrefixStore {
             return [library(at: SupportPaths.Steam.userData)]
         }
 
-        var roots: [URL] = []
-        for line in text.split(separator: "\n") {
-            let fields = line.split(separator: "\"").map(String.init)
-                .filter { !$0.trimmingCharacters(in: .whitespaces).isEmpty }
-            guard fields.count >= 2, fields[0] == "path" else { continue }
-            roots.append(URL(filePath: fields[1]))
-        }
-
+        var roots = libraryPaths(in: text).map { URL(filePath: $0) }
         if roots.isEmpty { roots = [SupportPaths.Steam.userData] }
 
         var seen: Set<String> = []
         return roots.compactMap { root in
             guard seen.insert(root.path(percentEncoded: false)).inserted else { return nil }
             return library(at: root)
+        }
+    }
+
+    // Every "path" in libraryfolders.vdf, with Steam's \\ and \" escapes undone. The one
+    // reader for this file, so Uninstall, Prefixes and the 3.0 migration see the same paths.
+    static func libraryPaths(in text: String) -> [String] {
+        text.components(separatedBy: "\n").compactMap { line in
+            guard let (key, value, _) = BrandMigration.keyValue(line),
+                  key.caseInsensitiveCompare("path") == .orderedSame
+            else { return nil }
+            return value.replacingOccurrences(of: "\\\\", with: "\\").replacingOccurrences(of: "\\\"", with: "\"")
         }
     }
 

@@ -123,7 +123,11 @@ final class SystemStatus {
 
     var isBusy: Bool { activity != nil || runInFlight || checkingLicense }
     var isIdle: Bool { !isBusy && !isRefreshing }
-    var canInstall: Bool { isIdle && snapshot?.installContent.blocksInstallation != true }
+    // A pending 3.0 folder move blocks every install: anything written now would land in
+    // the new folders before the old ones are moved in.
+    var canInstall: Bool {
+        isIdle && snapshot?.installContent.blocksInstallation != true && !MigrationLaunch.shared.pending
+    }
 
     enum Confirmation: Identifiable, Hashable {
         case replaceSteam
@@ -157,7 +161,11 @@ final class SystemStatus {
         AppLog.note("run end\(failure == nil ? "" : " (failed)")")
     }
 
+    // What the last run threw, for callers that treat some failures as something else.
+    @ObservationIgnored private(set) var lastRunError: Error?
+
     private func record(_ error: Error) {
+        lastRunError = error
         setFailure(error)
         if let refusal = error as? WriteRefused {
             AppLog.note("run failed: cannot write \(refusal.path)")
@@ -242,7 +250,7 @@ final class SystemStatus {
         }
     }
 
-    func requestInstall() async {
+    func requestInstall(unattended: Bool = false) async {
         guard canInstall else { return }
         checkingLicense = true
         defer { checkingLicense = false }
@@ -253,7 +261,7 @@ final class SystemStatus {
         ) {
             pendingConfirmation = question
         } else {
-            await installIntoSteam()
+            await installIntoSteam(unattended: unattended)
         }
     }
 
@@ -442,6 +450,7 @@ final class SystemStatus {
 
         clearFailure()
         outcome = nil
+        lastRunError = nil
         let run = beginRun(first)
         defer { endRun() }
 
@@ -457,6 +466,10 @@ final class SystemStatus {
     }
 
     private func setUpRunner(from install: CrossOverInstall?, replacingExisting: Bool = false) async {
+        if let refusal = MigrationLaunch.shared.refusal {
+            setFailure(refusal)
+            return
+        }
         guard let install else {
             setFailure(String(localized: "No supported Wine engine found. Download the free WineHQ or WineCX engine first."))
             AppLog.note("run refused: no supported CrossOver")
@@ -593,13 +606,22 @@ final class SystemStatus {
         }
     }
 
-    func installIntoSteam() async {
+    // unattended: nobody pressed anything, so a Steam that opened since the decision to
+    // install is left running and the install stops instead.
+    func installIntoSteam(unattended: Bool = false) async {
+        if let refusal = MigrationLaunch.shared.refusal {
+            setFailure(refusal)
+            AppLog.note("run refused: install waits for the 3.0 folder move")
+            return
+        }
         var failedInputResets: [String]?
         await perform(from: InstallPhase.checkingPayload.label) { progress in
             let lock = try DeploymentContent.acquireInstallationLock()
             defer { lock.release() }
+            let stopClient = unattended ? SteamInstaller.leaveTheClient : SteamInstaller.stopTheClient
             let result = try await Task.detached(priority: .userInitiated) {
-                try SteamInstaller.run(holdingInstallationLock: true, report: { progress($0.label) })
+                try SteamInstaller.run(holdingInstallationLock: true, stopClient: stopClient,
+                                       report: { progress($0.label) })
             }.value
 
             var parts = [String(localized: "Bridgeplay successfully installed.")]
@@ -732,7 +754,14 @@ final class SystemStatus {
             guard isIdle else { return }
             AppLog.note("patch keeper (\(trigger)): re-applying on its own, \(kind)")
             lastAutoReapply = now
-            await installIntoSteam()
+            await installIntoSteam(unattended: true)
+            if lastRunError is SteamInstaller.ClientStarted {
+                // Not a failure: Steam opened in the meantime, so ask as if it had been open.
+                AppLog.note("patch keeper (\(trigger)): Steam opened before re-applying, asking instead")
+                clearFailure()
+                patchBanner = SteamPatchKeeper.Banner(kind: kind, blocker: .steamRunning)
+                return
+            }
             settleReapply(kind)
         }
     }
@@ -807,12 +836,12 @@ final class SystemStatus {
 
     func removeEverything() async {
         await perform(from: UninstallPhase.stoppingClient.label) { progress in
-            let result = try await Uninstall.run { progress($0.label) }
+            let result = try await Uninstall.run(leftovers: .live) { progress($0.label) }
 
-            if let partial = result.partialRemoval { return partial }
-            return result.steamNeedsRedownload
+            let summary = result.partialRemoval ?? (result.steamNeedsRedownload
                 ? String(localized: "Bridgeplay has been removed. Steam could not be restored. Reinstall Steam from steampowered.com before using it again.")
-                : String(localized: "Bridgeplay has been removed.")
+                : String(localized: "Bridgeplay has been removed."))
+            return [summary, result.keptGamefixesNote].compactMap { $0 }.joined(separator: " ")
         }
     }
 

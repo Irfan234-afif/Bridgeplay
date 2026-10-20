@@ -24,6 +24,14 @@ enum AppLog {
         queue.async { append(line) }
     }
 
+    // The command line paths exit() as soon as they finish, which would drop queued lines,
+    // so they pass their exit status through here first.
+    static func finished(_ status: Int32) -> Int32 {
+        note("command line: exit \(status)")
+        queue.sync {}
+        return status
+    }
+
     static func note(_ snapshot: StatusSnapshot) {
         var lines = [
             "state steam=\(describe(snapshot.steam))",

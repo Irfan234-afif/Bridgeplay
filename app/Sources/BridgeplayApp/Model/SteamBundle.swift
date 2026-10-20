@@ -27,8 +27,15 @@ enum SteamBundle {
         FileManager.default.fileExists(atPath: SupportPaths.Steam.app.path(percentEncoded: false))
     }
 
+    // Any account's Steam: they all run the same Steam.app, so one open in another account
+    // still holds the bundle Bridgeplay re-signs.
     static var isRunning: Bool {
+        Shell.processIsRunning(named: "steam_osx", allUsers: true)
+    }
 
+    // This account's Steam, the only one that writes this account's config.vdf and the
+    // only one steam://exit reaches.
+    static var isRunningForThisUser: Bool {
         Shell.processIsRunning(named: "steam_osx")
     }
 
@@ -79,38 +86,58 @@ enum SteamBundle {
         return text.isEmpty ? nil : text
     }
 
+    // What stopClient looks at and does, so tests can stand in for Steam.
+    struct Client: Sendable {
+        var runningAnywhere: @Sendable () -> Bool = { SteamBundle.isRunning }
+        var runningHere: @Sendable () -> Bool = { SteamBundle.isRunningForThisUser }
+        var askToQuit: @Sendable () -> Void = { _ = try? Shell.run("/usr/bin/open", ["-g", "steam://exit"]) }
+        var sweep: @Sendable (String) -> Void = { _ = try? Shell.run("/usr/bin/pkill", ["-f", $0]) }
+        var pause: @Sendable () -> Void = { Thread.sleep(forTimeInterval: 0.5) }
+        var attempts = 60
+    }
+
+    // Asks this account's Steam to quit and waits up to 30 seconds. Steam is never killed:
+    // it may be writing its config or an update, so a Steam that stays open is reported
+    // instead. A Steam another account runs is out of reach and reported as such.
     static func stopClient(
         app: URL = SupportPaths.Steam.app,
         helpers: [URL] = [SupportPaths.Steam.innerApp],
         step: String,
+        client: Client = Client(),
         onStopping: () -> Void = {}
     ) throws -> Bool {
-        guard isRunning else { return false }
+        guard client.runningAnywhere() else { return false }
+        guard client.runningHere() else { throw OpenInAnotherAccount(step: step) }
         onStopping()
 
-        _ = try? Shell.run("/usr/bin/open", ["-g", "steam://exit"])
-        for _ in 0..<60 where isRunning {
-            Thread.sleep(forTimeInterval: 0.5)
+        client.askToQuit()
+        for _ in 0..<client.attempts where client.runningHere() {
+            client.pause()
         }
 
-        if isRunning {
-            _ = try? Shell.run("/usr/bin/pkill", ["-9", "-x", "steam_osx"])
-            for _ in 0..<10 where isRunning {
-                Thread.sleep(forTimeInterval: 0.5)
-            }
-        }
-
-        guard !isRunning else {
+        guard !client.runningHere() else {
             throw StepFailure(
                 step: step,
-                detail: String(localized: "Steam is running, please close Steam.")
+                detail: String(localized: "Steam did not quit. Quit Steam, then try again.")
             )
         }
+        guard !client.runningAnywhere() else { throw OpenInAnotherAccount(step: step) }
 
         for pattern in sweepPatterns(app: app, helpers: helpers) {
-            _ = try? Shell.run("/usr/bin/pkill", ["-f", pattern])
+            client.sweep(pattern)
         }
         return true
+    }
+
+    // Its own type, so a caller that only touches this account's files can carry on.
+    struct OpenInAnotherAccount: LocalizedError {
+        let step: String
+        var errorDescription: String? {
+            StepFailure(
+                step: step,
+                detail: String(localized: "Steam is open in another account on this Mac. Quit Steam in that account, then try again.")
+            ).errorDescription
+        }
     }
 
     static func sweepPatterns(app: URL, helpers: [URL]) -> [String] {

@@ -59,6 +59,9 @@ enum SupportPaths {
     // Per-game defaults Bridgeplay ships. Replaced on every install; the user's own
     // overrides live in the sibling "gamefixes" directory, which Bridgeplay never writes.
     static var gamefixesDefault: URL { support.appending(path: "gamefixes-default") }
+    static var gamefixes: URL { support.appending(path: "gamefixes") }
+    // Where Remove Everything moves the user's own overrides, outside the folder it deletes.
+    static var keptGamefixes: URL { applicationSupport.appending(path: "\(supportDirName)-gamefixes") }
 
     static var signatures: URL {
         support.appending(path: "signatures/macos.arm64")
@@ -114,7 +117,6 @@ enum SupportPaths {
             !FileManager.default.fileExists(atPath: bundle.deletingLastPathComponent().path(percentEncoded: false))
         }
         static var infoPlist: URL { infoPlist(inBundle: app) }
-        static var executable: URL { app.appending(path: "Contents/MacOS/steam_osx") }
         static var deployedDylib: URL { deployedDylib(inBundle: app) }
 
         static func infoPlist(inBundle bundle: URL) -> URL {
