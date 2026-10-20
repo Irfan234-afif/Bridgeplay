@@ -92,7 +92,7 @@ t0.ok(!!legacyFx && legacyFx.g.BRIDGEPLAY_RETINA === '1',
 failed += t0.failed;
 
 const LABELS = ['Metal HUD', 'DLSS', 'Advertise AVX2 to Rosetta', 'MSync', 'High Resolution',
-                'Let games read controllers directly (May break Steam Input. Not recommended)'];
+                'Let games read controllers directly (Recommended on Mac. Turn off only for Steam Input remapping)'];
 globalThis.MSCXFx = fx;
 for (const form of Object.keys(FORMS)) {
   const { render: P, written } = panel(emit, form);

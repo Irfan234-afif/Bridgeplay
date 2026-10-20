@@ -78,7 +78,7 @@ for (const form of Object.keys(FORMS)) {
   t.ok(root.props.className === 'MSCXPanel', 'the panel root carries its own class');
   const classes = nodes('').filter(x => x.type === 'Toggle').map(x => x.props.className);
   t.ok(classes.length === 7 && classes.every(c => c === 'MSCXRow'), 'every checkbox carries the row class');
-  const raw = o => nodes(o).find(x => x.props.label === 'Let games read controllers directly (May break Steam Input. Not recommended)');
+  const raw = o => nodes(o).find(x => x.props.label === 'Let games read controllers directly (Recommended on Mac. Turn off only for Steam Input remapping)');
   t.ok(sections(nodes('')).includes('Controllers') && raw('').props.checked === false,
        'controller hiding is on unless the game says otherwise');
   written.length = 0;

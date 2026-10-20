@@ -29,9 +29,9 @@ for (const form of Object.keys(FORMS)) {
       assert(nodes.some(n => n.props.label === t('Graphics', '图形', 'Grafica')));
       assert(nodes.some(n => n.props.label === t('Controllers', '控制器', 'Controller')));
       const raw = nodes.find(n => n.props.label === t(
-        'Let games read controllers directly (May break Steam Input. Not recommended)',
-        '允许游戏直接读取控制器（可能导致 Steam Input 失效，不推荐）',
-        'Lascia che i giochi leggano direttamente i controller (può interferire con Steam Input, sconsigliato)'));
+        'Let games read controllers directly (Recommended on Mac. Turn off only for Steam Input remapping)',
+        '允许游戏直接读取控制器（Mac 上推荐，仅在需要 Steam Input 按键映射时关闭）',
+        'Lascia che i giochi leggano direttamente i controller (consigliato su Mac, disattiva solo per la rimappatura di Steam Input)'));
       assert(nodes.some(n => n.props.label === t('Disable hidraw', '停用 hidraw', 'Disable hidraw')));
       raw.props.onChange(true);
       assert.equal(written.at(-1).opts, 'BRIDGEPLAY_RAW_CONTROLLERS=1 CX_GRAPHICS_BACKEND=dxmt %command%');
