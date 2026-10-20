@@ -343,6 +343,27 @@ struct SetupAssistantView: View {
                       tone: .info,
                       action: StatusAction(label: String(localized: "Open Input Monitoring")) { SystemStatus.openInputMonitoring() }))
         }
+        Text("For every game")
+            .font(BP.sans(13, .semibold))
+            .foregroundStyle(BP.fg)
+            .padding(.horizontal, 2)
+            .padding(.top, 8)
+        Card {
+            WizardRow(row: StatusRow(title: String(localized: "Metal HUD"),
+                      value: String(localized: "Shows frame rate and GPU details in a corner while you play."),
+                      toggle: Binding(get: { model.metalHUD }, set: { model.setGameDefault(.metalHUD, $0) })),
+                      symbol: "gauge.with.dots.needle.33percent")
+            Hairline()
+            WizardRow(row: StatusRow(title: String(localized: "High Resolution"),
+                      value: String(localized: "Sharper on Retina displays, but games run slower."),
+                      toggle: Binding(get: { model.highResolution }, set: { model.setGameDefault(.highResolution, $0) })),
+                      symbol: "display")
+        }
+        Text("Both start off. You can change them here later, or for one game in its Steam Properties › Compatibility.")
+            .font(BP.sans(12))
+            .foregroundStyle(BP.fg3)
+            .fixedSize(horizontal: false, vertical: true)
+            .padding(.horizontal, 2)
     }
 
     private func value(of task: SetupAssistant.SetupTask) -> String? {
@@ -510,6 +531,8 @@ private struct WizardRow: View {
     var pending = false
     // A step number in place of the tone, for rows that are instructions.
     var number: Int?
+    // A symbol in place of the tone, for rows that are settings rather than checks.
+    var symbol: String?
 
     var body: some View {
         HStack(alignment: .center, spacing: 14) {
@@ -519,6 +542,13 @@ private struct WizardRow: View {
                     .foregroundStyle(.black)
                     .frame(width: 24, height: 24)
                     .background(BP.iridescentDiagonal, in: RoundedRectangle(cornerRadius: 7, style: .continuous))
+            } else if let symbol {
+                Image(systemName: symbol)
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(BP.fg2)
+                    .frame(width: 24, height: 24)
+                    .background(BP.raise2, in: RoundedRectangle(cornerRadius: 7, style: .continuous))
+                    .accessibilityHidden(true)
             } else {
                 ToneBadge(tone: row.tone, pending: pending)
             }
@@ -553,6 +583,12 @@ private struct WizardRow: View {
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
+            if let toggle = row.toggle {
+                Toggle(row.title, isOn: toggle)
+                    .toggleStyle(.switch)
+                    .labelsHidden()
+                    .tint(BP.blue)
+            }
             if row.secondaryAction != nil || row.action != nil {
                 HStack(spacing: 8) {
                     if let secondary = row.secondaryAction { button(secondary, prominent: false) }

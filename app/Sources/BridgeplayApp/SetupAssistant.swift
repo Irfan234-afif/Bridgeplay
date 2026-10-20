@@ -61,6 +61,10 @@ final class SetupAssistant {
     var needsAppManagement = false
     @ObservationIgnored private var permissionWatch: Task<Void, Never>?
 
+    // Done: settings for every game, read from and written to gamefixes/default.conf.
+    var metalHUD = GameDefaults.isOn(.metalHUD)
+    var highResolution = GameDefaults.isOn(.highResolution)
+
     static let plannedTasks = [
         SetupTask(id: "steam", title: String(localized: "Add Bridgeplay to Steam")),
         SetupTask(id: "engine", title: String(localized: "Set up the WineCX engine")),
@@ -80,6 +84,8 @@ final class SetupAssistant {
             rosettaInstalled = false
             signedIn = false
             trust = .needed
+            metalHUD = false
+            highResolution = false
         }
         // The preview can open on a later step; the steps before it count as passed, so a
         // fresh Mac shows step 4 as someone who pressed Trust in step 3 would see it.
@@ -94,6 +100,20 @@ final class SetupAssistant {
     }
 
     enum Preview { case thisMac, fresh }
+
+    // The preview only flips the switch; it never writes the real default.conf.
+    func setGameDefault(_ setting: GameDefaults.Setting, _ on: Bool) {
+        switch setting {
+        case .metalHUD: metalHUD = on
+        case .highResolution: highResolution = on
+        }
+        guard !isPreview else { return }
+        do {
+            try GameDefaults.set(setting, to: on)
+        } catch {
+            message = String(localized: "Bridgeplay could not save this setting. \(error.localizedDescription)")
+        }
+    }
 
     private func pretend(_ seconds: Double = 0.9) async {
         try? await Task.sleep(for: .seconds(seconds))

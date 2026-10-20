@@ -57,7 +57,8 @@ enum SupportPaths {
     // Free WineHQ engines Bridgeplay downloaded, laid out like a CrossOver bundle.
     static var engines: URL { support.appending(path: "engines") }
     // Per-game defaults Bridgeplay ships. Replaced on every install; the user's own
-    // overrides live in the sibling "gamefixes" directory, which Bridgeplay never writes.
+    // overrides live in the sibling "gamefixes" directory. Bridgeplay writes there only the
+    // lines of default.conf that GameDefaults owns, and keeps everything else as it is.
     static var gamefixesDefault: URL { support.appending(path: "gamefixes-default") }
     static var gamefixes: URL { support.appending(path: "gamefixes") }
     // Where Remove Everything moves the user's own overrides, outside the folder it deletes.

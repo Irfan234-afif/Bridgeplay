@@ -164,6 +164,10 @@ struct StatusRow: View {
 
 struct StatusView: View {
     @Environment(SystemStatus.self) private var status
+    // gamefixes/default.conf, read when the page opens; the switches write it straight away.
+    @State private var metalHUD = GameDefaults.isOn(.metalHUD)
+    @State private var highResolution = GameDefaults.isOn(.highResolution)
+    @State private var gameDefaultsError: String?
 
     private static let updateBlockPrompt =
         String(localized: "Steam client updates may break Bridgeplay. If you don't want to wait for Bridgeplay to be updated to be compatible with future Steam versions at the cost of not getting updates to the Steam client, you can stop the Steam client from updating itself.")
@@ -364,6 +368,8 @@ struct StatusView: View {
                 }
             }
 
+            gameDefaultsSection
+
             componentsSection(snapshot.payload)
 
             dangerSection
@@ -434,6 +440,36 @@ struct StatusView: View {
                 }
             )
         }
+    }
+
+    private var gameDefaultsSection: some View {
+        Section {
+            StatusRow(title: String(localized: "Metal HUD"),
+                      value: String(localized: "Shows frame rate and GPU details in a corner while you play."),
+                      toggle: gameDefault(.metalHUD, $metalHUD))
+            StatusRow(title: String(localized: "High Resolution"),
+                      value: String(localized: "Sharper on Retina displays, but games run slower."),
+                      toggle: gameDefault(.highResolution, $highResolution))
+            if let gameDefaultsError {
+                StatusRow(title: String(localized: "Something went wrong"), value: gameDefaultsError, tone: .bad)
+            }
+        } header: {
+            Text("For Every Game")
+        } footer: {
+            Text("A game's own Steam Properties › Compatibility settings win over these.")
+        }
+    }
+
+    private func gameDefault(_ setting: GameDefaults.Setting, _ value: Binding<Bool>) -> Binding<Bool> {
+        Binding(get: { value.wrappedValue }, set: { on in
+            value.wrappedValue = on
+            do {
+                try GameDefaults.set(setting, to: on)
+                gameDefaultsError = nil
+            } catch {
+                gameDefaultsError = String(localized: "Bridgeplay could not save this setting. \(error.localizedDescription)")
+            }
+        })
     }
 
     private var dangerSection: some View {

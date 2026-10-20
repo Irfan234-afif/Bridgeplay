@@ -972,6 +972,22 @@
         }
       }
     },
+    "A game's own Steam Properties › Compatibility settings win over these." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le impostazioni di un gioco in Proprietà di Steam › Compatibilità hanno la precedenza su queste."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "单个游戏在 Steam 属性 › 兼容性中的设置优先于这里。"
+          }
+        }
+      }
+    },
     "A header field" : {
       "localizations" : {
         "it" : {
@@ -1948,6 +1964,22 @@
         }
       }
     },
+    "Both start off. You can change them here later, or for one game in its Steam Properties › Compatibility." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Entrambe partono disattivate. Puoi cambiarle qui più tardi, o per un singolo gioco in Proprietà di Steam › Compatibilità."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "两项默认关闭。之后可以在这里更改，也可以在单个游戏的 Steam 属性 › 兼容性中更改。"
+          }
+        }
+      }
+    },
     "Bridgeplay" : {
       "shouldTranslate" : false
     },
@@ -2059,6 +2091,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Bridgeplay 无法连接 %@ 服务器。请检查网络连接，然后重试。"
+          }
+        }
+      }
+    },
+    "Bridgeplay could not save this setting. %@" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bridgeplay non è riuscito a salvare questa impostazione. %@"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bridgeplay 无法保存此设置。%@"
           }
         }
       }
@@ -4062,6 +4110,38 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "正在完成收尾工作"
+          }
+        }
+      }
+    },
+    "For Every Game" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Per tutti i giochi"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "所有游戏"
+          }
+        }
+      }
+    },
+    "For every game" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Per tutti i giochi"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "所有游戏"
           }
         }
       }
@@ -7234,6 +7314,22 @@
         }
       }
     },
+    "Sharper on Retina displays, but games run slower." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Più nitido sui display Retina, ma i giochi vanno più lenti."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在 Retina 显示屏上更清晰，但游戏会变慢。"
+          }
+        }
+      }
+    },
     "Show all compatibility tools" : {
       "localizations" : {
         "it" : {
@@ -7310,6 +7406,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "在“自动”或 DXMT 下显示。以低于显示器的分辨率渲染，再用 MetalFX 放大：1.5×、1.72×、2× 或 3×。关闭则保持游戏中设置的分辨率。"
+          }
+        }
+      }
+    },
+    "Shows frame rate and GPU details in a corner while you play." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mostra frame rate e dettagli della GPU in un angolo mentre giochi."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "游戏时在角落显示帧率和 GPU 信息。"
           }
         }
       }
