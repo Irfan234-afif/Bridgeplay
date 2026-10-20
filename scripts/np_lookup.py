@@ -9,7 +9,7 @@ import time
 import urllib.parse
 import urllib.request
 
-UA = {"User-Agent": "notproton-compat-tools/1.0 (+https://github.com/raymondchins/NotProton-WineHQ)"}
+UA = {"User-Agent": "bridgeplay-compat-tools/1.0 (+https://github.com/raymondchins/Bridgeplay)"}
 _last = {}
 
 

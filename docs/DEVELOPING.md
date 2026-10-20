@@ -1,4 +1,4 @@
-# NotProton-WineHQ
+# Bridgeplay developer guide
 
 > **This is a fork of [NotProton](https://github.com/NotProtonNot/NotProton).**
 >
@@ -18,7 +18,7 @@
 > This fork is not affiliated with or endorsed by the NotProton developers, the Wine project
 > (WineHQ), CodeWeavers or Valve. "Wine" and "CrossOver" are trademarks of their respective
 > owners and are only used here to describe what the software works with. Please report problems
-> with this fork [here](https://github.com/raymondchins/NotProton-WineHQ/issues), not upstream.
+> with this fork [here](https://github.com/raymondchins/Bridgeplay/issues), not upstream.
 >
 > Modified by Leon Seemann, 2026. Like upstream, this fork is licensed under the GPLv3; see
 > [NOTICE](NOTICE) for details.

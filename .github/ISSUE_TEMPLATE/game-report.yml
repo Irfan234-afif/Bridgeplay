@@ -1,5 +1,5 @@
 name: Game report
-description: Report how a Windows game runs under NotProton (WineHQ engine)
+description: Report how a Windows game runs under Bridgeplay
 title: "[Game] <name> (<appid>)"
 labels: ["game-report"]
 body:
@@ -65,7 +65,7 @@ body:
     id: fork_commit
     attributes:
       label: Fork commit
-      description: Output of `git rev-parse --short HEAD` in your NotProton-WineHQ checkout.
+      description: The Bridgeplay version you run, or `git rev-parse --short HEAD` in your Bridgeplay checkout.
     validations:
       required: true
   - type: input
