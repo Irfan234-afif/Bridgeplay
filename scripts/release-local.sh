@@ -1,60 +1,208 @@
 #!/bin/sh
-# Build Bridgeplay from this checkout and publish it as this fork's latest GitHub release,
-# which is what the app's "Check for Updates…" (Sparkle, SUFeedURL in app/Info.plist)
-# reads.
+# Build Bridgeplay from this checkout and publish it as the latest GitHub release of
+# raymondchins/Bridgeplay, which is what the app's updater (Sparkle, SUFeedURL in
+# app/Info.plist) reads. See docs/RELEASING.md.
 #
-#   scripts/release-local.sh "release notes"
+#   scripts/release-local.sh [--dry-run] [--legacy-feed] ["release notes"]
+#
+#   --dry-run      run the checks and write the zips and appcasts to out/release/ without
+#                  publishing, from the app already in build/ or out/; never reads the
+#                  keychain (SPARKLE_KEY_FILE signs, else the appcast stays unsigned)
+#   --legacy-feed  also publish the update where NotProton builds up to 1.1.9-ray.31
+#                  look for one (raymondchins/NotProton-WineHQ), as NotProton.zip
+#   release notes  default: the commit subjects since the previous release
 #
 # The update is signed with the EdDSA key in this Mac's login keychain, created once with
 # app/.build/artifacts/sparkle/Sparkle/bin/generate_keys; app/Info.plist's SUPublicEDKey
-# must be its public half. The version comes from dylib/version.h and must not have been
-# released yet. HEAD must already be pushed to origin/main.
+# must be its public half. The version comes from dylib/version.h (scripts/bump-version.sh)
+# and must not have been released yet. HEAD must already be pushed to the Bridgeplay
+# repository's main.
 
 set -eu
 
 repo=$(cd "$(dirname "$0")/.." && pwd)
 cd "$repo"
 
-notes=${1:-}
-[ -n "$notes" ] || { sed -n '6p' "$0" | sed 's/^# \{0,1\}//'; exit 1; }
+usage() {
+	sed -n '6,13p' "$0" | sed 's/^# \{0,1\}//' >&2
+	exit 1
+}
+
+dry_run=0
+legacy=0
+notes=""
+for arg in "$@"; do
+	case "$arg" in
+		--dry-run) dry_run=1 ;;
+		--legacy-feed) legacy=1 ;;
+		-h|--help) usage ;;
+		-*) usage ;;
+		*) [ -z "$notes" ] || usage; notes=$arg ;;
+	esac
+done
+
+slug=raymondchins/Bridgeplay
+legacy_slug=raymondchins/NotProton-WineHQ
+# Bridgeplay needs macOS 26 (SetupChecks.minimumMacOS); older Macs are not offered updates.
+min_macos=26.0
 
 die() { echo "==> $*" >&2; exit 1; }
+# A failed safety check stops a release; a dry run reports it and carries on.
+check() {
+	if [ "$dry_run" -eq 1 ]; then echo "==> dry run, would stop here: $*" >&2; else die "$*"; fi
+}
+run() {
+	if [ "$dry_run" -eq 1 ]; then
+		printf '==> would run:'; printf ' %s' "$@"; echo
+	else
+		"$@"
+	fi
+}
 
-[ -z "$(git status --porcelain --untracked-files=no)" ] || die "the tree has uncommitted changes"
-git fetch -q origin
-[ "$(git rev-parse HEAD)" = "$(git rev-parse origin/main)" ] || die "HEAD is not origin/main; push first"
+remote=""
+for r in $(git remote); do
+	case "$(git remote get-url "$r")" in
+		*github.com[:/]"$slug"|*github.com[:/]"$slug".git) remote=$r ;;
+	esac
+done
+[ -n "$remote" ] || die "no git remote points at github.com/$slug; git remote add bridgeplay https://github.com/$slug.git"
 
-slug=$(git remote get-url origin | sed -E 's#^(https://github.com/|git@github.com:)##; s#\.git$##')
-version=$(sed -n 's/^#define NOTPROTON_VERSION "\(.*\)"/\1/p' dylib/version.h)
-if gh release view "v$version" -R "$slug" >/dev/null 2>&1; then
-	die "v$version is already released; bump dylib/version.h (scripts/sync-upstream.sh does)"
+[ -z "$(git status --porcelain --untracked-files=no)" ] || check "the tree has uncommitted changes"
+git fetch -q "$remote"
+[ "$(git rev-parse HEAD)" = "$(git rev-parse "$remote/main")" ] || check "HEAD is not $remote/main; push first"
+
+version=$(sed -n 's/^#define BRIDGEPLAY_VERSION "\(.*\)"$/\1/p' dylib/version.h)
+build=$(sed -n 's/^#define BRIDGEPLAY_BUILD \([0-9][0-9]*\)$/\1/p' dylib/version.h)
+upstream=$(sed -n 's/^#define NOTPROTON_VERSION "\(.*\)"$/\1/p' dylib/version.h)
+[ -n "$version" ] && [ -n "$build" ] || die "dylib/version.h has no BRIDGEPLAY_VERSION/BRIDGEPLAY_BUILD"
+tag="v$version"
+if gh release view "$tag" -R "$slug" >/dev/null 2>&1; then
+	check "$tag is already released; run scripts/bump-version.sh patch|minor|major"
+fi
+
+# Release notes: the commits since the previous app release, unless given. Other releases
+# in the repository (DXMT builds) have tags that are not vX.Y.Z and are skipped.
+previous=$(gh release list -R "$slug" --limit 100 --json tagName -q '.[].tagName' 2>/dev/null \
+	| grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | head -n 1 || true)
+if [ -z "$previous" ] || ! git rev-parse -q --verify "refs/tags/$previous" >/dev/null; then
+	git fetch -q --tags "$remote" 2>/dev/null || true
+fi
+if [ -z "$previous" ] || ! git rev-parse -q --verify "refs/tags/$previous" >/dev/null; then
+	# Before the first Bridgeplay release: the last release of the old scheme.
+	previous=$(git tag --list 'v*-ray.*' --sort=-v:refname | head -n 1)
+fi
+if [ -z "$notes" ]; then
+	if [ -n "$previous" ]; then
+		notes=$(git log --no-merges --format='- %s' "$previous..HEAD")
+	fi
+	[ -n "$notes" ] || notes="Bridgeplay $version"
 fi
 
 sparkle=app/.build/artifacts/sparkle/Sparkle/bin
-key=$("$sparkle/generate_keys" -p 2>/dev/null) || die "no Sparkle key in the keychain; run $sparkle/generate_keys"
-[ "$key" = "$(/usr/libexec/PlistBuddy -c 'Print :SUPublicEDKey' app/Info.plist)" ] \
-	|| die "app/Info.plist SUPublicEDKey is not this keychain's Sparkle key"
+[ -x "$sparkle/generate_appcast" ] || swift build --package-path app >/dev/null
+[ -x "$sparkle/generate_appcast" ] || die "no Sparkle tools at $sparkle"
 
-if [ -z "${CX_ROOT:-}" ]; then
-	CX_ROOT="$HOME/Library/Application Support/notproton/runners/crossover-winehq-11.15/CrossOver"
-	export CX_ROOT
+if [ "$dry_run" -eq 1 ]; then
+	out=out/release
+	rm -rf "$out"
+	mkdir -p "$out"
+	# Never the keychain. SPARKLE_KEY_FILE (generate_keys -x) signs for real; otherwise a
+	# throwaway key stands in, and since it is not SUPublicEDKey's pair generate_appcast
+	# leaves the enclosure unsigned. generate_appcast's cache goes under out/, not ~/Library.
+	if [ -n "${SPARKLE_KEY_FILE:-}" ]; then
+		cp "$SPARKLE_KEY_FILE" "$out/throwaway.key"
+	else
+		openssl genpkey -algorithm ed25519 -outform DER 2>/dev/null | tail -c 32 | base64 >"$out/throwaway.key"
+	fi
+	key_args="--ed-key-file $out/throwaway.key"
+	CFFIXED_USER_HOME=$repo/$out/home
+	export CFFIXED_USER_HOME
+	app=""
+	for candidate in build/Bridgeplay.app out/Bridgeplay.app; do
+		[ -d "$candidate" ] && { app=$candidate; break; }
+	done
+	[ -n "$app" ] || die "--dry-run needs a built app: make app (or scripts/build-local.sh)"
+else
+	key=$("$sparkle/generate_keys" -p 2>/dev/null) || die "no Sparkle key in the keychain; run $sparkle/generate_keys"
+	[ "$key" = "$(/usr/libexec/PlistBuddy -c 'Print :SUPublicEDKey' app/Info.plist)" ] \
+		|| die "app/Info.plist SUPublicEDKey is not this keychain's Sparkle key"
+	key_args=""
+
+	if [ -z "${CX_ROOT:-}" ]; then
+		CX_ROOT="$HOME/Library/Application Support/notproton/runners/crossover-winehq-11.15/CrossOver"
+		export CX_ROOT
+	fi
+	scripts/build-local.sh --checks
+	app=build/Bridgeplay.app
+	out=$(mktemp -d)
+	trap 'rm -rf "$out"' EXIT
 fi
-scripts/build-local.sh --checks
 
-built=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' build/Bridgeplay.app/Contents/Info.plist)
-[ "$built" = "$version" ] || die "built $built, expected $version"
+plist=$app/Contents/Info.plist
+built=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$plist")
+built_build=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$plist")
+[ "$built" = "$version" ] && [ "$built_build" = "$build" ] \
+	|| check "built $built ($built_build), expected $version ($build) from dylib/version.h"
+codesign --verify --strict "$app" || die "$app is not validly signed; Sparkle rejects that"
 
-out=$(mktemp -d)
-trap 'rm -rf "$out"' EXIT
-cp build/Bridgeplay.zip "$out/Bridgeplay.zip"
-printf '%s\n' "$notes" >"$out/Bridgeplay.txt"
-"$sparkle/generate_appcast" \
-	--download-url-prefix "https://github.com/$slug/releases/download/v$version/" \
-	--embed-release-notes "$out"
+# One archive and one appcast per feed. The appcast attached to the latest release is the
+# feed, so each only needs the newest item; its enclosure points at this tag's zip.
+# $1 directory, $2 archive name, $3 app name inside it, $4 repository
+feed() {
+	mkdir -p "$1"
+	staging=$(mktemp -d)
+	ditto "$app" "$staging/$3"
+	ditto -c -k --keepParent "$staging/$3" "$1/$2"
+	rm -rf "$staging"
+	printf '%s\n' "$notes" >"$1/${2%.zip}.txt"
+	# shellcheck disable=SC2086 # key_args is empty or two words
+	"$sparkle/generate_appcast" $key_args --embed-release-notes --maximum-versions 1 \
+		--download-url-prefix "https://github.com/$4/releases/download/$tag/" "$1"
+	rm -f "$1/${2%.zip}.txt"
+	# generate_appcast takes the minimum from LSMinimumSystemVersion; the feed asks for the
+	# macOS Bridgeplay supports. The feed is not signed (only the archive is), so this edit
+	# keeps every signature valid.
+	sed -i '' "s#<sparkle:minimumSystemVersion>[^<]*</sparkle:minimumSystemVersion>#<sparkle:minimumSystemVersion>$min_macos</sparkle:minimumSystemVersion>#" "$1/appcast.xml"
+	grep -q "<sparkle:minimumSystemVersion>$min_macos<" "$1/appcast.xml" || die "$1/appcast.xml has no minimumSystemVersion"
+	grep -q "<sparkle:version>$build</sparkle:version>" "$1/appcast.xml" || die "$1/appcast.xml does not carry build $build"
+	grep -q "url=\"https://github.com/$4/releases/download/$tag/$2\"" "$1/appcast.xml" \
+		|| die "$1/appcast.xml does not point at $4 $tag/$2"
+	if grep -q 'sparkle-signatures' "$1/appcast.xml"; then die "$1/appcast.xml is signed; the minimum OS edit would break it"; fi
+	# SUVerifyUpdateBeforeExtraction: an update without a valid EdDSA signature is refused.
+	if ! grep -q 'sparkle:edSignature="' "$1/appcast.xml"; then
+		if [ "$dry_run" -eq 1 ]; then
+			echo "==> dry run: $1/appcast.xml is unsigned (no SPARKLE_KEY_FILE); a release stops here instead"
+		else
+			die "$1/appcast.xml has no sparkle:edSignature; users would refuse this update"
+		fi
+	fi
+}
 
-gh release create "v$version" "$out/Bridgeplay.zip" "$out/appcast.xml" -R "$slug" \
-	--target "$(git rev-parse HEAD)" --title "$version" --notes "$notes" --latest
-echo "==> released v$version: https://github.com/$slug/releases/tag/v$version"
+feed "$out/bridgeplay" Bridgeplay.zip Bridgeplay.app "$slug"
+# NotProton builds look for NotProton.app or com.notproton.NotProton in the archive
+# (Sparkle's SUInstaller), so the legacy feed ships the same app under that name. It
+# installs over /Applications/NotProton.app; later updates match by bundle identifier.
+[ "$legacy" -eq 0 ] || feed "$out/legacy" NotProton.zip NotProton.app "$legacy_slug"
+
+title="Bridgeplay $version"
+body=$(printf '%s\n\nBuild %s, based on NotProton %s.\n' "$notes" "$build" "$upstream")
+echo "==> $title (build $build), notes since ${previous:-the beginning}:"
+printf '%s\n' "$notes" | sed 's/^/    /'
+run gh release create "$tag" "$out/bridgeplay/Bridgeplay.zip" "$out/bridgeplay/appcast.xml" -R "$slug" \
+	--target "$(git rev-parse HEAD)" --title "$title" --notes "$body" --latest
+if [ "$legacy" -eq 1 ]; then
+	# Only a carrier for the feed: the tag goes on that repository's default branch, since
+	# this commit need not exist there. --latest is what moves its feed.
+	run gh release create "$tag" "$out/legacy/NotProton.zip" "$out/legacy/appcast.xml" -R "$legacy_slug" \
+		--title "$title" --notes "NotProton is now Bridgeplay. $body" --latest
+fi
+
+if [ "$dry_run" -eq 1 ]; then
+	rm -f "$out/throwaway.key"
+	echo "==> dry run: nothing published; zips and appcasts in $out"
+	exit 0
+fi
+echo "==> released $tag: https://github.com/$slug/releases/tag/$tag"
 # The release is the zip; the built app copies would only show up in Spotlight next to
 # /Applications/Bridgeplay.app.
 rm -rf build/Bridgeplay.app out/Bridgeplay.app
