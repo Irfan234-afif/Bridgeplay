@@ -16,7 +16,10 @@
 set -eu
 
 db_url=https://raw.githubusercontent.com/mdqinc/SDL_GameControllerDB/master/gamecontrollerdb.txt
-own="$HOME/Library/Application Support/notproton/gamecontrollerdb.txt"
+own="$HOME/Library/Application Support/bridgeplay/gamecontrollerdb.txt"
+# Before the app's 3.0.0 migration the file is still in the old support folder.
+legacy_own="$HOME/Library/Application Support/notproton/gamecontrollerdb.txt"
+[ -f "$own" ] || [ ! -f "$legacy_own" ] || own=$legacy_own
 db="$db_url"
 out=""
 

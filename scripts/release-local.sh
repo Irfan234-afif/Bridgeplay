@@ -129,7 +129,11 @@ else
 	key_args=""
 
 	if [ -z "${CX_ROOT:-}" ]; then
-		CX_ROOT="$HOME/Library/Application Support/notproton/runners/crossover-winehq-11.15/CrossOver"
+		# The support folder moved to bridgeplay in 3.0.0; a Mac the app has not migrated yet
+		# still has it under notproton.
+		CX_ROOT="$HOME/Library/Application Support/bridgeplay/runners/crossover-winehq-11.15/CrossOver"
+		legacy_cx="$HOME/Library/Application Support/notproton/runners/crossover-winehq-11.15/CrossOver"
+		[ -d "$CX_ROOT" ] || [ ! -d "$legacy_cx" ] || CX_ROOT=$legacy_cx
 		export CX_ROOT
 	fi
 	scripts/build-local.sh --checks

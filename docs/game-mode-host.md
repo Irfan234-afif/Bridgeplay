@@ -15,7 +15,7 @@ external launchers retain their original identities. This avoids assigning
 the game icon to every service in the prefix.
 
 Both helpers are built and included in the normal app payload. Installation
-and integrity checks cover them, and removing NotProton removes them with its
+and integrity checks cover them, and removing Bridgeplay removes them with its
 support directory.
 
 This declares eligibility and preserves application identity. macOS still

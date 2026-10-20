@@ -6,11 +6,25 @@ usage: steam-launch-options.py <localconfig.vdf> <TOKEN> <appid...>
 Edits userdata/<id>/config/localconfig.vdf in place. Run it only while Steam
 is fully closed (Steam rewrites the file on exit). A token already present is
 left alone; an app with no launch options gets "<TOKEN> %command%".
+
+A token is written with the public 3.0.0 spelling (BRIDGEPLAY_*, ~/.bridgeplay/...)
+even when given as NOTPROTON_* or ~/.notproton/...; either spelling already in the
+launch options counts as present.
 """
 import re
 import sys
 
-path, token = sys.argv[1], sys.argv[2]
+
+def public(t):
+    return re.sub(r"\bNOTPROTON_", "BRIDGEPLAY_", t.replace("/.notproton/", "/.bridgeplay/"))
+
+
+def legacy(t):
+    return re.sub(r"\bBRIDGEPLAY_", "NOTPROTON_", t.replace("/.bridgeplay/", "/.notproton/"))
+
+
+path, token = sys.argv[1], public(sys.argv[2])
+spellings = {token, legacy(token)}
 ids = set(sys.argv[3:])
 lines = open(path, encoding="utf-8").read().split("\n")
 out, done, in_apps, i = [], set(), False, 0
@@ -33,7 +47,7 @@ while i < len(lines):
             if mm:
                 found = True
                 val = mm.group(2)
-                if token not in val.split():
+                if not spellings & set(val.split()):
                     rest = val if "%command%" in val else (val + " %command%").strip()
                     val = f"{token} {rest}"
                 block[k] = mm.group(1) + val + mm.group(3)

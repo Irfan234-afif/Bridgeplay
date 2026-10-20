@@ -25,7 +25,9 @@
 
 ---
 
-## NotProton
+## NotProton (upstream)
+
+_From upstream's README._
 
 NotProton enables the Steam Play experience from Linux Steam in the macOS Steam client.
 
@@ -50,9 +52,9 @@ If a game has a native macOS version as well as a Windows one, Steam will downlo
 
 ## Free Wine engine (no CrossOver needed)
 
-NotProton can also run entirely on free software. Under Compatibility Tool, **Download & Set Up**
+Bridgeplay can also run entirely on free software. Under Compatibility Tool, **Download & Set Up**
 fetches the WineHQ 11.15 macOS build from [Gcenx/macOS_Wine_builds](https://github.com/Gcenx/macOS_Wine_builds)
-(hash pinned), unpacks it into `~/Library/Application Support/notproton/engines/` and sets the
+(hash pinned), unpacks it into `~/Library/Application Support/bridgeplay/engines/` and sets the
 compatibility tool up from it exactly like a CrossOver copy. No CrossOver license is involved; the
 license check is skipped only for loaders whose hash pins the free build.
 
@@ -65,7 +67,7 @@ against. Differences from CrossOver to be aware of:
   Wine's own wined3d cannot reach feature level 11 on macOS OpenGL. D3DMetal is Apple's and needs
   CrossOver's Wine changes, so this engine does not use it; the WineCX engine can, with a Game
   Porting Toolkit you supply (`docs/WINECX.md`).
-- DXMT needs macdrv functions upstream Wine hides; NotProton ships a rebuilt `winemac.so`
+- DXMT needs macdrv functions upstream Wine hides; Bridgeplay ships a rebuilt `winemac.so`
   that exports them (see `winemac-patch/`).
 - D3D 12 has no fast path; vkd3d over the bundled MoltenVK is limited.
 - WineHQ has no msync/esync, so CPU-heavy games can run slower than under CrossOver or Sikarugir.
@@ -96,5 +98,5 @@ Developer Notes:
 As far as the source structure goes, the macOS app itself is located in the ```app``` folder. The core logic is in ```dylib```.
 ```lsteamclient``` is a macOS port of Valve's lsteamclient. ```steam-shim```is a port of Valve's
 steam-helper from Proton 9.0. ntdll-patch patches the copy of CrossOver that the app
-makes/places in the ```~/Library/Application Support/notproton/runners/``` folder so that
+makes/places in the ```~/Library/Application Support/bridgeplay/runners/``` folder so that
 lsteamclient is loaded.

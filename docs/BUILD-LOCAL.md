@@ -29,9 +29,9 @@ output to `build/logs/<phase>.log`.
 
 | Path | What |
 |---|---|
-| `build/NotProton.app` | ad-hoc signed app, passes `codesign --verify --strict` |
-| `build/NotProton.zip` | `ditto -c -k --keepParent` of the app, as CI packages it |
-| `out/NotProton.app` | the bundle `make app` writes; the script copies it to `build/` |
+| `build/Bridgeplay.app` | ad-hoc signed app, passes `codesign --verify --strict` |
+| `build/Bridgeplay.zip` | `ditto -c -k --keepParent` of the app, as CI packages it |
+| `out/Bridgeplay.app` | the bundle `make app` writes; the script copies it to `build/` |
 
 At the end the script prints the version (from `dylib/version.h`: `make app` writes
 `BRIDGEPLAY_VERSION` into `CFBundleShortVersionString` and `BRIDGEPLAY_BUILD` into

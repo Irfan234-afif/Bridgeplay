@@ -1,6 +1,6 @@
 # DualSense Bluetooth transport
 
-NotProton builds and packages `controllers/dualsense` with its runtime.
+Bridgeplay builds and packages `controllers/dualsense` with its runtime.
 The launcher and broker run per game session; the injected facade contains
 arm64 and x86_64 slices.
 
@@ -90,7 +90,7 @@ write deadline independently, so a blocked IOKit call cannot hang shutdown. Clea
 only when the game touched them.
 
 Runtime files and diagnostics are under
-`~/Library/Application Support/notproton/controllers/dualsense/`.
+`~/Library/Application Support/bridgeplay/controllers/dualsense/`.
 The `sessions/<AppID>-status.json` file contains transport counters. The
 `sessions/<AppID>.json` file contains a temporary credential and should not be
 included in issue reports. The launcher removes it on normal exit.

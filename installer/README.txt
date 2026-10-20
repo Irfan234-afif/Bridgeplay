@@ -20,6 +20,10 @@ You need:
      the Settings window that opens. Setup then continues by itself.
 5. Click Open Steam, pick a Windows game, Install, Play.
 
+Updating from Bridgeplay 2.x: the first time 3.0.0 opens, it moves its files
+from the old "notproton" folders to "bridgeplay" and keeps a backup. Quit Steam
+and any game first; it waits until they are closed.
+
 Controllers: the first time you use a controller, Steam asks for Input
 Monitoring. Click Allow (or turn on Steam in System Settings > Privacy &
 Security > Input Monitoring).

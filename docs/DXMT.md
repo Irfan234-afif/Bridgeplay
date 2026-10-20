@@ -1,6 +1,6 @@
 # DXMT build
 
-NotProton ships DXMT built from a pinned master commit, not the v0.80 release, to pick up
+Bridgeplay ships DXMT built from a pinned master commit, not the v0.80 release, to pick up
 the 262 commits since that release (D3D11 fixes, the macOS 27 HUD fix, Xcode 27 build
 fixes, the WIP D3D12 backend).
 
@@ -11,7 +11,7 @@ fixes, the WIP D3D12 backend).
 | Tarball | `dxmt-e94c312.tar.gz`, top-level directory `e94c312/` |
 | License | LGPL-2.1-or-later since `ec357fd` (v0.80 was the last MIT release) |
 
-## In NotProton
+## In Bridgeplay
 
 Both free engines download this tarball from
 `https://github.com/raymondchins/Bridgeplay/releases/download/dxmt-e94c312/` into the

@@ -7,7 +7,23 @@
 set -uo pipefail
 
 here="$(cd "$(dirname "$0")" && pwd)"
-support="$HOME/Library/Application Support/notproton"
+support="$HOME/Library/Application Support/bridgeplay"
+caches="$HOME/Library/Caches/bridgeplay"
+# Bridgeplay before 3.0.0 kept its files under "notproton". The app moves them to
+# "bridgeplay" itself on first launch (with a backup), so the installer never moves them.
+# While only the old folders exist, it writes into them so that move carries the new
+# files along; a bridgeplay folder made next to them would get in the migration's way.
+legacy_support="$HOME/Library/Application Support/notproton"
+legacy_caches="$HOME/Library/Caches/notproton"
+migrate_later=0
+if [ ! -d "$support" ] && [ -d "$legacy_support" ]; then
+    support="$legacy_support"
+    migrate_later=1
+fi
+if [ ! -d "$caches" ] && [ -d "$legacy_caches" ]; then
+    caches="$legacy_caches"
+    migrate_later=1
+fi
 
 say()  { printf '\n\033[1;32m==>\033[0m %s\n' "$*"; }
 die()  { printf '\n\033[1;31mGagal:\033[0m %s\n' "$*" >&2; read -r -p "Tekan Enter untuk menutup..." _; exit 1; }
@@ -64,11 +80,14 @@ if [ ! -d /Applications/Steam.app ]; then
 fi
 
 say "Menyalin Game Porting Toolkit, engine WineCX dan config (tanpa download)..."
-mkdir -p "$support/gamefixes" "$HOME/Library/Caches/notproton"
+if [ "$migrate_later" -eq 1 ]; then
+    say "Data Bridgeplay lama ditemukan di folder notproton. File baru ditaruh di sana dulu; Bridgeplay memindahkannya ke folder bridgeplay saat pertama dibuka (tutup Steam dan game dulu)."
+fi
+mkdir -p "$support/gamefixes" "$caches"
 rm -rf "$support/gptk"
 ditto "$here/gptk" "$support/gptk" || die "Game Porting Toolkit gagal disalin."
 # Bridgeplay reuses any cached file whose hash matches its pin, so nothing is downloaded.
-ditto "$here/cache" "$HOME/Library/Caches/notproton" || die "File engine gagal disalin."
+ditto "$here/cache" "$caches" || die "File engine gagal disalin."
 # default.conf is always the bundled one (an existing different copy is kept as .bak);
 # per-game confs the user already has are left alone.
 if [ -f "$support/gamefixes/default.conf" ] && ! cmp -s "$here/config/gamefixes/default.conf" "$support/gamefixes/default.conf"; then

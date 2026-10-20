@@ -10,7 +10,9 @@
 # itself are downloaded on the user's Mac from Valve. GPTK is never committed.
 #
 # Overridable: APP (default out/Bridgeplay.app), ENGINE_CACHE (default
-# ~/Library/Caches/notproton), GPTK_DIR (default ~/Library/Application Support/notproton/gptk)
+# ~/Library/Caches/bridgeplay), GPTK_DIR (default ~/Library/Application Support/bridgeplay/gptk).
+# On a Mac the app has not migrated to 3.0.0 yet, the defaults fall back to the old
+# notproton folders when the bridgeplay ones are missing.
 
 set -eu
 
@@ -18,12 +20,19 @@ repo=$(cd "$(dirname "$0")/.." && pwd)
 cd "$repo"
 
 APP=${APP:-$repo/out/Bridgeplay.app}
-ENGINE_CACHE=${ENGINE_CACHE:-$HOME/Library/Caches/notproton}
-GPTK_DIR=${GPTK_DIR:-$HOME/Library/Application Support/notproton/gptk}
+if [ -z "${ENGINE_CACHE:-}" ]; then
+	ENGINE_CACHE=$HOME/Library/Caches/bridgeplay
+	[ -d "$ENGINE_CACHE" ] || [ ! -d "$HOME/Library/Caches/notproton" ] || ENGINE_CACHE=$HOME/Library/Caches/notproton
+fi
+if [ -z "${GPTK_DIR:-}" ]; then
+	GPTK_DIR="$HOME/Library/Application Support/bridgeplay/gptk"
+	legacy_gptk="$HOME/Library/Application Support/notproton/gptk"
+	[ -d "$GPTK_DIR" ] || [ ! -d "$legacy_gptk" ] || GPTK_DIR=$legacy_gptk
+fi
 stage_root=$repo/out/installer
 stage=$stage_root/Bridgeplay
 zip=$repo/out/Bridgeplay-Installer.zip
-models=app/Sources/NotProtonApp/Model
+models=app/Sources/BridgeplayApp/Model
 
 die() {
 	echo "==> $*" >&2
