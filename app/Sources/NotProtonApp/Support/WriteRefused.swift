@@ -34,7 +34,10 @@ enum Remedy: Hashable {
 
     var advice: String {
         switch self {
-        case .appManagement: String(localized: "Bridgeplay needs the App Management permission.")
+        // macOS ties the permission to the app's signature, so after an update the switch can
+        // stay on while no longer applying.
+        case .appManagement:
+            String(localized: "Bridgeplay needs the App Management permission. Turn on Bridgeplay in System Settings › Privacy & Security › App Management. After a Bridgeplay update the switch can look on but no longer work: turn it off and on again.")
         case .otherAccount:
             String(localized: "Steam was installed by another account on this Mac. Only that account can modify it. Log in to macOS with that account to reinstall Bridgeplay.")
         case .ownership: String(localized: "Check permissions, make sure your user owns the folder.")
