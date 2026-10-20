@@ -45,6 +45,18 @@ struct UninstallTests {
             SteamModifications(file: root.appending(path: "steam-bundles.json"),
                                legacyRecord: support.appending(path: "install-build.json"))
         }
+        var steamConfig: URL { root.appending(path: "config.vdf") }
+        var keptGamefixes: URL { root.appending(path: "bridgeplay-gamefixes") }
+        var homeDir: URL { root.appending(path: ".bridgeplay") }
+        var leftovers: Uninstall.Leftovers {
+            Uninstall.Leftovers(
+                gamefixes: support.appending(path: "gamefixes"),
+                keptGamefixes: keptGamefixes,
+                steamConfig: steamConfig,
+                defaultToolBackup: support.appending(path: "backups/steam-default-tool.json"),
+                files: [homeDir],
+                steamRunning: { false })
+        }
     }
 
     private func layout(signable: Bool = true) throws -> Layout {
@@ -221,7 +233,7 @@ struct UninstallTests {
             compatTools: layout.compatTools,
             directories: [layout.support, layout.caches],
             libraries: [],
-            modifications: layout.modifications, lockFolder: layout.root,
+            modifications: layout.modifications, lockFolder: layout.root, leftovers: layout.leftovers,
             repair: { _, _ in throw Offline() },
             stop: { _, _ in false }
         )
@@ -256,7 +268,7 @@ struct UninstallTests {
             compatTools: layout.compatTools,
             directories: [layout.support, layout.caches],
             libraries: [],
-            modifications: layout.modifications, lockFolder: layout.root,
+            modifications: layout.modifications, lockFolder: layout.root, leftovers: layout.leftovers,
             repair: { _, _ in repaired.set() },
             stop: { _, _ in false }
         )
@@ -284,7 +296,7 @@ struct UninstallTests {
             compatTools: layout.compatTools,
             directories: [layout.support, layout.caches],
             libraries: [],
-            modifications: layout.modifications, lockFolder: layout.root,
+            modifications: layout.modifications, lockFolder: layout.root, leftovers: layout.leftovers,
             repair: { _, _ in },
             stop: { _, _ in false }
         )
@@ -307,7 +319,7 @@ struct UninstallTests {
             compatTools: layout.compatTools,
             directories: [layout.support, layout.caches],
             libraries: [],
-            modifications: layout.modifications, lockFolder: layout.root,
+            modifications: layout.modifications, lockFolder: layout.root, leftovers: layout.leftovers,
             repair: { _, _ in },
             stop: { _, _ in false }
         )
@@ -347,7 +359,7 @@ struct UninstallTests {
             compatTools: layout.compatTools,
             directories: [layout.support, layout.caches],
             libraries: [],
-            modifications: layout.modifications, lockFolder: layout.root,
+            modifications: layout.modifications, lockFolder: layout.root, leftovers: layout.leftovers,
             repair: { _, _ in throw Offline() },
             stop: { _, _ in false }
         )
@@ -379,7 +391,7 @@ struct UninstallTests {
             compatTools: layout.compatTools,
             directories: [layout.support, caches],
             libraries: [],
-            modifications: layout.modifications, lockFolder: layout.root,
+            modifications: layout.modifications, lockFolder: layout.root, leftovers: layout.leftovers,
             repair: { _, _ in
                 let staged = caches.appending(path: "bundle")
                 try FileManager.default.createDirectory(at: staged, withIntermediateDirectories: true)
@@ -408,7 +420,7 @@ struct UninstallTests {
             compatTools: layout.compatTools,
             directories: [layout.support, layout.caches],
             libraries: [],
-            modifications: layout.modifications, lockFolder: layout.root,
+            modifications: layout.modifications, lockFolder: layout.root, leftovers: layout.leftovers,
             report: { log.add($0) },
             repair: { _, report in
                 report(.checking)
@@ -451,7 +463,7 @@ struct UninstallTests {
             app: layout.app, innerPlist: layout.innerPlist, updateBlocks: [layout.updateBlock],
             legacyCompat: layout.legacyCompat, compatTools: layout.compatTools,
             directories: [layout.support, layout.caches], libraries: [library],
-            modifications: layout.modifications, lockFolder: layout.root,
+            modifications: layout.modifications, lockFolder: layout.root, leftovers: layout.leftovers,
             repair: { _, _ in }, stop: { _, _ in false })
 
         for template in templates { #expect(!FileManager.default.fileExists(atPath: template.path)) }
@@ -487,7 +499,7 @@ struct UninstallTests {
             app: layout.app, innerPlist: layout.innerPlist, updateBlocks: [layout.updateBlock],
             legacyCompat: layout.legacyCompat, compatTools: layout.compatTools,
             directories: [layout.support, layout.caches], libraries: [ours, foreign, real, empty],
-            modifications: layout.modifications, lockFolder: layout.root,
+            modifications: layout.modifications, lockFolder: layout.root, leftovers: layout.leftovers,
             repair: { _, _ in }, stop: { _, _ in false })
 
         #expect((try? files.destinationOfSymbolicLink(atPath: dll(ours).path(percentEncoded: false))) == nil)
@@ -506,7 +518,7 @@ struct UninstallTests {
             app: app ?? layout.app, innerPlist: layout.innerPlist, updateBlocks: [layout.updateBlock],
             legacyCompat: layout.legacyCompat, compatTools: layout.compatTools,
             directories: [layout.support, layout.caches], libraries: [],
-            modifications: layout.modifications, lockFolder: layout.root,
+            modifications: layout.modifications, lockFolder: layout.root, leftovers: layout.leftovers,
             repair: repair, stop: stop)
     }
 
@@ -703,9 +715,94 @@ struct UninstallTests {
                 app: layout.app, innerPlist: layout.innerPlist, updateBlocks: [layout.updateBlock],
                 legacyCompat: layout.legacyCompat, compatTools: layout.compatTools,
                 directories: [layout.support, layout.caches], libraries: [library],
-                modifications: layout.modifications, lockFolder: layout.root,
+                modifications: layout.modifications, lockFolder: layout.root, leftovers: layout.leftovers,
                 repair: { _, _ in }, stop: { _, _ in false })
         }
         #expect(try String(contentsOf: sentinel, encoding: .utf8) == "keep")
+    }
+
+    // MARK: What lives outside the removed folders
+
+    private static let config = """
+        "InstallConfigStore"
+        {
+        \t"Software"
+        \t{
+        \t\t"Valve"
+        \t\t{
+        \t\t\t"Steam"
+        \t\t\t{
+        \t\t\t\t"CompatToolMapping"
+        \t\t\t\t{
+        \t\t\t\t}
+        \t\t\t}
+        \t\t}
+        \t}
+        }
+        """
+
+    @Test("The user's own game fixes are moved aside, never deleted")
+    func keepsTheUsersGamefixes() async throws {
+        let layout = try layout()
+        defer { try? FileManager.default.removeItem(at: layout.root) }
+        let fix = layout.support.appending(path: "gamefixes/3764200.conf")
+        try FileManager.default.createDirectory(at: fix.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try Data("BACKEND=wined3d\n".utf8).write(to: fix)
+        // A copy kept by an earlier removal stays as it is.
+        try FileManager.default.createDirectory(at: layout.keptGamefixes, withIntermediateDirectories: true)
+
+        let outcome = try await remove(layout)
+
+        let kept = try #require(outcome.keptGamefixes)
+        #expect(kept != layout.keptGamefixes)
+        #expect(try String(contentsOf: kept.appending(path: "3764200.conf"), encoding: .utf8) == "BACKEND=wined3d\n")
+        #expect(outcome.keptGamefixesNote?.contains(kept.path(percentEncoded: false)) == true)
+        #expect(!FileManager.default.fileExists(atPath: layout.support.path))
+    }
+
+    @Test("Without game fixes of the user's own, nothing is kept")
+    func keepsNothingWithoutGamefixes() async throws {
+        let layout = try layout()
+        defer { try? FileManager.default.removeItem(at: layout.root) }
+        try FileManager.default.createDirectory(at: layout.support.appending(path: "gamefixes"), withIntermediateDirectories: true)
+
+        let outcome = try await remove(layout)
+        #expect(outcome.keptGamefixes == nil)
+        #expect(!FileManager.default.fileExists(atPath: layout.keptGamefixes.path))
+    }
+
+    // Steam was left defaulting to a tool the removal had just deleted.
+    @Test("Steam's default tool is put back to what the user had")
+    func restoresSteamsDefaultTool() async throws {
+        let layout = try layout()
+        defer { try? FileManager.default.removeItem(at: layout.root) }
+        let original = Self.config.replacingOccurrences(
+            of: "\t\t\t\t{\n\t\t\t\t}",
+            with: "\t\t\t\t{\n\t\t\t\t\t\"0\"\n\t\t\t\t\t{\n\t\t\t\t\t\t\"name\"\t\t\"GE-Proton9-1\"\n\t\t\t\t\t\t\"config\"\t\t\"\"\n\t\t\t\t\t\t\"priority\"\t\t\"250\"\n\t\t\t\t\t}\n\t\t\t\t}")
+        try Data(original.utf8).write(to: layout.steamConfig)
+        let leftovers = layout.leftovers
+        try SteamDefaultTool.set("bridgeplay-proton-winecx-11.17", in: leftovers.steamConfig,
+                                 backup: leftovers.defaultToolBackup, steamRunning: { false })
+
+        let outcome = try await remove(layout)
+
+        #expect(outcome.restoredDefaultTool)
+        #expect(try String(contentsOf: layout.steamConfig, encoding: .utf8) == original)
+    }
+
+    @Test("~/.bridgeplay and the record of modified Steam bundles go too")
+    func removesTheOtherLeftovers() async throws {
+        let layout = try layout()
+        defer { try? FileManager.default.removeItem(at: layout.root) }
+        try FileManager.default.createDirectory(at: layout.homeDir, withIntermediateDirectories: true)
+        try Data("binary".utf8).write(to: layout.homeDir.appending(path: "np-native"))
+        try layout.modifications.prepare()
+        #expect(FileManager.default.fileExists(atPath: layout.modifications.file.path))
+
+        let outcome = try await remove(layout)
+
+        #expect(!FileManager.default.fileExists(atPath: layout.homeDir.path))
+        #expect(!FileManager.default.fileExists(atPath: layout.modifications.file.path))
+        #expect(outcome.removed.contains(".bridgeplay"))
     }
 }

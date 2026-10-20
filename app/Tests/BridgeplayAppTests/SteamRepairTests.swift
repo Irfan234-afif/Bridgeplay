@@ -184,6 +184,10 @@ struct SteamRepairTests {
             app: app, innerPlist: work.appending(path: "inner.plist"), updateBlocks: [],
             legacyCompat: work.appending(path: "legacycompat"), compatTools: [],
             directories: [support], libraries: [], modifications: modifications, lockFolder: work,
+            leftovers: Uninstall.Leftovers(gamefixes: support.appending(path: "gamefixes"), keptGamefixes: work.appending(path: "kept"),
+                                           steamConfig: work.appending(path: "config.vdf"),
+                                           defaultToolBackup: support.appending(path: "backups/steam-default-tool.json"),
+                                           files: [], steamRunning: { false }),
             repair: { _, _ in Issue.record("A disconnected repaired copy needs no repair") },
             stop: { _, _ in false })
 

@@ -836,12 +836,12 @@ final class SystemStatus {
 
     func removeEverything() async {
         await perform(from: UninstallPhase.stoppingClient.label) { progress in
-            let result = try await Uninstall.run { progress($0.label) }
+            let result = try await Uninstall.run(leftovers: .live) { progress($0.label) }
 
-            if let partial = result.partialRemoval { return partial }
-            return result.steamNeedsRedownload
+            let summary = result.partialRemoval ?? (result.steamNeedsRedownload
                 ? String(localized: "Bridgeplay has been removed. Steam could not be restored. Reinstall Steam from steampowered.com before using it again.")
-                : String(localized: "Bridgeplay has been removed.")
+                : String(localized: "Bridgeplay has been removed."))
+            return [summary, result.keptGamefixesNote].compactMap { $0 }.joined(separator: " ")
         }
     }
 

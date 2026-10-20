@@ -25,8 +25,18 @@ struct UninstallOutcome: Sendable {
     let restoredValveSignature: Bool
     let removed: [String]
     var unreachableSteam: [URL] = []
+    // Where the user's own game fixes were moved, when there were any.
+    var keptGamefixes: URL?
+    // Steam's default compatibility tool was ours and was put back or cleared.
+    var restoredDefaultTool = false
 
     var steamNeedsRedownload: Bool { steamInstalled && !restoredValveSignature }
+
+    var keptGamefixesNote: String? {
+        keptGamefixes.map {
+            String(localized: "Your own game fixes were kept in \($0.path(percentEncoded: false)).")
+        }
+    }
 
     var partialRemoval: String? {
         guard !unreachableSteam.isEmpty else { return nil }
@@ -53,6 +63,27 @@ enum Uninstall {
 
     typealias Stop = @Sendable (URL, @Sendable () -> Void) throws -> Bool
 
+    // What Bridgeplay leaves outside the folders `directories` names, and where the user's own
+    // game fixes go. No default in run(): the live paths are this Mac's, so tests name theirs.
+    struct Leftovers: Sendable {
+        var gamefixes: URL
+        var keptGamefixes: URL
+        var steamConfig: URL
+        var defaultToolBackup: URL
+        var files: [URL]
+        var steamRunning: @Sendable () -> Bool
+
+        static var live: Leftovers {
+            Leftovers(
+                gamefixes: SupportPaths.gamefixes,
+                keptGamefixes: SupportPaths.keptGamefixes,
+                steamConfig: SteamDefaultTool.config,
+                defaultToolBackup: SteamDefaultTool.backup,
+                files: [SupportPaths.homeDir],
+                steamRunning: { SteamBundle.isRunningForThisUser })
+        }
+    }
+
     static func run(
         app: URL = SupportPaths.Steam.app,
         innerPlist: URL = SupportPaths.Steam.innerInfoPlist,
@@ -66,6 +97,7 @@ enum Uninstall {
         libraries: [SteamLibrary] = PrefixStore.libraries(),
         modifications: SteamModifications = .shared,
         lockFolder: URL = SupportPaths.applicationSupport,
+        leftovers: Leftovers,
         report: @escaping @Sendable (UninstallPhase) -> Void = { _ in },
         repair: Repair? = nil,
         stop: Stop = { app, onStopping in try SteamBundle.stopClient(app: app, step: step, onStopping: onStopping) }
@@ -138,10 +170,20 @@ enum Uninstall {
         }
         _ = try SteamRepair.clearInsert(at: innerPlist)
         _ = try UpdateBlock.remove(from: updateBlocks)
+        // Before the support folder, which holds the backup, goes: a default naming a tool
+        // that is about to be deleted would leave Steam pointing at nothing.
+        let restoredDefault = try SteamDefaultTool.restore(
+            in: leftovers.steamConfig, backup: leftovers.defaultToolBackup, steamRunning: leftovers.steamRunning)
         report(.removing)
+        let kept = try keepGamefixes(leftovers.gamefixes, in: leftovers.keptGamefixes)
         var removed = try remove(
-            legacyCompat: legacyCompat, compatTools: compatTools, directories: directories
+            legacyCompat: legacyCompat, compatTools: compatTools, directories: directories + leftovers.files
         )
+        // The record of modified bundles is kept while one is out of reach, so a later
+        // removal still finds it.
+        if missing.isEmpty, try modifications.paths().isEmpty {
+            removed += try removeItems([modifications.file] + [modifications.legacyFile].compactMap { $0 })
+        }
         removed += try removeSteamDLLLinks(to: legacyCompat, in: libraries)
         let templateFailures = RunnerInstaller.removePrefixTemplates(
             keeping: [], libraries: libraries, removingFolder: true)
@@ -155,7 +197,9 @@ enum Uninstall {
             steamInstalled: steamInstalled,
             restoredValveSignature: restored,
             removed: removed,
-            unreachableSteam: missing
+            unreachableSteam: missing,
+            keptGamefixes: kept,
+            restoredDefaultTool: restoredDefault
         )
     }
 
@@ -191,16 +235,40 @@ enum Uninstall {
     }
 
     static func remove(legacyCompat: URL, compatTools: [URL], directories: [URL]) throws -> [String] {
+        try removeItems([legacyCompat] + compatTools + directories)
+    }
+
+    private static func removeItems(_ targets: [URL]) throws -> [String] {
         let files = FileManager.default
         var removed: [String] = []
 
-        for target in [legacyCompat] + compatTools + directories {
+        for target in targets {
             let path = target.path(percentEncoded: false)
             guard files.fileExists(atPath: path) else { continue }
             try WriteRefused.catching(path) { try files.removeItem(at: target) }
             removed.append(target.lastPathComponent)
         }
         return removed
+    }
+
+    // The user's own overrides are theirs: they are moved out of the folder about to be
+    // deleted rather than deleted with it. An empty folder is not worth keeping. A previous
+    // removal's copy is never overwritten; this one gets a dated name beside it.
+    static func keepGamefixes(_ gamefixes: URL, in kept: URL, now: Date = Date()) throws -> URL? {
+        let files = FileManager.default
+        let entries = (try? files.contentsOfDirectory(atPath: gamefixes.path(percentEncoded: false))) ?? []
+        guard entries.contains(where: { $0 != ".DS_Store" }) else { return nil }
+        var destination = kept
+        if files.fileExists(atPath: destination.path(percentEncoded: false)) {
+            let format = DateFormatter()
+            format.locale = Locale(identifier: "en_US_POSIX")
+            format.dateFormat = "yyyy-MM-dd HH.mm.ss"
+            let stamp = format.string(from: now)
+            destination = kept.deletingLastPathComponent().appending(path: "\(kept.lastPathComponent) \(stamp)")
+        }
+        try WriteRefused.catching(destination) { try files.moveItem(at: gamefixes, to: destination) }
+        AppLog.note("uninstall: kept the user's game fixes in \(destination.path(percentEncoded: false))")
+        return destination
     }
 
     // Links the run script made point at legacycompat. Anything else at that name is left alone.
