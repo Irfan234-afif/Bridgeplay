@@ -119,6 +119,12 @@ struct ShellTests {
         #expect(Shell.processIsRunning(named: "WindowServer") == false)
     }
 
+    // Steam.app is shared, so the check that guards changing it has to see every account.
+    @Test("A process another account runs counts when asking about all accounts")
+    func anotherAccountsProcessCountsForAllUsers() {
+        #expect(Shell.processIsRunning(named: "WindowServer", allUsers: true))
+    }
+
     @Test("Nothing matching reports nothing running")
     func noMatchReportsNothingRunning() throws {
         let (pgrep, dir) = try stubPgrep(body: "exit 1")

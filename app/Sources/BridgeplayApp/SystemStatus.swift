@@ -157,7 +157,11 @@ final class SystemStatus {
         AppLog.note("run end\(failure == nil ? "" : " (failed)")")
     }
 
+    // What the last run threw, for callers that treat some failures as something else.
+    @ObservationIgnored private(set) var lastRunError: Error?
+
     private func record(_ error: Error) {
+        lastRunError = error
         setFailure(error)
         if let refusal = error as? WriteRefused {
             AppLog.note("run failed: cannot write \(refusal.path)")
@@ -242,7 +246,7 @@ final class SystemStatus {
         }
     }
 
-    func requestInstall() async {
+    func requestInstall(unattended: Bool = false) async {
         guard canInstall else { return }
         checkingLicense = true
         defer { checkingLicense = false }
@@ -253,7 +257,7 @@ final class SystemStatus {
         ) {
             pendingConfirmation = question
         } else {
-            await installIntoSteam()
+            await installIntoSteam(unattended: unattended)
         }
     }
 
@@ -442,6 +446,7 @@ final class SystemStatus {
 
         clearFailure()
         outcome = nil
+        lastRunError = nil
         let run = beginRun(first)
         defer { endRun() }
 
@@ -593,13 +598,17 @@ final class SystemStatus {
         }
     }
 
-    func installIntoSteam() async {
+    // unattended: nobody pressed anything, so a Steam that opened since the decision to
+    // install is left running and the install stops instead.
+    func installIntoSteam(unattended: Bool = false) async {
         var failedInputResets: [String]?
         await perform(from: InstallPhase.checkingPayload.label) { progress in
             let lock = try DeploymentContent.acquireInstallationLock()
             defer { lock.release() }
+            let stopClient = unattended ? SteamInstaller.leaveTheClient : SteamInstaller.stopTheClient
             let result = try await Task.detached(priority: .userInitiated) {
-                try SteamInstaller.run(holdingInstallationLock: true, report: { progress($0.label) })
+                try SteamInstaller.run(holdingInstallationLock: true, stopClient: stopClient,
+                                       report: { progress($0.label) })
             }.value
 
             var parts = [String(localized: "Bridgeplay successfully installed.")]
@@ -732,7 +741,14 @@ final class SystemStatus {
             guard isIdle else { return }
             AppLog.note("patch keeper (\(trigger)): re-applying on its own, \(kind)")
             lastAutoReapply = now
-            await installIntoSteam()
+            await installIntoSteam(unattended: true)
+            if lastRunError is SteamInstaller.ClientStarted {
+                // Not a failure: Steam opened in the meantime, so ask as if it had been open.
+                AppLog.note("patch keeper (\(trigger)): Steam opened before re-applying, asking instead")
+                clearFailure()
+                patchBanner = SteamPatchKeeper.Banner(kind: kind, blocker: .steamRunning)
+                return
+            }
             settleReapply(kind)
         }
     }

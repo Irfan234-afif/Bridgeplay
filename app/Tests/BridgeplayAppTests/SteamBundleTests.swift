@@ -46,6 +46,83 @@ struct SteamBundleTests {
         #expect(patterns == [#"/Volumes/Games \(SSD\)\+/Steam\.app/"#])
     }
 
+    // MARK: Stopping Steam
+
+    // A stand-in Steam: running here and in another account, and whether it quits when asked.
+    private final class FakeSteam: @unchecked Sendable {
+        private let lock = NSLock()
+        private var here: Bool
+        private var elsewhere: Bool
+        private let quits: Bool
+        private(set) var asked = 0
+        private(set) var swept: [String] = []
+
+        init(here: Bool, elsewhere: Bool = false, quits: Bool = true) {
+            self.here = here
+            self.elsewhere = elsewhere
+            self.quits = quits
+        }
+
+        var client: SteamBundle.Client {
+            SteamBundle.Client(
+                runningAnywhere: { self.lock.withLock { self.here || self.elsewhere } },
+                runningHere: { self.lock.withLock { self.here } },
+                askToQuit: { self.lock.withLock { self.asked += 1; if self.quits { self.here = false } } },
+                sweep: { pattern in self.lock.withLock { self.swept.append(pattern) } },
+                pause: {},
+                attempts: 3)
+        }
+    }
+
+    private func stop(_ steam: FakeSteam) throws -> Bool {
+        try SteamBundle.stopClient(
+            app: URL(filePath: "/tmp/Steam.app"), helpers: [], step: "Test", client: steam.client)
+    }
+
+    @Test("A closed Steam is left alone")
+    func closedSteamIsLeftAlone() throws {
+        let steam = FakeSteam(here: false)
+        #expect(try stop(steam) == false)
+        #expect(steam.asked == 0)
+        #expect(steam.swept.isEmpty)
+    }
+
+    @Test("Steam that quits when asked is reported stopped, and its helpers are swept")
+    func steamThatQuitsIsStopped() throws {
+        let steam = FakeSteam(here: true)
+        #expect(try stop(steam))
+        #expect(steam.asked == 1)
+        #expect(steam.swept == [#"/tmp/Steam\.app/"#])
+    }
+
+    // It used to be killed with SIGKILL after 30 seconds, mid-write or mid-update.
+    @Test("Steam that does not quit is reported, never killed")
+    func steamThatStaysIsReported() {
+        let steam = FakeSteam(here: true, quits: false)
+        let failure = #expect(throws: StepFailure.self) { try stop(steam) }
+        #expect(failure?.detail.contains("did not quit") == true)
+        #expect(steam.asked == 1)
+        #expect(steam.swept.isEmpty)
+    }
+
+    // steam://exit only reaches this account's Steam; another account's keeps the bundle open.
+    @Test("Steam open in another account stops the change without asking this one")
+    func otherAccountsSteamIsReported() {
+        let steam = FakeSteam(here: false, elsewhere: true)
+        let failure = #expect(throws: StepFailure.self) { try stop(steam) }
+        #expect(failure?.detail == SteamBundle.otherAccountRunning)
+        #expect(steam.asked == 0)
+    }
+
+    @Test("Steam open in two accounts is reported once this one has quit")
+    func bothAccountsSteamIsReported() {
+        let steam = FakeSteam(here: true, elsewhere: true)
+        let failure = #expect(throws: StepFailure.self) { try stop(steam) }
+        #expect(failure?.detail == SteamBundle.otherAccountRunning)
+        #expect(steam.asked == 1)
+        #expect(steam.swept.isEmpty)
+    }
+
     private enum Insert {
         case absent
         case own

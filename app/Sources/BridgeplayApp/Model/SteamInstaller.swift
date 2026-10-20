@@ -53,6 +53,19 @@ enum SteamInstaller {
         try SteamBundle.stopClient(app: app, step: step, onStopping: onStopping)
     }
 
+    // For an install nobody asked for: it was decided while Steam was closed, and checking
+    // again here, under the installation lock, keeps a Steam opened since then running.
+    static let leaveTheClient: ClientStopper = { _, _ in
+        if SteamBundle.isRunning { throw ClientStarted() }
+        return false
+    }
+
+    struct ClientStarted: LocalizedError {
+        var errorDescription: String? {
+            String(localized: "Steam opened while Bridgeplay was getting ready to update it, so Steam was left alone.")
+        }
+    }
+
     static func run(
         payload suppliedPayload: InstallPayload.Located? = nil,
         bridgePayload suppliedBridge: BridgePayload.Located? = nil,
