@@ -13,43 +13,86 @@ struct SetupAssistantView: View {
     @State private var revealed: Int
     @State private var forward = true
     private let fixedReveal: Int?
+    private let onClose: (() -> Void)?
 
-    init(model: SetupAssistant = SetupAssistant(), revealed: Int? = nil) {
+    init(model: SetupAssistant = SetupAssistant(), revealed: Int? = nil, onClose: (() -> Void)? = nil) {
         _model = State(initialValue: model)
         _revealed = State(initialValue: revealed ?? 0)
         fixedReveal = revealed
+        self.onClose = onClose
+    }
+
+    private func close() {
+        if let onClose { onClose() } else { dismiss() }
     }
 
     static let pageSpring = Animation.spring(response: 0.42, dampingFraction: 0.86)
     static let rowSpring = Animation.spring(response: 0.32, dampingFraction: 0.8)
 
     var body: some View {
+        HStack(spacing: 0) {
+            SetupArt(step: model.step, progress: finishedFraction, running: model.step == .finish && model.isWorking)
+                .overlay(alignment: .topLeading) {
+                    HStack(spacing: 9) {
+                        BridgeplayMark(size: 22)
+                        Text(verbatim: "Bridgeplay")
+                            .font(BP.display(13))
+                            .foregroundStyle(BP.iridescent)
+                    }
+                    .padding(22)
+                }
+                .frame(width: 240)
+                .animation(Self.pageSpring, value: model.step)
+            Rectangle().fill(BP.line).frame(width: 1)
+            main
+        }
+        .frame(width: 780, height: 580)
+        .background(BP.bg)
+        .foregroundStyle(BP.fg)
+        .environment(\.colorScheme, .dark)
+        .tint(BP.blue)
+        .task(id: model.step) { await wave() }
+    }
+
+    private var finishedFraction: Double {
+        switch model.step {
+        case .mac, .graphics, .steam: 0
+        case .finish: Double(model.tasks.filter { $0.state == .done }.count) / Double(max(model.tasks.count, 1))
+        case .done: 1
+        }
+    }
+
+    private var main: some View {
         VStack(spacing: 0) {
             StepBar(current: model.step)
-                .padding(.horizontal, 24)
-                .padding(.top, 18)
+                .padding(.horizontal, 28)
+                .padding(.top, 26)
                 .padding(.bottom, 4)
             ZStack {
-                Form {
-                    content
-                    if let message = model.message {
-                        Section {
-                            StatusRow(title: String(localized: "Something went wrong"), value: message, tone: .bad)
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 14) {
+                        content
+                        if let message = model.message {
+                            Card {
+                                WizardRow(row: StatusRow(title: String(localized: "Something went wrong"), value: message, tone: .bad))
+                            }
                         }
                     }
+                    .padding(.horizontal, 28)
+                    .padding(.top, 20)
+                    .padding(.bottom, 24)
+                    .frame(maxWidth: .infinity, alignment: .leading)
                 }
-                .formStyle(.grouped)
+                .scrollIndicators(.never)
                 .id(model.step)
                 .transition(pageTransition)
             }
             .clipped()
-            Divider()
+            Rectangle().fill(BP.line).frame(height: 1)
             footer
-                .padding(.horizontal, 20)
-                .padding(.vertical, 12)
+                .padding(.horizontal, 24)
+                .padding(.vertical, 14)
         }
-        .frame(width: 640, height: 560)
-        .task(id: model.step) { await wave() }
     }
 
     private var pageTransition: AnyTransition {
@@ -92,13 +135,8 @@ struct SetupAssistantView: View {
             shown.secondaryAction = nil
             shown.trailing = nil
         }
-        return shown
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .overlay(alignment: .trailing) {
-                if pending {
-                    ProgressView().controlSize(.small).transition(.opacity)
-                }
-            }
+        return WizardRow(row: shown, pending: pending)
+            .animation(Self.rowSpring, value: pending)
     }
 
     @ViewBuilder
@@ -116,78 +154,92 @@ struct SetupAssistantView: View {
 
     @ViewBuilder
     private var macStep: some View {
-        Section {
+        StepHeader(step: model.step, title: "Check your Mac",
+                   detail: "Bridgeplay runs Windows games from your Steam library. First, a few quick checks.")
+        Card {
             checked(0, StatusRow(title: String(localized: "Apple silicon"),
                       value: model.appleSilicon ? SetupChecks.chipName : String(localized: "Bridgeplay doesn't run on Intel Macs."),
                       tone: model.appleSilicon ? .ok : .bad))
+            Hairline()
             checked(1, StatusRow(title: String(localized: "macOS \(SetupChecks.minimumMacOS) or later"),
                       value: model.macOSSupported ? SetupChecks.macOSDisplay : String(localized: "\(SetupChecks.macOSDisplay). Update macOS first."),
                       tone: model.macOSSupported ? .ok : .bad))
+            Hairline()
             checked(2, StatusRow(title: String(localized: "Free space"),
                       value: model.freeBytes.map { String(localized: "\(ByteCountFormatter.string(fromByteCount: $0, countStyle: .file)) available, 3 GB needed") },
                       tone: model.hasSpace ? .ok : .bad))
+            Hairline()
             checked(3, StatusRow(title: String(localized: "Rosetta 2"),
                       value: model.rosettaInstalled ? String(localized: "Installed.") : String(localized: "Apple's translator for Windows games. Asks for your Mac password."),
                       tone: model.rosettaInstalled ? .ok : .warning,
                       action: model.rosettaInstalled ? nil : StatusAction(
                         label: String(localized: "Install"), isProminent: true, isEnabled: !model.isWorking
                       ) { Task { await model.installRosetta() } }))
-        } header: {
-            StepHeader(title: "Check your Mac",
-                       detail: "Bridgeplay runs Windows games from your Steam library. First, a few quick checks.")
         }
     }
 
     @ViewBuilder
     private var graphicsStep: some View {
-        Section {
+        StepHeader(step: model.step, title: "Add Apple's game graphics",
+                   detail: "Apple's Game Porting Toolkit includes D3DMetal, which runs DirectX 11 and 12 games on Metal, with MetalFX upscaling. It's free, but only Apple can hand it out, so you download it once with your Apple Account.")
+        Card {
             if let gptk = model.gptk {
-                StatusRow(title: String(localized: "Game Porting Toolkit"),
+                WizardRow(row: StatusRow(title: String(localized: "Game Porting Toolkit"),
                           value: String(localized: "Ready from \(gptk.libRoot.path(percentEncoded: false))."),
-                          tone: .ok, trailing: gptk.version)
+                          tone: .ok, trailing: gptk.version))
             } else {
+                WizardRow(row: StatusRow(title: String(localized: "Download it from Apple"),
+                          value: String(localized: "Sign in, then download the latest Game Porting Toolkit .dmg."),
+                          action: StatusAction(label: String(localized: "Open Apple Downloads")) {
+                              NSWorkspace.shared.open(URL(string: "https://developer.apple.com/download/all/?q=Game%20Porting%20Toolkit")!)
+                          }), number: 1)
+                Hairline()
                 if let image = model.gptkImages.first {
-                    StatusRow(title: image.lastPathComponent, value: String(localized: "Found in Downloads."), tone: .info,
+                    WizardRow(row: StatusRow(title: String(localized: "Use the one in Downloads"),
+                              value: image.lastPathComponent,
                               action: StatusAction(label: String(localized: "Use This"), isProminent: true, isEnabled: !model.isWorking) {
                                   Task { await model.importGPTK(image) }
-                              })
+                              }), number: 2)
+                } else {
+                    WizardRow(row: StatusRow(title: String(localized: "Add the disk image"),
+                              value: String(localized: "Drag the .dmg onto this window, or choose it."),
+                              action: StatusAction(label: String(localized: "Choose…"), isProminent: true, isEnabled: !model.isWorking) { chooseImage() }),
+                              number: 2)
                 }
-                StatusRow(title: String(localized: "Choose a disk image"),
-                          value: String(localized: "Drop Game_Porting_Toolkit .dmg on this window, or pick it from a folder."),
-                          tone: .neutral,
-                          secondaryAction: StatusAction(label: String(localized: "Get It from Apple")) {
-                              NSWorkspace.shared.open(URL(string: "https://developer.apple.com/download/all/?q=Game%20Porting%20Toolkit")!)
-                          },
-                          action: StatusAction(label: String(localized: "Choose…"), isEnabled: !model.isWorking) { chooseImage() })
             }
-        } header: {
-            StepHeader(title: "Add Apple's game graphics",
-                       detail: "The Game Porting Toolkit (D3DMetal) runs DirectX 11 and 12 games on Metal. Apple gives it away for free with an Apple Account. Without it, games use DXMT.")
         }
         .dropDestination(for: URL.self) { urls, _ in
             guard let url = urls.first(where: { $0.pathExtension.lowercased() == "dmg" }) else { return false }
             Task { await model.importGPTK(url) }
             return true
         }
+        if model.gptk == nil {
+            Text("Optional. If you skip it, games use DXMT, which runs DirectX 10 and 11 games only. You can add the toolkit later from Status.")
+                .font(BP.sans(12))
+                .foregroundStyle(BP.fg3)
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(.horizontal, 2)
+        }
     }
 
     @ViewBuilder
     private var steamStep: some View {
-        Section {
+        StepHeader(step: model.step, title: "Sign in to Steam",
+                   detail: "Sign in with your account in Steam. Bridgeplay continues on its own once you're in.")
+        Card {
             checked(0, StatusRow(title: String(localized: "Steam"),
                       value: model.steamInstalled ? SupportPaths.Steam.app.path(percentEncoded: false) : String(localized: "Not installed."),
                       tone: model.steamInstalled ? .ok : .warning,
                       action: model.steamInstalled ? nil : StatusAction(
                         label: String(localized: "Install Steam"), isProminent: true, isEnabled: !model.isWorking
                       ) { Task { await model.installSteam() } }))
+            Hairline()
             checked(1, StatusRow(title: String(localized: "Steam account"),
                       value: model.signedIn ? String(localized: "Signed in.") : String(localized: "Waiting for you to sign in. Bridgeplay never sees your password."),
                       tone: model.signedIn ? .ok : .info,
-                      action: model.signedIn || !model.steamInstalled ? nil : StatusAction(label: String(localized: "Open Steam")) { model.openSteam() }))
+                      action: model.signedIn || !model.steamInstalled ? nil : StatusAction(label: String(localized: "Open Steam"), isProminent: true) { model.openSteam() }))
+            Hairline()
             checked(2, trustRow)
-        } header: {
-            StepHeader(title: "Sign in to Steam",
-                       detail: "Sign in with your account in Steam. Bridgeplay continues on its own once you're in.")
         }
     }
 
@@ -216,60 +268,57 @@ struct SetupAssistantView: View {
 
     @ViewBuilder
     private var finishStep: some View {
-        Section {
-            ForEach(model.tasks) { task in
-                StatusRow(title: task.title, value: value(of: task), tone: tone(of: task))
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .overlay(alignment: .trailing) {
-                        if task.state == .running {
-                            ProgressView().controlSize(.small).transition(.opacity)
-                        }
-                    }
+        StepHeader(step: model.step, title: "Set up Bridgeplay",
+                   detail: "Bridgeplay adds itself to Steam, sets up the WineCX engine and makes it Steam's default. Steam closes for a moment.")
+        Card {
+            ForEach(Array(model.tasks.enumerated()), id: \.element.id) { index, task in
+                if index > 0 { Hairline() }
+                WizardRow(row: StatusRow(title: task.title, value: value(of: task), tone: tone(of: task)),
+                          pending: task.state == .running)
                     .animation(Self.rowSpring, value: task.state)
             }
-        } header: {
-            StepHeader(title: "Set up Bridgeplay",
-                       detail: "Bridgeplay adds itself to Steam, sets up the WineCX engine and makes it Steam's default. Steam closes for a moment.")
-        } footer: {
-            let done = model.tasks.filter { $0.state == .done }.count
-            HStack(spacing: 12) {
-                ProgressView(value: Double(done), total: Double(model.tasks.count))
-                    .tint(.accentColor)
-                    .animation(Self.rowSpring, value: done)
-                Text("\(done) of \(model.tasks.count)")
-                    .monospacedDigit()
-                    .contentTransition(.numericText(value: Double(done)))
-                    .animation(Self.rowSpring, value: done)
-                    .foregroundStyle(.secondary)
-            }
-            .padding(.top, 6)
         }
+        let done = model.tasks.filter { $0.state == .done }.count
+        HStack(spacing: 12) {
+            GradientProgress(fraction: Double(done) / Double(max(model.tasks.count, 1)))
+                .animation(Self.rowSpring, value: done)
+            Text("\(done) of \(model.tasks.count)")
+                .font(BP.sans(12, .medium))
+                .monospacedDigit()
+                .contentTransition(.numericText(value: Double(done)))
+                .animation(Self.rowSpring, value: done)
+                .foregroundStyle(BP.fg3)
+        }
+        .padding(.horizontal, 2)
         if model.needsAppManagement {
-            Section {
-                StatusRow(title: String(localized: "App Management"),
+            Card {
+                WizardRow(row: StatusRow(title: String(localized: "App Management"),
                           value: String(localized: "Turn on Bridgeplay in Privacy & Security › App Management. Setup continues by itself once it's on."),
                           tone: .warning,
                           detail: String(localized: "After a Bridgeplay update the switch can look on but no longer work. Turn it off and on again, or remove Bridgeplay from the list with − and add it back with +."),
-                          action: StatusAction(label: Remedy.settingsButton, isProminent: true) { model.openAppManagement() })
+                          action: StatusAction(label: Remedy.settingsButton, isProminent: true) { model.openAppManagement() }))
             }
         }
     }
 
     @ViewBuilder
     private var doneStep: some View {
-        Section {
+        StepHeader(step: model.step, title: "You're all set",
+                   detail: "Open Steam, install a Windows game and press Play. Status, Prefixes and Prefix Backups in this window change engines, fix a game or undo everything.",
+                   emphasized: true)
+        Card {
             checked(0, StatusRow(title: String(localized: "Bridgeplay"), value: String(localized: "Installed into Steam."), tone: .ok))
+            Hairline()
             checked(1, StatusRow(title: String(localized: "WineCX Engine"), value: String(localized: "Steam's default for Windows games."), tone: .ok))
+            Hairline()
             checked(2, StatusRow(title: String(localized: "Game Porting Toolkit"),
                       value: model.gptk == nil ? String(localized: "Skipped. Games use DXMT; add it later from Status.") : String(localized: "Linked."),
                       tone: model.gptk == nil ? .neutral : .ok))
+            Hairline()
             checked(3, StatusRow(title: String(localized: "Controllers"),
                       value: String(localized: "The first time a game uses a controller, macOS asks to let Steam use Input Monitoring. Click Allow. If you missed it, turn on Steam in Input Monitoring."),
                       tone: .info,
                       action: StatusAction(label: String(localized: "Open Input Monitoring")) { SystemStatus.openInputMonitoring() }))
-        } header: {
-            StepHeader(title: "You're all set",
-                       detail: "Open Steam, install a Windows game and press Play. Status, Prefixes and Prefix Backups in this window change engines, fix a game or undo everything.")
         }
     }
 
@@ -302,38 +351,48 @@ struct SetupAssistantView: View {
     // MARK: Footer
 
     private var footer: some View {
-        HStack {
+        HStack(spacing: 10) {
             if model.step == .mac {
-                Button("Not Now") { model.dismiss(); dismiss() }
+                Button("Not Now") { model.dismiss(); close() }
+                    .buttonStyle(.pillPlain)
             } else if model.step != .done {
                 Button("Back") { go(forward: false) { model.back() } }
+                    .buttonStyle(.pillPlain)
                     .disabled(model.isWorking)
             }
             Spacer()
-            if model.isWorking { ProgressView().controlSize(.small).padding(.trailing, 6) }
+            if model.isWorking { ProgressView().controlSize(.small).padding(.trailing, 4) }
             switch model.step {
             case .mac:
                 Button("Continue") { go(forward: true) { model.advance() } }
+                    .buttonStyle(.pillLarge)
                     .disabled(!model.macReady || model.isWorking)
                     .keyboardShortcut(.defaultAction)
             case .graphics:
                 if model.gptk == nil {
-                    Button("Skip") { go(forward: true) { model.skippedGraphics = true; model.advance() } }.disabled(model.isWorking)
+                    Button("Skip") { go(forward: true) { model.skippedGraphics = true; model.advance() } }
+                        .buttonStyle(.pillSecondaryLarge)
+                        .disabled(model.isWorking)
                 }
                 Button("Continue") { go(forward: true) { model.advance() } }
+                    .buttonStyle(.pillLarge)
                     .disabled(model.gptk == nil || model.isWorking)
                     .keyboardShortcut(.defaultAction)
             case .steam:
                 Button("Continue") { go(forward: true) { model.advance() } }
+                    .buttonStyle(.pillLarge)
                     .disabled(!model.steamInstalled || !model.signedIn || model.isWorking)
                     .keyboardShortcut(.defaultAction)
             case .finish:
                 Button(model.failed ? "Try Again" : "Set Up") { Task { await model.finish(with: status) } }
+                    .buttonStyle(.pillLarge)
                     .disabled(model.isWorking || !(model.failed || model.notStarted))
                     .keyboardShortcut(.defaultAction)
             case .done:
-                Button("Close") { model.dismiss(); dismiss() }
-                Button("Open Steam") { model.openSteamAndClose(); model.dismiss(); dismiss() }
+                Button("Close") { model.dismiss(); close() }
+                    .buttonStyle(.pillSecondaryLarge)
+                Button("Open Steam") { model.openSteamAndClose(); model.dismiss(); close() }
+                    .buttonStyle(.pillLarge)
                     .keyboardShortcut(.defaultAction)
             }
         }
@@ -342,27 +401,25 @@ struct SetupAssistantView: View {
 
 // MARK: - Pieces
 
+// One continuous gradient across the five segments, revealed up to the current step.
 private struct StepBar: View {
     let current: SetupAssistant.Step
     private let steps = SetupAssistant.Step.allCases
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            GeometryReader { proxy in
-                let fraction = CGFloat(current.rawValue + 1) / CGFloat(steps.count)
-                ZStack(alignment: .leading) {
-                    Capsule().fill(.quaternary)
-                    Capsule().fill(Color.accentColor)
-                        .frame(width: max(6, proxy.size.width * fraction))
-                }
+            ZStack {
+                segments { _ in BP.raise2 }
+                BP.iridescent
+                    .mask(segments { step in step.rawValue <= current.rawValue ? Color.white : Color.clear })
             }
             .frame(height: 3)
             .animation(SetupAssistantView.pageSpring, value: current)
-            HStack(spacing: 0) {
+            HStack(spacing: 6) {
                 ForEach(steps) { step in
                     Text(step.title)
-                        .font(.caption.weight(step == current ? .semibold : .regular))
-                        .foregroundStyle(step.rawValue <= current.rawValue ? .primary : .tertiary)
+                        .font(BP.sans(11, step == current ? .semibold : .medium))
+                        .foregroundStyle(step == current ? BP.fg : (step.rawValue < current.rawValue ? BP.fg2 : BP.fg3))
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .animation(.easeOut(duration: 0.2), value: current)
                 }
@@ -371,18 +428,195 @@ private struct StepBar: View {
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("Step \(current.rawValue + 1) of \(steps.count), \(current.title)")
     }
+
+    private func segments(_ fill: @escaping (SetupAssistant.Step) -> Color) -> some View {
+        HStack(spacing: 6) {
+            ForEach(steps) { step in Capsule().fill(fill(step)) }
+        }
+    }
 }
 
 private struct StepHeader: View {
+    let step: SetupAssistant.Step
     let title: LocalizedStringKey
     let detail: LocalizedStringKey
+    var emphasized = false
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text(title).font(.title2.weight(.semibold)).foregroundStyle(.primary)
-            Text(detail).font(.body).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Step \(step.rawValue + 1) of \(SetupAssistant.Step.allCases.count)")
+                .font(BP.sans(11, .semibold))
+                .tracking(0.9)
+                .textCase(.uppercase)
+                .foregroundStyle(BP.fg3)
+            Text(title)
+                .font(BP.sans(28, .semibold))
+                .tracking(-0.9)
+                .foregroundStyle(emphasized ? AnyShapeStyle(BP.iridescent) : AnyShapeStyle(BP.fg))
+            Text(detail)
+                .font(BP.sans(14))
+                .lineSpacing(2)
+                .foregroundStyle(BP.fg2)
+                .fixedSize(horizontal: false, vertical: true)
         }
-        .textCase(nil)
-        .padding(.bottom, 8)
+        .padding(.bottom, 6)
+    }
+}
+
+// .tile on the site: one raised panel, hairline border, small radius.
+private struct Card<Content: View>: View {
+    @ViewBuilder let content: Content
+
+    var body: some View {
+        VStack(spacing: 0) { content }
+            .background(BP.raise, in: RoundedRectangle(cornerRadius: BP.radius, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: BP.radius, style: .continuous).strokeBorder(BP.line, lineWidth: 1))
+    }
+}
+
+private struct Hairline: View {
+    var body: some View {
+        Rectangle().fill(BP.line).frame(height: 1).padding(.leading, 54)
+    }
+}
+
+// A StatusRow's content in the wizard's style: a tone badge, the title and value, and pill
+// buttons on the right.
+private struct WizardRow: View {
+    let row: StatusRow
+    var pending = false
+    // A step number in place of the tone, for rows that are instructions.
+    var number: Int?
+
+    var body: some View {
+        HStack(alignment: .center, spacing: 14) {
+            if let number {
+                Text("\(number)")
+                    .font(BP.sans(12, .semibold))
+                    .foregroundStyle(.black)
+                    .frame(width: 24, height: 24)
+                    .background(BP.iridescentDiagonal, in: RoundedRectangle(cornerRadius: 7, style: .continuous))
+            } else {
+                ToneBadge(tone: row.tone, pending: pending)
+            }
+            VStack(alignment: .leading, spacing: 3) {
+                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                    Text(row.title)
+                        .font(BP.sans(14, .semibold))
+                        .tracking(-0.2)
+                        .foregroundStyle(BP.fg)
+                    if let trailing = row.trailing {
+                        Text(trailing)
+                            .font(BP.sans(11, .semibold))
+                            .foregroundStyle(BP.fg2)
+                            .padding(.horizontal, 7)
+                            .padding(.vertical, 2)
+                            .background(BP.raise2, in: Capsule())
+                    }
+                }
+                if let value = row.value {
+                    Text(value)
+                        .font(BP.sans(13))
+                        .foregroundStyle(BP.fg2)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .contentTransition(.opacity)
+                }
+                if let detail = row.detail {
+                    Text(detail)
+                        .font(BP.sans(12))
+                        .foregroundStyle(BP.fg3)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .textSelection(.enabled)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            if row.secondaryAction != nil || row.action != nil {
+                HStack(spacing: 8) {
+                    if let secondary = row.secondaryAction { button(secondary, prominent: false) }
+                    if let action = row.action { button(action, prominent: action.isProminent) }
+                }
+                .transition(.opacity)
+            }
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 13)
+    }
+
+    private func button(_ action: StatusAction, prominent: Bool) -> some View {
+        Button(action.label, role: action.role, action: action.perform)
+            .buttonStyle(PillButtonStyle(kind: prominent ? .primary : .secondary))
+            .fixedSize()
+            .disabled(!action.isEnabled)
+            .help(action.help ?? "")
+    }
+}
+
+private struct ToneBadge: View {
+    let tone: StatusTone?
+    var pending = false
+
+    var body: some View {
+        ZStack {
+            RoundedRectangle(cornerRadius: 7, style: .continuous).fill(fill)
+            RoundedRectangle(cornerRadius: 7, style: .continuous).strokeBorder(border, lineWidth: 1)
+            if pending {
+                ProgressView().controlSize(.mini)
+            } else if let symbol {
+                Image(systemName: symbol)
+                    .font(.system(size: 10, weight: .bold))
+                    .foregroundStyle(color)
+                    .contentTransition(.symbolEffect(.replace))
+            }
+        }
+        .frame(width: 24, height: 24)
+        .accessibilityHidden(true)
+    }
+
+    private var color: Color {
+        switch tone {
+        case .ok: BP.green
+        case .warning: BP.orange
+        case .bad: BP.red
+        case .info, .neutral, nil: BP.fg2
+        }
+    }
+
+    private var fill: Color {
+        switch tone {
+        case .ok, .warning, .bad: color.opacity(pending ? 0 : 0.14)
+        case .info, .neutral, nil: BP.raise2
+        }
+    }
+
+    private var border: Color {
+        switch tone {
+        case .ok, .warning, .bad: pending ? BP.line : .clear
+        case .info, .neutral, nil: BP.line
+        }
+    }
+
+    private var symbol: String? {
+        switch tone {
+        case .ok: "checkmark"
+        case .warning: "exclamationmark"
+        case .bad: "xmark"
+        case .info: "arrow.right"
+        case .neutral, nil: nil
+        }
+    }
+}
+
+private struct GradientProgress: View {
+    let fraction: Double
+
+    var body: some View {
+        GeometryReader { proxy in
+            ZStack(alignment: .leading) {
+                Capsule().fill(BP.raise2)
+                Capsule().fill(BP.iridescent)
+                    .frame(width: max(4, proxy.size.width * fraction))
+            }
+        }
+        .frame(height: 4)
     }
 }

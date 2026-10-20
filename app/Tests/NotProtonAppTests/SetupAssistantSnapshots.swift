@@ -36,7 +36,7 @@ struct SetupAssistantSnapshots {
                         _ configure: (SetupAssistant) -> Void) throws {
         let model = SetupAssistant()
         configure(model)
-        try render(SetupAssistantView(model: model, revealed: revealed), name, size: CGSize(width: 640, height: 560), status: status)
+        try render(SetupAssistantView(model: model, revealed: revealed), name, size: CGSize(width: 780, height: 580), status: status)
     }
 
     // Frames of the check wave and of Set Up progressing, stitched into GIFs for review.

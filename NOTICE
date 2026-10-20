@@ -101,6 +101,12 @@ The app bundle embeds Sparkle, which checks for and installs updates. Sparkle is
 MIT licensed, see
 https://github.com/sparkle-project/Sparkle/blob/2.10.0/LICENSE
 
+The app's interface uses the Geist and Unbounded typefaces, bundled in
+app/Sources/NotProtonApp/Resources/Fonts/ under the SIL Open Font License 1.1
+(OFL-Geist.txt, OFL-Unbounded.txt there). Game covers shown in the app are read
+from the user's own Steam library cache or Steam's CDN at run time; none ship
+with Bridgeplay.
+
 /fonts/ contains the font sources from Valve's Proton repo. Fonts are licensed
 under their original licenses, see the LICENSE file in each folder. The build
 files from Proton are covered by LICENSE.fonts.

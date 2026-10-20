@@ -17,11 +17,11 @@ enum StatusTone: Sendable {
 
     var color: Color {
         switch self {
-        case .ok: .green
-        case .info: .secondary
-        case .warning: .orange
-        case .bad: .red
-        case .neutral: .secondary
+        case .ok: BP.green
+        case .info: BP.fg2
+        case .warning: BP.orange
+        case .bad: BP.red
+        case .neutral: BP.fg3
         }
     }
 }
@@ -62,6 +62,7 @@ struct StatusRow: View {
                     Image(systemName: tone.symbol)
                         .font(.system(size: 8))
                         .foregroundStyle(tone.color)
+                        .shadow(color: tone.color.opacity(tone == .ok || tone == .warning || tone == .bad ? 0.7 : 0), radius: 3)
                         .contentTransition(.symbolEffect(.replace))
                         .frame(width: StatusMetrics.symbolWidth)
                         .accessibilityHidden(true)
@@ -71,7 +72,8 @@ struct StatusRow: View {
 
                 VStack(alignment: .leading, spacing: 2) {
                     Text(title)
-                        .font(.headline)
+                        .font(BP.sans(13, .semibold))
+                        .tracking(-0.1)
                     if let value {
                         Text(value)
                             .foregroundStyle(.secondary)
@@ -152,10 +154,10 @@ struct StatusRow: View {
     private func button(_ action: StatusAction) -> some View {
         if action.isProminent {
             Button(action.label, role: action.role, action: action.perform)
-                .buttonStyle(.borderedProminent)
+                .buttonStyle(.pill)
         } else {
             Button(action.label, role: action.role, action: action.perform)
-                .buttonStyle(.bordered)
+                .buttonStyle(.pillSecondary)
         }
     }
 }
@@ -365,6 +367,7 @@ struct StatusView: View {
             dangerSection
         }
         .formStyle(.grouped)
+        .safeAreaInset(edge: .top, spacing: 0) { StatusHero(snapshot: snapshot) }
     }
 
     // A reset macOS refused leaves Steam's old approval in place, and macOS then blocks the

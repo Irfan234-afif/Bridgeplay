@@ -19,7 +19,7 @@ struct NotProtonApp: App {
             RootView(pane: $pane)
                 .environment(status)
                 .environment(prefixes)
-                .frame(minWidth: 720, minHeight: 460)
+                .frame(minWidth: 800, minHeight: 600)
                 .onChange(of: pane) { prefixes.forgetOutcome() }
                 .onChange(of: status.snapshot?.installedRunners.map(\.id)) {
                     if prefixes.hasLoaded { Task { await prefixes.load() } }

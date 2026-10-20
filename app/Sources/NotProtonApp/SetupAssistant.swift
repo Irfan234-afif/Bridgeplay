@@ -67,10 +67,26 @@ final class SetupAssistant {
         SetupTask(id: "default", title: String(localized: "Make WineCX Steam's default")),
     ]
 
-    init() {
-        let located = WinecxD3DMetal.locate()
+    // Set by the debug-only --setup-preview window: actions pretend instead of installing,
+    // so the assistant can be clicked through on a Mac that is already set up.
+    let isPreview: Bool
+
+    init(preview: Preview? = nil) {
+        isPreview = preview != nil
+        let located = preview == .fresh ? nil : WinecxD3DMetal.locate()
         gptk = located
-        gptkImages = GPTKImport.candidatesIfMissing(installed: located != nil)
+        gptkImages = preview == .fresh ? [] : GPTKImport.candidatesIfMissing(installed: located != nil)
+        if preview == .fresh {
+            rosettaInstalled = false
+            signedIn = false
+            trust = .needed
+        }
+    }
+
+    enum Preview { case thisMac, fresh }
+
+    private func pretend(_ seconds: Double = 0.9) async {
+        try? await Task.sleep(for: .seconds(seconds))
     }
 
     var macReady: Bool { appleSilicon && macOSSupported && rosettaInstalled && hasSpace }
@@ -106,6 +122,7 @@ final class SetupAssistant {
     func installRosetta() async {
         isWorking = true
         defer { isWorking = false }
+        if isPreview { await pretend(); rosettaInstalled = true; return }
         do {
             try await Task.detached(priority: .userInitiated) { try SetupChecks.installRosetta() }.value
         } catch {
@@ -133,6 +150,7 @@ final class SetupAssistant {
     func installSteam() async {
         isWorking = true
         defer { isWorking = false }
+        if isPreview { await pretend(); steamInstalled = true; return }
         message = nil
         do {
             try await SetupChecks.installSteam { _ in }
@@ -143,13 +161,14 @@ final class SetupAssistant {
     }
 
     func openSteam() {
+        if isPreview { Task { await pretend(1.5); signedIn = true }; return }
         NSWorkspace.shared.open(SupportPaths.Steam.app)
         watchSignIn()
     }
 
     private func watchSignIn() {
         signInWatch?.cancel()
-        guard !signedIn else { return }
+        guard !signedIn, !isPreview else { return }
         signInWatch = Task { [weak self] in
             while !Task.isCancelled {
                 try? await Task.sleep(for: .seconds(3))
@@ -173,6 +192,7 @@ final class SetupAssistant {
     func trustThisMac() async {
         guard trust != .working, trust != .done else { return }
         trust = .working
+        if isPreview { await pretend(); trust = .done; return }
         do {
             _ = try await Task.detached(priority: .userInitiated) { try LocalSigning.ensure() }.value
             trust = .done
@@ -194,6 +214,16 @@ final class SetupAssistant {
         needsAppManagement = false
         message = nil
         tasks = Self.plannedTasks
+
+        if isPreview {
+            for task in Self.plannedTasks {
+                set(task.id, .running)
+                await pretend(1.2)
+                set(task.id, .done)
+            }
+            step = .done
+            return
+        }
 
         set("steam", .running)
         await status.installIntoSteam()
@@ -271,12 +301,14 @@ final class SetupAssistant {
     }
 
     func openSteamAndClose() {
+        guard !isPreview else { return }
         NSWorkspace.shared.open(SupportPaths.Steam.app)
     }
 
     func dismiss() {
         signInWatch?.cancel()
         permissionWatch?.cancel()
+        guard !isPreview else { return }
         UserDefaults.standard.set(true, forKey: Self.finishedKey)
     }
 }

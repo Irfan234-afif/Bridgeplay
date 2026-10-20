@@ -12,6 +12,12 @@ enum Launch {
         if CommandLine.arguments.dropFirst().contains(SetupWinecxCommand.flag) {
             SetupWinecxCommand.run()
         }
+        #if DEBUG
+        if CommandLine.arguments.dropFirst().contains(SetupPreviewApp.flag) {
+            SetupPreviewApp.main()
+            return
+        }
+        #endif
         NotProtonApp.main()
     }
 }

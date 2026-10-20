@@ -28,6 +28,7 @@ struct RootView: View {
 
     @Binding var pane: Pane
     @Environment(SystemStatus.self) private var status
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         NavigationSplitView {
@@ -38,6 +39,33 @@ struct RootView: View {
                 }
             }
             .listStyle(.sidebar)
+            .listItemTint(.monochrome)
+            .scrollContentBackground(.hidden)
+            .background(BP.bg)
+            .safeAreaInset(edge: .top, spacing: 0) {
+                HStack(spacing: 9) {
+                    BridgeplayMark(size: 22)
+                    Text(verbatim: "Bridgeplay")
+                        .font(BP.display(13))
+                        .foregroundStyle(BP.iridescent)
+                    Spacer()
+                }
+                .padding(.horizontal, 12)
+                .padding(.top, 6)
+                .padding(.bottom, 10)
+            }
+            .safeAreaInset(edge: .bottom, spacing: 0) {
+                VStack(alignment: .leading, spacing: 10) {
+                    libraryCard
+                    Text(verbatim: ProductVersion.display)
+                        .font(BP.sans(11, .medium))
+                        .foregroundStyle(BP.fg3)
+                        .lineLimit(1)
+                        .padding(.horizontal, 6)
+                }
+                .padding(.horizontal, 12)
+                .padding(.bottom, 12)
+            }
             .navigationSplitViewColumnWidth(min: 180, ideal: 200, max: 260)
         } detail: {
             Group {
@@ -52,6 +80,37 @@ struct RootView: View {
                     PatchBanner(banner: banner)
                 }
             }
+            .scrollContentBackground(.hidden)
+            .background(BP.bg)
+            .toolbarBackground(BP.bg, for: .windowToolbar)
         }
+        .font(BP.sans(13))
+        .tint(BP.blue)
+        .preferredColorScheme(.dark)
+    }
+
+    // The landing page's games marquee in miniature, under the hero line.
+    private var libraryCard: some View {
+        TimelineView(.animation(minimumInterval: 1 / 30, paused: reduceMotion)) { context in
+            let t = reduceMotion ? 1.2 : context.date.timeIntervalSinceReferenceDate
+            ZStack(alignment: .bottomLeading) {
+                Aurora(t: t * 0.6, lean: 0.5)
+                GameWall(t: t * 0.8)
+                LinearGradient(stops: [.init(color: .clear, location: 0.35), .init(color: .black.opacity(0.92), location: 0.8)],
+                               startPoint: .top, endPoint: .bottom)
+                VStack(alignment: .leading, spacing: 1) {
+                    Text("Windows games.").foregroundStyle(BP.fg)
+                    Text("In your Mac's Steam.").foregroundStyle(BP.iridescent)
+                }
+                .font(BP.sans(13, .semibold))
+                .tracking(-0.2)
+                .shadow(color: .black.opacity(0.8), radius: 6)
+                .padding(12)
+            }
+        }
+        .frame(height: 190)
+        .clipShape(RoundedRectangle(cornerRadius: BP.radius, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: BP.radius, style: .continuous).strokeBorder(BP.line, lineWidth: 1))
+        .accessibilityHidden(true)
     }
 }
