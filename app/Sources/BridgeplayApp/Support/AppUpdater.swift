@@ -3,6 +3,9 @@ import Sparkle
 @MainActor
 final class AppUpdater {
 
+    // One updater for the app: the menu and the Status page's Refresh share it.
+    static let shared = AppUpdater()
+
     private let controller: SPUStandardUpdaterController
 
     init() {
@@ -23,4 +26,5 @@ final class AppUpdater {
         controller.checkForUpdates(nil)
         #endif
     }
+
 }

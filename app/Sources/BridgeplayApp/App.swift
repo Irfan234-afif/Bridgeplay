@@ -8,7 +8,7 @@ struct BridgeplayApp: App {
     @State private var prefixes = PrefixesModel()
     @State private var pane: Pane = .status
     @State private var showsSetup = false
-    private let updater = AppUpdater()
+    private let updater = AppUpdater.shared
 
     init() {
         AppLog.start()
