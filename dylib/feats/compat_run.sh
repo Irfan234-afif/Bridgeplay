@@ -1,5 +1,5 @@
 #!/bin/sh
-# notproton CrossOver compatibility tool shim
+# bridgeplay CrossOver compatibility tool shim
 set -e
 
 verb="$1"
@@ -10,6 +10,17 @@ shift || true
 # and anything after %command% is a launch argument passed to the game.
 launch_args="$*"
 
+# Steam launch options and gamefix confs spell the settings BRIDGEPLAY_<X>; everything below
+# reads NOTPROTON_<X>, the name upstream NotProton uses. NOTPROTON_<X> stays honored and wins
+# when both are set, so launch options written before Bridgeplay 3.0 keep working.
+for np_name in $(env | LC_ALL=C sed -n 's/^BRIDGEPLAY_\([A-Z0-9_]*\)=.*/\1/p'); do
+  eval "np_new=\${BRIDGEPLAY_$np_name+x} np_old=\${NOTPROTON_$np_name+x}"
+  # shellcheck disable=SC2154 # eval assigns np_new and np_old on the line above
+  if [ -n "$np_new" ] && [ -z "$np_old" ]; then
+    eval "export NOTPROTON_$np_name=\"\$BRIDGEPLAY_$np_name\""
+  fi
+done
+
 case "$verb" in
   getcompatpath)
     printf '%s\n' "$STEAM_COMPAT_DATA_PATH"
@@ -17,7 +28,11 @@ case "$verb" in
     ;;
 esac
 
-np_support="$HOME/Library/Application Support/notproton"
+np_support="$HOME/Library/Application Support/bridgeplay"
+# Before the app moves the support folder over, a game still runs from the old one.
+if [ ! -d "$np_support" ] && [ -d "$HOME/Library/Application Support/notproton" ]; then
+  np_support="$HOME/Library/Application Support/notproton"
+fi
 controller_bridge="$np_support/controllers/dualsense/launch"
 if [ "$verb" = waitforexitandrun ] && [ "${DSB_SESSION:-0}" != 1 ] && [ -x "$controller_bridge" ]; then
   exec "$controller_bridge" "$0" "$verb" "$@"
@@ -119,13 +134,13 @@ resolve_icon() {
   fi
   icon_cache="$icon_root/game.icns"
   icon_status=1
-  if [ -n "$art" ] && [ -s "$icon_cache" ] &&   [ "$(cat "$icon_root/notproton-icon.source" 2>/dev/null)" =   "$icon_source" ]; then
+  if [ -n "$art" ] && [ -s "$icon_cache" ] &&   [ "$(cat "$icon_root/bridgeplay-icon.source" 2>/dev/null)" =   "$icon_source" ]; then
     icon_status=0
     echo "icon reused from $art" >> "$log" 2>&1 || true
   elif [ -n "$art" ] && [ -x "$iconmaker" ]; then
     if "$iconmaker" "$art" "$icon_cache" >> "$log" 2>&1; then
       icon_status=0
-      printf '%s\n' "$icon_source" > "$icon_root/notproton-icon.source"
+      printf '%s\n' "$icon_source" > "$icon_root/bridgeplay-icon.source"
       echo "icon built from $art" >> "$log" 2>&1 || true
     elif [ "$art" = "$ico" ]; then
       # A cached .ico that iconmaker rejects is corrupt and passes the size
@@ -225,14 +240,14 @@ export WINEDLLPATH="$CX_ROOT/lib/wine/x86_64-windows:$wine_unix${WINEDLLPATH:+:$
 export PATH="$CX_ROOT/bin:$PATH"
 
 if [ -n "$STEAM_COMPAT_DATA_PATH" ]; then
-  log="$STEAM_COMPAT_DATA_PATH/notproton-run.log"
+  log="$STEAM_COMPAT_DATA_PATH/bridgeplay-run.log"
 else
   log=/dev/null
 fi
 [ "$(stat -f %z "$log" 2>/dev/null || echo 0)" -gt 262144 ] \
   && : > "$log" || true
 {
-  echo "=== notproton run $(date) ==="
+  echo "=== bridgeplay run $(date) ==="
   echo "verb=$verb"
   echo "args:"; for a in "$@"; do printf '  [%s]\n' "$a"; done
   echo "cwd=$(pwd)"
@@ -308,7 +323,7 @@ echo "app_id=$app_id (STEAM_COMPAT_APP_ID=$STEAM_COMPAT_APP_ID)" >> "$log" 2>&1 
 # winebus through the environment; its registry "map" loader crashes in this Wine.
 # macOS Steam has no virtual gamepad Wine could read, so a pad Steam Input claims (and
 # lists in SDL_GAMECONTROLLER_IGNORE_DEVICES) would reach the game as nothing. Games read
-# pads directly unless the launch options set NOTPROTON_RAW_CONTROLLERS=0.
+# pads directly unless the launch options set BRIDGEPLAY_RAW_CONTROLLERS=0.
 if [ "${NOTPROTON_RAW_CONTROLLERS:-1}" = "1" ]; then
   NOTPROTON_RAW_CONTROLLERS=1
   SDL_GAMECONTROLLER_IGNORE_DEVICES=
@@ -458,6 +473,11 @@ gamefix_read() {
       gamefix_log "$2 conf line $lineno rejected: not KEY=VALUE"
       continue
     fi
+    # The keys that set a BRIDGEPLAY_ variable also take its full name: BRIDGEPLAY_RETINA=1 is RETINA=1.
+    case "$key" in
+      BRIDGEPLAY_STDOUT_NULL|BRIDGEPLAY_VSYNC|BRIDGEPLAY_RETINA|BRIDGEPLAY_FRAMEGEN|BRIDGEPLAY_FRAMEGEN_?*)
+        key=${key#BRIDGEPLAY_} ;;
+    esac
     value=${line#*=}
     reason=$(gamefix_reason "$key" "$value")
     if [ -n "$reason" ]; then
@@ -678,7 +698,7 @@ imports_d3d12() {
   return 1
 }
 
-# NOTPROTON_BACKEND > CX_GRAPHICS_BACKEND > gamefix BACKEND > auto-detect > dxmt, then down
+# BRIDGEPLAY_BACKEND > CX_GRAPHICS_BACKEND > gamefix BACKEND > auto-detect > dxmt, then down
 # to what the engine has.
 select_backend() {
   wanted=""
@@ -695,8 +715,8 @@ select_backend() {
     '') ;;
     dxmt|dxvk|wined3d|d3dmetal)
       wanted=$NOTPROTON_BACKEND
-      backend_from="NOTPROTON_BACKEND in the launch options" ;;
-    *) graphics_log "NOTPROTON_BACKEND is not dxmt, dxvk, wined3d or d3dmetal, ignored" ;;
+      backend_from="BRIDGEPLAY_BACKEND in the launch options" ;;
+    *) graphics_log "BRIDGEPLAY_BACKEND is not dxmt, dxvk, wined3d or d3dmetal, ignored" ;;
   esac
   # The Steam panel's Graphics menu writes CX_GRAPHICS_BACKEND.
   if [ -z "$wanted" ] && [ -n "${CX_GRAPHICS_BACKEND:-}" ]; then
@@ -1282,7 +1302,7 @@ $controllers_wanted"
 }
 
 # Sets Wine's DisableHidraw for games with "Disable hidraw" checked. When it's
-# unchecked, the value is removed only if NotProton set it.
+# unchecked, the value is removed only if Bridgeplay set it.
 plan_disable_hidraw() {
   hidraw_file="$STEAM_COMPAT_DATA_PATH/notproton-disable-hidraw"
   hidraw_value=""
@@ -1401,7 +1421,7 @@ import_prefix_settings() {
     without_lock_fds "$WINESERVER" -w >> "$log" 2>&1 || true
   fi
   if [ "$import_status" -eq 0 ] && [ "$hidraw_planned" -eq 1 ] && [ "$NOTPROTON_DISABLE_HIDRAW" = "1" ]; then
-    echo "controllers: hidraw disabled (NOTPROTON_DISABLE_HIDRAW=1)" >> "$log" 2>&1 || true
+    echo "controllers: hidraw disabled (BRIDGEPLAY_DISABLE_HIDRAW=1)" >> "$log" 2>&1 || true
   fi
   if [ "$import_status" -eq 0 ] && [ -n "$dpi_value" ]; then
     echo "video: LogPixels=$new_dpi" >> "$log" 2>&1 || true
@@ -1409,7 +1429,7 @@ import_prefix_settings() {
   if [ "$import_status" -eq 0 ] && [ "$controllers_planned" -eq 1 ]; then
     write_owned_controllers "$controllers_wanted" 2>/dev/null || true
     if [ "$NOTPROTON_RAW_CONTROLLERS" = "1" ]; then
-      echo "controllers: games read them directly (NOTPROTON_RAW_CONTROLLERS=1)" >> "$log" 2>&1 || true
+      echo "controllers: games read them directly (BRIDGEPLAY_RAW_CONTROLLERS=1)" >> "$log" 2>&1 || true
     elif [ -n "$controllers_wanted" ]; then
       echo "controllers: $(printf '%s\n' "$controllers_wanted" | grep -c .) kept off hidraw" \
         >> "$log" 2>&1 || true
@@ -1723,7 +1743,7 @@ prepare_prefix_directory() {
   for interrupted in "$STEAM_COMPAT_DATA_PATH"/pfx.replaced.*; do
     [ -e "$interrupted" ] || [ -L "$interrupted" ] || continue
     echo "=== interrupted prefix replacement needs recovery: $interrupted ===" >> "$log" 2>&1 || true
-    show_alert "Prefix recovery required" "An interrupted prefix replacement may hold saved games. Do not delete this prefix. Check its notproton-run.log for the recovery folder."
+    show_alert "Prefix recovery required" "An interrupted prefix replacement may hold saved games. Do not delete this prefix. Check its bridgeplay-run.log for the recovery folder."
     exit 1
   done
   mkdir -p "$WINEPREFIX"
@@ -1866,7 +1886,7 @@ if [ -n "$STEAM_COMPAT_DATA_PATH" ]; then
   seed_prefix_from_template
   stage_step="profile layout"
   if ! lay_out_proton_profile; then
-    show_alert "Saved-game folders need attention" "Bridgeplay left the conflicting files in place. Open this prefix's notproton-run.log for details before trying again."
+    show_alert "Saved-game folders need attention" "Bridgeplay left the conflicting files in place. Open this prefix's bridgeplay-run.log for details before trying again."
     exit 1
   fi
   [ "$verb" != waitforexitandrun ] || echo "video: RetinaMode=${NOTPROTON_RETINA:-0}" >> "$log" 2>&1 || true
@@ -2060,7 +2080,7 @@ if [ -d "$bridge_src" ] && [ -n "$WINEPREFIX" ]; then
       fi
     done
     if [ "$unstaged" -eq 1 ]; then
-      show_alert "Steam files could not be copied" "Bridgeplay could not copy a file into this game's prefix. Open this prefix's notproton-run.log for details."
+      show_alert "Steam files could not be copied" "Bridgeplay could not copy a file into this game's prefix. Open this prefix's bridgeplay-run.log for details."
       exit 1
     fi
   fi
@@ -2073,7 +2093,7 @@ if [ -d "$bridge_src" ] && [ -n "$WINEPREFIX" ]; then
   done
   verify_runner
   if ! install_lsteamclient_trigger; then
-    show_alert "Steam files could not be copied" "Bridgeplay could not copy a file into this game's prefix. Open this prefix's notproton-run.log for details."
+    show_alert "Steam files could not be copied" "Bridgeplay could not copy a file into this game's prefix. Open this prefix's bridgeplay-run.log for details."
     exit 1
   fi
   install_legacy_steam_dll
@@ -2145,7 +2165,7 @@ bundle_name=$(printf '%s' "$game_name" | tr -d '/:"`$\\')
 bundle_name=${bundle_name#"${bundle_name%%[!.]*}"}
 [ -n "$bundle_name" ] || bundle_name="Steam Game"
 game_name_xml=$(printf '%s' "$game_name" | sed -e 's/&/\&amp;/g' -e 's/</\&lt;/g' -e 's/>/\&gt;/g')
-loader_root="$HOME/Library/Application Support/notproton/launchers/$app_id"
+loader_root="$np_support/launchers/$app_id"
 mkdir -p "$loader_root"
 loader_app="$loader_root/$bundle_name.app"
 find "$loader_root" -maxdepth 1 -name '.build.*' -mmin +60 -exec rm -rf {} + 2>/dev/null || true
@@ -2166,7 +2186,7 @@ fi
 uielement_arg=""
 if [ "${NOTPROTON_HIDE_LAUNCHER_TILE:-0}" = "1" ]; then
   uielement_arg="  <key>LSUIElement</key><true/>"
-  echo "launcher tile hidden by NOTPROTON_HIDE_LAUNCHER_TILE" >> "$log" 2>&1 || true
+  echo "launcher tile hidden by BRIDGEPLAY_HIDE_LAUNCHER_TILE" >> "$log" 2>&1 || true
 fi
 cat > "$loader_contents/Info.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
@@ -2218,9 +2238,9 @@ fi
 cat > "$loader_macos/launcher" <<LAUNCHER
 #!/bin/sh
 export WINELOADER="$WINELOADER"
-wine_log="$loader_root/notproton-wine.log"
+wine_log="$loader_root/bridgeplay-wine.log"
 exec > "\$wine_log" 2>&1
-shim="$HOME/Library/Application Support/notproton/overlay-shim.dylib"
+shim="$np_support/overlay-shim.dylib"
 if [ -n "\$STEAM_DYLD_INSERT_LIBRARIES" ]; then
   if [ -f "\$shim" ]; then
     export DYLD_INSERT_LIBRARIES="\$shim:\$STEAM_DYLD_INSERT_LIBRARIES"
