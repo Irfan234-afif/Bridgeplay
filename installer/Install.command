@@ -50,8 +50,15 @@ major="$(sw_vers -productVersion | cut -d. -f1)"
 [ -d "$here/Bridgeplay.app" ] || die "Bridgeplay.app tidak ada di folder installer. Ekstrak ulang zip-nya, lalu coba lagi."
 
 say "Memasang Bridgeplay..."
+# quit is asynchronous: wait until the app has gone before its bundle is removed.
 osascript -e 'tell application id "com.bridgeplay.Bridgeplay" to quit' >/dev/null 2>&1 || true
-rm -rf /Applications/Bridgeplay.app
+waited=0
+while pgrep -qx BridgeplayApp; do
+    [ "$waited" -lt 30 ] || die "Bridgeplay masih berjalan. Tutup Bridgeplay dulu, lalu jalankan Install.command lagi."
+    sleep 1
+    waited=$((waited + 1))
+done
+rm -rf /Applications/Bridgeplay.app || die "Bridgeplay lama tidak bisa dihapus dari Applications."
 ditto "$here/Bridgeplay.app" /Applications/Bridgeplay.app || die "Bridgeplay gagal disalin ke Applications."
 xattr -dr com.apple.quarantine /Applications/Bridgeplay.app 2>/dev/null || true
 
@@ -66,7 +73,7 @@ if [ ! -d /Applications/Steam.app ]; then
         || die "File yang diunduh bukan installer Steam (bukan DMG). Coba lagi nanti."
     say "Memasang Steam..."
     steam_mnt="$steam_tmp/mnt"
-    mkdir "$steam_mnt"
+    mkdir "$steam_mnt" || die "Folder sementara tidak bisa dibuat."
     hdiutil attach -nobrowse -readonly -noautoopen -quiet -mountpoint "$steam_mnt" "$dmg" </dev/null \
         || { steam_mnt=""; die "Installer Steam tidak bisa dibuka."; }
     if ! codesign --verify --strict "$steam_mnt/Steam.app" 2>/dev/null \
@@ -83,19 +90,53 @@ say "Menyalin Game Porting Toolkit, engine WineCX dan config (tanpa download)...
 if [ "$migrate_later" -eq 1 ]; then
     say "Data Bridgeplay lama ditemukan di folder notproton. File baru ditaruh di sana dulu; Bridgeplay memindahkannya ke folder bridgeplay saat pertama dibuka (tutup Steam dan game dulu)."
 fi
-mkdir -p "$support/gamefixes" "$caches"
-rm -rf "$support/gptk"
+mkdir -p "$support/gamefixes" "$support/gamefixes-default" "$support/.installer" "$caches" \
+    || die "Folder Bridgeplay di Library tidak bisa dibuat."
+rm -rf "$support/gptk" || die "Game Porting Toolkit lama tidak bisa dihapus."
 ditto "$here/gptk" "$support/gptk" || die "Game Porting Toolkit gagal disalin."
 # Bridgeplay reuses any cached file whose hash matches its pin, so nothing is downloaded.
 ditto "$here/cache" "$caches" || die "File engine gagal disalin."
-# default.conf is always the bundled one (an existing different copy is kept as .bak);
-# per-game confs the user already has are left alone.
-if [ -f "$support/gamefixes/default.conf" ] && ! cmp -s "$here/config/gamefixes/default.conf" "$support/gamefixes/default.conf"; then
-    cp "$support/gamefixes/default.conf" "$support/gamefixes/default.conf.bak"
+
+# Per-game confs are Bridgeplay's shipped defaults (gamefixes/ in the repository). They go
+# to gamefixes-default/, which the app owns and refreshes on every update, so a newer
+# default is never hidden behind an old copy. The user's gamefixes/ holds only overrides.
+for conf in "$here/config/gamefixes-default/"*.conf; do
+    [ -f "$conf" ] || continue
+    cp -f "$conf" "$support/gamefixes-default/" || die "Config game gagal disalin."
+done
+# Installers up to 3.0.1 copied their own per-game confs into the user's gamefixes/,
+# where they override the shipped defaults. A copy still byte-identical to one of those
+# was never edited, so it goes; an edited one stays.
+for old in 1422450:3ec703897532711d09717384333bce001642c16e9b33875e20f685af8fd09279 \
+           3669870:e5aa727e1f42de9db3a0975a1837974334dd3691fab13138b299902a68737f02 \
+           3764200:fef67384fb54b17d0f9818273f09548b699186e320eeae933b388f3b0aeda02f; do
+    f="$support/gamefixes/${old%%:*}.conf"
+    [ -f "$f" ] || continue
+    [ "$(shasum -a 256 "$f" | cut -d' ' -f1)" = "${old#*:}" ] || continue
+    rm -f "$f" || die "Config game lama tidak bisa dihapus: $f"
+done
+
+# default.conf is the user's global file. It follows the bundled one unless the user has
+# edited it: .installer/default.conf records the copy last installed, and a default.conf
+# that still matches it, or the one every earlier installer shipped, is replaced. An
+# edited one is kept and the new bundled file is put next to it as default.conf.new.
+shipped="$here/config/gamefixes/default.conf"
+current="$support/gamefixes/default.conf"
+record="$support/.installer/default.conf"
+first_shipped=442803b868fc31b188aa7f650c711efc6b8d2d63cb47399312d028c92be7b130
+if [ ! -f "$current" ] || cmp -s "$current" "$shipped" \
+    || { [ -f "$record" ] && cmp -s "$current" "$record"; } \
+    || [ "$(shasum -a 256 "$current" | cut -d' ' -f1)" = "$first_shipped" ]; then
+    cp -f "$shipped" "$current" || die "default.conf gagal disalin."
+else
+    cp -f "$shipped" "$current.new" || die "default.conf gagal disalin."
+    say "default.conf kamu sudah diubah, jadi tidak ditimpa. Versi terbaru disimpan sebagai default.conf.new di $support/gamefixes."
 fi
-cp "$here/config/gamefixes/default.conf" "$support/gamefixes/default.conf"
-cp -n "$here/config/gamefixes/"*.conf "$support/gamefixes/" 2>/dev/null || true
-cp -n "$here/config/gamecontrollerdb.txt" "$support/" 2>/dev/null || true
+cp -f "$shipped" "$record" || die "default.conf gagal dicatat."
+# The user's own controller mappings: only seeded when there are none yet.
+if [ ! -f "$support/gamecontrollerdb.txt" ]; then
+    cp "$here/config/gamecontrollerdb.txt" "$support/" || die "gamecontrollerdb.txt gagal disalin."
+fi
 xattr -dr com.apple.quarantine "$support" 2>/dev/null || true
 # Show the Setup Assistant again even if an earlier Bridgeplay was dismissed.
 defaults delete com.bridgeplay.Bridgeplay setupAssistantFinished >/dev/null 2>&1 || true
