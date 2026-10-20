@@ -18,7 +18,8 @@ rm -f "$obj"/*.o
 objects=()
 compile() {   # source, extra flags...
     local src="$1"; shift
-    local o="$obj/$(basename "${src%.*}").o"
+    local o
+    o="$obj/$(basename "${src%.*}").o"
     if ! clang "${cflags[@]}" "$@" -c "$here/$src" -o "$o"; then
         echo "build.sh: FAILED compiling $src" >&2
         exit 1

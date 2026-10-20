@@ -41,10 +41,8 @@ version_of() {
 }
 
 pending=""
-for ref in upstream/main; do
-	count=$(git rev-list --count "HEAD..$ref")
-	[ "$count" -eq 0 ] || pending="$pending $ref:$count"
-done
+count=$(git rev-list --count "HEAD..upstream/main")
+[ "$count" -eq 0 ] || pending=" upstream/main:$count"
 
 if [ -z "$pending" ]; then
 	echo "==> up to date with upstream/main"

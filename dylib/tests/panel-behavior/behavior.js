@@ -19,7 +19,7 @@ for (const form of Object.keys(FORMS)) {
        'a shortcut renders the panel before a tool name reaches the page');
 
   let r = nodes('');
-  t.ok(toggles(r).length === 6 && sections(r).length === 4, 'automatic shows six toggles in four sections');
+  t.ok(toggles(r).length === 7 && sections(r).length === 4, 'automatic shows seven toggles in four sections');
   t.ok(r.filter(x => x.type === 'Dropdown').length === 3, 'three dropdowns');
   t.ok(!('label' in r.find(x => x.type === 'Dropdown').props), 'the backend dropdown carries no label column');
 
@@ -77,12 +77,13 @@ for (const form of Object.keys(FORMS)) {
   const root = P({ details: details('') });
   t.ok(root.props.className === 'MSCXPanel', 'the panel root carries its own class');
   const classes = nodes('').filter(x => x.type === 'Toggle').map(x => x.props.className);
-  t.ok(classes.length === 6 && classes.every(c => c === 'MSCXRow'), 'every checkbox carries the row class');
-  const raw = o => nodes(o).find(x => x.props.label === 'Let games read controllers directly');
+  t.ok(classes.length === 7 && classes.every(c => c === 'MSCXRow'), 'every checkbox carries the row class');
+  const raw = o => nodes(o).find(x => x.props.label === 'Let games read controllers directly (May break Steam Input. Not recommended)');
   t.ok(sections(nodes('')).includes('Controllers') && raw('').props.checked === false,
        'controller hiding is on unless the game says otherwise');
-  t.ok(nodes('').some(x => x.type === 'Section' && x.props.label === 'Controllers (May break Steam Input. Not recommended)'),
-       'the controller section warns what the row changes');
+  written.length = 0;
+  nodes('').find(x => x.props.label === 'Disable hidraw').props.onChange(true);
+  t.ok(last().trim() === 'NOTPROTON_DISABLE_HIDRAW=1 %command%', `hidraw (${last()})`);
   written.length = 0;
   raw('').props.onChange(true);
   t.ok(last().trim() === 'NOTPROTON_RAW_CONTROLLERS=1 %command%', `the controller row writes its flag (${last()})`);
@@ -97,7 +98,7 @@ for (const form of Object.keys(FORMS)) {
     e: { notproton: { WINEMSYNC: '1' }, '': { WINEMSYNC: '0' } },
     d: { NOTPROTON_RAW_CONTROLLERS: '1' },
   };
-  const row = (o, l) => nodes(o).find(x => x.props.label === l);
+  const row = (o, l) => nodes(o).find(x => x.props.label === l || (typeof x.props.label === 'string' && x.props.label.startsWith(l + ' (')));
   t.ok(row('', 'Metal HUD').props.checked === true, 'a global conf value reads as on');
   t.ok(row('', 'High Resolution').props.checked === false, 'the per-app conf beats the global conf');
   t.ok(row('', 'MSync').props.checked === true, 'the engine default reads as on');
@@ -125,7 +126,7 @@ for (const form of Object.keys(FORMS)) {
   };
   const FGT = { ui: 'Protect UI (keeps static HUD and menus sharp)',
                 fb: 'Fast-motion fallback (skips frames that would smear)' };
-  const fgrow = (o, l) => fgRows(o).find(x => x.props.label === l);
+  const fgrow = (o, l) => fgRows(o).find(x => x.props.label === l || (typeof x.props.label === 'string' && x.props.label.startsWith(l + ' (')));
   for (const b of ['', 'd3dmetal', 'dxmt', 'dxvk', 'wined3d']) {
     t.ok(fgrow(b ? 'CX_GRAPHICS_BACKEND=' + b : '', 'Mode') !== undefined,
          `${b || 'automatic'} shows the frame generation mode`);
@@ -235,7 +236,7 @@ for (const form of Object.keys(FORMS)) {
   const NAT = "'/Users/some one/.notproton/np-native'";
   const mac = (o, over) => details(o, Object.assign({ vecPlatforms: ['osx'], strCompatToolName: '' }, over || {}));
   const nnodes = o => walk(P({ details: mac(o) }));
-  const nrow = (o, l) => nnodes(o).find(x => x.props.label === l);
+  const nrow = (o, l) => nnodes(o).find(x => x.props.label === l || (typeof x.props.label === 'string' && x.props.label.startsWith(l + ' (')));
   globalThis.MSCXFx = { g: { MTL_HUD_ENABLED: '1', NOTPROTON_FRAMEGEN: '2' }, a: { 287700: { WINEMSYNC: '1' } },
                         e: {}, d: { NOTPROTON_FRAMEGEN_UI: '1', NOTPROTON_FRAMEGEN_FALLBACK: '1' },
                         ng: {}, na: {}, h: HOME };

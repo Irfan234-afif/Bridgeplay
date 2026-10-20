@@ -358,6 +358,9 @@ static int out_expand(np_out_t *o, const char *replace, const np_cap_t *caps) {
     "fo&&T([\"NOTPROTON_FRAMEGEN_FALLBACK\"],\"Fast-motion fallback (skips frames that would smear)\",\"1\",\"0\")," \
     "fo&&D(\"NOTPROTON_FRAMEGEN_ENGINE\",\"Engine\",[{data:\"own\",label:\"Built-in optical flow\"}," \
     "{data:\"metalfx\",label:\"MetalFX\"}],lc(\"own\"))]},\"fgn\")," \
+    /* A toggle that is on unless set to "0" (upstream 1.2.0: AVX2, FEX x87 precision). */ \
+    "X=(k,l)=>(0," RT ".jsx)(" BARREL ".Yh,{className:\"MSCXRow\",label:l," \
+    "checked:\"0\"!==ev(k),onChange:v=>s([[k,v?\"\":\"0\"]])},k)," \
     "bv=g(\"CX_GRAPHICS_BACKEND\"),b=fex&&\"d3dmetal\"===bv?\"\":bv," \
     "dm=!fex&&(\"\"===b||\"d3dmetal\"===b)," \
     "dx=\"\"===b||\"dxmt\"===b," \
@@ -397,7 +400,7 @@ static int out_expand(np_out_t *o, const char *replace, const np_cap_t *caps) {
     "T([\"MTL_HUD_ENABLED\"],npL(\"Metal HUD\",\"Metal 性能监视器\",\"Metal HUD\"),\"1\")," \
     "dm&&T([\"D3DM_ENABLE_METALFX\"],\"DLSS\",\"1\")," \
     "\"dxmt\"===b&&T([\"DXMT_ENABLE_NVEXT\"],\"DLSS\",\"1\")," \
-    "!fex&&T([\"ROSETTA_ADVERTISE_AVX\"],npL(\"Advertise AVX2 to Rosetta\",\"向 Rosetta 声明 AVX2 支持\",\"Segnala AVX2 a Rosetta\"),\"1\",\"0\")," \
+    "!fex&&X(\"ROSETTA_ADVERTISE_AVX\",npL(\"Advertise AVX2 to Rosetta\",\"向 Rosetta 声明 AVX2 支持\",\"Segnala AVX2 a Rosetta\"))," \
     "T([\"WINEMSYNC\"],\"MSync\",\"1\",\"0\")," \
     "T([\"NOTPROTON_RETINA\"],npL(\"High Resolution\",\"高分辨率\",\"Alta risoluzione\"),\"1\",\"0\")" \
     "]},\"gfx\")," \
@@ -408,10 +411,15 @@ static int out_expand(np_out_t *o, const char *replace, const np_cap_t *caps) {
     "selectedOption:sw?(U.find(u=>u.data&&+u.data===fn)||{data:String(fn)}).data:\"\"," \
     "onChange:v=>s([[\"DXMT_METALFX_SPATIAL_SWAPCHAIN\",v.data?\"1\":\"\"],[\"DXMT_CONFIG\",fx(v.data)]])})},\"usf\")," \
     "FG()," \
-    "(0," RT ".jsx)(" BARREL ".XY,{label:npL(\"Controllers (May break Steam Input. Not recommended)\"," \
-    "\"控制器（可能导致 Steam Input 失效，不推荐）\",\"Controller (pu\\u00f2 interferire con Steam Input, sconsigliato)\"),children:" \
-    "T([\"NOTPROTON_RAW_CONTROLLERS\"],npL(\"Let games read controllers directly\"," \
-    "\"允许游戏直接读取控制器\",\"Lascia che i giochi leggano direttamente i controller\"),\"1\",\"\")},\"ctl\")" \
+    "(0," RT ".jsxs)(" BARREL ".XY,{label:npL(\"Controllers\",\"控制器\",\"Controller\"),children:[" \
+    "T([\"NOTPROTON_RAW_CONTROLLERS\"],npL(\"Let games read controllers directly (May break Steam Input. Not recommended)\"," \
+    "\"允许游戏直接读取控制器（可能导致 Steam Input 失效，不推荐）\"," \
+    "\"Lascia che i giochi leggano direttamente i controller (pu\\u00f2 interferire con Steam Input, sconsigliato)\"),\"1\",\"\")," \
+    "T([\"NOTPROTON_DISABLE_HIDRAW\"],npL(\"Disable hidraw\",\"停用 hidraw\",\"Disable hidraw\"),\"1\",\"\")" \
+    "]},\"ctl\")," \
+    "fex&&(0," RT ".jsx)(" BARREL ".XY,{label:\"FEX\"," \
+    "children:X(\"FEX_X87REDUCEDPRECISION\"," \
+    "\"Reduced x87 Precision (Reducing precision improves game performance, is enabled by default in CrossOver Preview)\")},\"fex\")" \
     "]})})}"
 
 #define NP_CX_OPTIONS_CAPTURE(RT, BARREL) \
@@ -544,10 +552,18 @@ static const np_gate_t g_gates_selecttool[] = {
 #define NP_MAC_CHECK(OS, APP) \
     "(0," OS ".Pr)()&&" NP_PLATFORM_LISTS ".mac.has(" APP ".appid)?!" APP \
     ".most_available_per_client_data?.is_invalid_os_type:(0," OS ".Pr)()&&" \
-    NP_PLATFORM_LISTS ".windows.has(" APP ".appid)?!1:(0," OS ".Pr)()?" \
+    NP_WINDOWS(APP) "?!1:(0," OS ".Pr)()?" \
     APP ".is_available_on_current_platform&&!" APP ".most_available_per_client_data?.is_invalid_os_type:"
+// .exe shortcuts = Windows
+#define NP_RUNS_EXE "window.__NOTPROTON_RUNS_EXE__"
+#define NP_RUNS_EXE_JS \
+    NP_RUNS_EXE "=a=>{if(!a.BIsShortcut?.())return!1;const s=window.appDetailsStore,e=s?.m_mapAppData?.get(a.appid);" \
+    "s&&!e?.cRegistered&&queueMicrotask(()=>s.m_mapAppData.get(a.appid)?.cRegistered||s.RegisterForAppData(a.appid));" \
+    "return/\\.exe\"?$/i.test(e?.details?.strShortcutExe??\"\")};\n"
+#define NP_WINDOWS(APP) \
+    "(" NP_PLATFORM_LISTS ".windows.has(" APP ".appid)||" NP_RUNS_EXE "(" APP "))"
 #define NP_WINDOWS_ONLY_CASE(OS, APP) \
-    "case\"notprotonWindows\":return(0," OS ".Pr)()&&" NP_PLATFORM_LISTS ".windows.has(" APP ".appid)&&!" \
+    "case\"notprotonWindows\":return(0," OS ".Pr)()&&" NP_WINDOWS(APP) "&&!" \
     NP_MAC_64(APP) ";"
 
 static const np_gate_t g_fixes[] = {
@@ -1066,7 +1082,9 @@ char *np_webpatch_transform(const uint8_t *src, size_t src_len, size_t *out_len,
 
     np_out_t out = {0};
     np_cap_t caps[NP_CAP_MAX];
-    if (native_mac_js && !out_put(&out, native_mac_js, strlen(native_mac_js))) {
+    if (native_mac_js && (!out_put(&out, native_mac_js, strlen(native_mac_js)) ||
+                          !out_put(&out, NP_RUNS_EXE_JS, sizeof(NP_RUNS_EXE_JS) - 1))) {
+        free(out.buf);
         free(native_mac_js);
         return NULL;
     }

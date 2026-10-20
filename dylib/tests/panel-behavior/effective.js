@@ -78,7 +78,7 @@ t0.ok(!!fx && JSON.stringify(fx.na) === '{"1778820":{"NP_PAD_MODE":"gc","NOTPROT
 failed += t0.failed;
 
 const LABELS = ['Metal HUD', 'DLSS', 'Advertise AVX2 to Rosetta', 'MSync', 'High Resolution',
-                'Let games read controllers directly'];
+                'Let games read controllers directly (May break Steam Input. Not recommended)'];
 globalThis.MSCXFx = fx;
 for (const form of Object.keys(FORMS)) {
   const { render: P, written } = panel(emit, form);
