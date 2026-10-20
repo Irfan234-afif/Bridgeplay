@@ -457,10 +457,11 @@ struct BrandMigration: Sendable {
     // Steam maps Cloud save paths only for tool names containing "proton".
     static let newToolPrefix = "bridgeplay-proton"
 
-    // notproton -> bridgeplay-proton, notproton-<x> -> bridgeplay-proton-<x>; nil when the
-    // tool is not ours.
+    // notproton -> bridgeplay-proton, notproton-<x> -> bridgeplay-proton-<x>, and the
+    // panel's "no tool" choice notproton.none -> bridgeplay-proton.none; nil when the tool
+    // is not ours.
     static func migratedToolName(_ name: String) -> String? {
-        guard name == "notproton" || name.hasPrefix("notproton-") else { return nil }
+        guard name == "notproton" || name.hasPrefix("notproton-") || name.hasPrefix("notproton.") else { return nil }
         return newToolPrefix + name.dropFirst("notproton".count)
     }
 

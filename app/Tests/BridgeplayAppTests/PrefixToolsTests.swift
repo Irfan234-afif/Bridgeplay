@@ -30,13 +30,13 @@ struct PrefixToolsTests {
     @Test("Log paths match where compat_run.sh writes them")
     func logPathsMatchRunScript() throws {
         let source = try Self.compatSource()
-        // compat_run.sh is renamed separately from the app; either spelling is a match until
-        // both land, and the app falls back to the old file names anyway.
+        // The app falls back to the pre-3.0 file names, so either spelling of a log is a match.
         func either(_ text: (String) -> String) -> Bool {
             source.contains(text("bridgeplay")) || source.contains(text("notproton"))
         }
         #expect(either { #"log="$STEAM_COMPAT_DATA_PATH/\#($0)-run.log""# })
-        #expect(either { #"loader_root="$HOME/Library/Application Support/\#($0)/launchers/$app_id""# })
+        #expect(source.contains(#"loader_root="$np_support/launchers/$app_id""#))
+        #expect(source.contains(#"np_support="$HOME/Library/Application Support/bridgeplay""#))
         #expect(either { #"wine_log="$loader_root/\#($0)-wine.log""# })
 
         let prefix = samplePrefix()

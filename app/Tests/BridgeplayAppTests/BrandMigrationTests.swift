@@ -1,7 +1,7 @@
 import Foundation
 import Testing
 
-@testable import NotProtonApp
+@testable import BridgeplayApp
 
 @Suite("Moving a NotProton install to Bridgeplay 3.0.0")
 struct BrandMigrationTests {
@@ -454,6 +454,8 @@ struct BrandMigrationTests {
     @Test("Tool names: only ours are renamed")
     func toolNames() {
         #expect(BrandMigration.migratedToolName("notproton") == "bridgeplay-proton")
+        #expect(BrandMigration.migratedToolName("notproton.none") == "bridgeplay-proton.none")
+        #expect(BrandMigration.migratedToolName("notprotonish") == nil)
         #expect(BrandMigration.migratedToolName("notproton-winecx-11.17") == "bridgeplay-proton-winecx-11.17")
         #expect(BrandMigration.migratedToolName("notproton-fex-winecx-11.17") == "bridgeplay-proton-fex-winecx-11.17")
         #expect(BrandMigration.migratedToolName("notprotonx") == nil)
