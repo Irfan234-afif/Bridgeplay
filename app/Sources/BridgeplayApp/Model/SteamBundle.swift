@@ -107,9 +107,7 @@ enum SteamBundle {
         onStopping: () -> Void = {}
     ) throws -> Bool {
         guard client.runningAnywhere() else { return false }
-        guard client.runningHere() else {
-            throw StepFailure(step: step, detail: otherAccountRunning)
-        }
+        guard client.runningHere() else { throw OpenInAnotherAccount(step: step) }
         onStopping()
 
         client.askToQuit()
@@ -123,9 +121,7 @@ enum SteamBundle {
                 detail: String(localized: "Steam did not quit. Quit Steam, then try again.")
             )
         }
-        guard !client.runningAnywhere() else {
-            throw StepFailure(step: step, detail: otherAccountRunning)
-        }
+        guard !client.runningAnywhere() else { throw OpenInAnotherAccount(step: step) }
 
         for pattern in sweepPatterns(app: app, helpers: helpers) {
             client.sweep(pattern)
@@ -133,8 +129,16 @@ enum SteamBundle {
         return true
     }
 
-    static let otherAccountRunning =
-        String(localized: "Steam is open in another account on this Mac. Quit Steam in that account, then try again.")
+    // Its own type, so a caller that only touches this account's files can carry on.
+    struct OpenInAnotherAccount: LocalizedError {
+        let step: String
+        var errorDescription: String? {
+            StepFailure(
+                step: step,
+                detail: String(localized: "Steam is open in another account on this Mac. Quit Steam in that account, then try again.")
+            ).errorDescription
+        }
+    }
 
     static func sweepPatterns(app: URL, helpers: [URL]) -> [String] {
         ([app] + helpers).map { url in

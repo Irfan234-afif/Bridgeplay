@@ -109,16 +109,15 @@ struct SteamBundleTests {
     @Test("Steam open in another account stops the change without asking this one")
     func otherAccountsSteamIsReported() {
         let steam = FakeSteam(here: false, elsewhere: true)
-        let failure = #expect(throws: StepFailure.self) { try stop(steam) }
-        #expect(failure?.detail == SteamBundle.otherAccountRunning)
+        let failure = #expect(throws: SteamBundle.OpenInAnotherAccount.self) { try stop(steam) }
+        #expect(failure?.localizedDescription.contains("another account") == true)
         #expect(steam.asked == 0)
     }
 
     @Test("Steam open in two accounts is reported once this one has quit")
     func bothAccountsSteamIsReported() {
         let steam = FakeSteam(here: true, elsewhere: true)
-        let failure = #expect(throws: StepFailure.self) { try stop(steam) }
-        #expect(failure?.detail == SteamBundle.otherAccountRunning)
+        #expect(throws: SteamBundle.OpenInAnotherAccount.self) { try stop(steam) }
         #expect(steam.asked == 1)
         #expect(steam.swept.isEmpty)
     }

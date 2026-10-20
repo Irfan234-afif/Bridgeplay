@@ -166,7 +166,12 @@ enum Uninstall {
         if !checkedClient {
             let bundleLock = try DeploymentContent.acquireSteamLock(for: app, holding: lock)
             defer { bundleLock.release() }
-            stopped = try stop(app) { report(.stoppingClient) }
+            do {
+                stopped = try stop(app) { report(.stoppingClient) }
+            } catch is SteamBundle.OpenInAnotherAccount {
+                // Steam.app is left as it is from here on, and another account's Steam does
+                // not use this account's files.
+            }
         }
         _ = try SteamRepair.clearInsert(at: innerPlist)
         _ = try UpdateBlock.remove(from: updateBlocks)
