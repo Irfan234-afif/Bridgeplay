@@ -908,6 +908,22 @@
         }
       }
     },
+    "A faster way for the game's threads to wait on each other. Leave it on unless a game hangs." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Un modo più veloce per far attendere i thread del gioco tra loro. Lascialo attivo, a meno che un gioco si blocchi."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "让游戏线程更快地相互等待。除非游戏卡住，否则保持开启。"
+          }
+        }
+      }
+    },
     "A game or Wine tool is running on build %@. Quit it before updating Bridgeplay." : {
       "localizations" : {
         "it" : {
@@ -1180,6 +1196,22 @@
         }
       }
     },
+    "Add to" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aggiungi a"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "添加到"
+          }
+        }
+      }
+    },
     "Adding the certificate…" : {
       "localizations" : {
         "it" : {
@@ -1192,6 +1224,38 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "正在添加证书…"
+          }
+        }
+      }
+    },
+    "Adds generated frames between the game's own: 2x, 3x, or Adaptive, which fills up to your display's refresh rate. Smoother motion, a little more input lag. Works with any game, native Mac games included." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aggiunge fotogrammi generati tra quelli del gioco: 2x, 3x o Adattivo, che arriva fino alla frequenza di aggiornamento dello schermo. Movimento più fluido, un po' più di input lag. Funziona con qualsiasi gioco, anche nativo per Mac."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在游戏自身的帧之间插入生成帧：2x、3x 或自适应（补足到显示器刷新率）。画面更流畅，输入延迟略增。适用于任何游戏，包括原生 Mac 游戏。"
+          }
+        }
+      }
+    },
+    "Advertise AVX2 to Rosetta" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Segnala AVX2 a Rosetta"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "向 Rosetta 声明 AVX2 支持"
           }
         }
       }
@@ -1452,6 +1516,22 @@
         }
       }
     },
+    "Apple's performance overlay: frame rate, frame time and GPU use." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "L'overlay delle prestazioni di Apple: frame rate, tempo di frame e uso della GPU."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apple 的性能叠层：帧率、帧时间和 GPU 占用。"
+          }
+        }
+      }
+    },
     "Apple's translator for Windows games. Asks for your Mac password." : {
       "localizations" : {
         "it" : {
@@ -1544,6 +1624,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "确定要继续吗？"
+          }
+        }
+      }
+    },
+    "Automatic" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Automatico"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "自动"
           }
         }
       }
@@ -1736,6 +1832,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "已备份“%@”的游戏容器。"
+          }
+        }
+      }
+    },
+    "Balanced" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bilanciato"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "均衡"
           }
         }
       }
@@ -2095,6 +2207,22 @@
         }
       }
     },
+    "Bridgeplay lives in Steam" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bridgeplay vive in Steam"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bridgeplay 就在 Steam 中"
+          }
+        }
+      }
+    },
     "Bridgeplay needs the App Management permission. Turn on Bridgeplay in System Settings › Privacy & Security › App Management. After a Bridgeplay update the switch can look on but no longer work: turn it off and on again." : {
       "localizations" : {
         "it" : {
@@ -2123,6 +2251,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Bridgeplay 可运行你 Steam 游戏库中的 Windows 游戏。首先，进行几项快速检查。"
+          }
+        }
+      }
+    },
+    "Bridgeplay sets the game up and the game prepares its graphics, which can show a black screen for a few minutes. Later launches are quick." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bridgeplay configura il gioco e il gioco prepara la grafica: per qualche minuto potresti vedere una schermata nera. I prossimi avvii sono rapidi."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bridgeplay 会配置游戏，游戏则会准备图形资源，期间可能出现几分钟的黑屏。之后再启动就很快了。"
           }
         }
       }
@@ -2235,6 +2379,38 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "构建版本 %@ 未记录 %@ ntdll 的哈希值。"
+          }
+        }
+      }
+    },
+    "Built-in optical flow" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Flusso ottico integrato"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "内置光流"
+          }
+        }
+      }
+    },
+    "Built-in optical flow follows the mode above. MetalFX uses Apple's frame interpolation and makes one frame per pair." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Il flusso ottico integrato segue la modalità qui sopra. MetalFX usa l'interpolazione di Apple e genera un fotogramma per ogni coppia."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "内置光流遵循上方的模式。MetalFX 使用 Apple 的插帧，每对帧生成一帧。"
           }
         }
       }
@@ -2415,6 +2591,22 @@
         }
       }
     },
+    "Choose Compatibility. Bridgeplay's settings follow Steam Play on that page." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Scegli Compatibilità. Le impostazioni di Bridgeplay seguono Steam Play in quella pagina."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "选择“兼容性”。Bridgeplay 的设置就在该页面 Steam Play 下方。"
+          }
+        }
+      }
+    },
     "Choose a Windows program to run in %@." : {
       "localizations" : {
         "it" : {
@@ -2523,6 +2715,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "请先关闭 Steam，再继续。"
+          }
+        }
+      }
+    },
+    "Compatibility" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Compatibilità"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "兼容性"
           }
         }
       }
@@ -2683,6 +2891,38 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "仍然继续"
+          }
+        }
+      }
+    },
+    "Controller" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Controller"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "手柄"
+          }
+        }
+      }
+    },
+    "Controller layer" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Livello controller"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "控制器层"
           }
         }
       }
@@ -3006,6 +3246,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "不会移除 CrossOver 原应用。"
+          }
+        }
+      }
+    },
+    "Customization" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Personalizzazione"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "自定义"
           }
         }
       }
@@ -3362,6 +3618,38 @@
         }
       }
     },
+    "Disable hidraw" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Disable hidraw"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "停用 hidraw"
+          }
+        }
+      }
+    },
+    "Do not run. Their anti-cheat needs a Windows driver." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Non funzionano. Il loro anti-cheat richiede un driver di Windows."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "无法运行。其反作弊程序需要 Windows 驱动程序。"
+          }
+        }
+      }
+    },
     "Done" : {
       "localizations" : {
         "it" : {
@@ -3522,6 +3810,70 @@
         }
       }
     },
+    "Drawn the way Steam shows them. Changes apply the next time the game starts. Not sure? Leave a setting as it is: Bridgeplay picks what works for each game." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mostrate come le mostra Steam. Le modifiche si applicano al prossimo avvio del gioco. Non sei sicuro? Lascia l'impostazione com'è: Bridgeplay sceglie ciò che funziona per ogni gioco."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "按 Steam 的显示方式呈现。更改将在下次启动游戏时生效。不确定？保持原样即可：Bridgeplay 会为每个游戏选择合适的设置。"
+          }
+        }
+      }
+    },
+    "Draws at your display's full Retina resolution instead of half. Sharper, heavier on the GPU." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Disegna alla piena risoluzione Retina dello schermo invece che a metà. Più nitido, più pesante per la GPU."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "以显示器完整的 Retina 分辨率绘制，而不是一半。更清晰，GPU 负担更重。"
+          }
+        }
+      }
+    },
+    "DualSense, Xbox, GameSir and other pads work without a mapping screen. The first time a game uses one, allow Steam in Input Monitoring." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "DualSense, Xbox, GameSir e altri pad funzionano senza una schermata di mappatura. La prima volta che un gioco ne usa uno, consenti Steam in Monitoraggio input."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "DualSense、Xbox、GameSir 等手柄无需映射界面即可使用。游戏首次使用手柄时，请在“输入监控”中允许 Steam。"
+          }
+        }
+      }
+    },
+    "Engine" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Motore"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "引擎"
+          }
+        }
+      }
+    },
     "Engines" : {
       "localizations" : {
         "it" : {
@@ -3570,6 +3922,22 @@
         }
       }
     },
+    "Every setting on the Compatibility page" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tutte le impostazioni della pagina Compatibilità"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "兼容性页面上的所有设置"
+          }
+        }
+      }
+    },
     "Extracting" : {
       "localizations" : {
         "it" : {
@@ -3598,6 +3966,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "操作失败"
+          }
+        }
+      }
+    },
+    "Fast-motion fallback (skips frames that would smear)" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ripiego per movimento veloce (salta i fotogrammi che sfocherebbero)"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "快速运动回退（跳过会产生拖影的帧）"
           }
         }
       }
@@ -3682,6 +4066,22 @@
         }
       }
     },
+    "Frame Generation (Experimental. Adds input lag)" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Generazione fotogrammi (sperimentale. Aggiunge input lag)"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "帧生成（实验性。会增加输入延迟）"
+          }
+        }
+      }
+    },
     "Free space" : {
       "localizations" : {
         "it" : {
@@ -3730,6 +4130,102 @@
         }
       }
     },
+    "Game Recording" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Registrazione di gioco"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "游戏录制"
+          }
+        }
+      }
+    },
+    "Game Versions & Betas" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Versioni e beta del gioco"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "游戏版本与测试版"
+          }
+        }
+      }
+    },
+    "Games that offer Vulkan as a rendering option run it through MoltenVK, without DLSS. Prefer DirectX 11 or 12." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "I giochi che offrono Vulkan come opzione di rendering lo eseguono tramite MoltenVK, senza DLSS. Meglio scegliere DirectX 11 o 12."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "提供 Vulkan 渲染选项的游戏会通过 MoltenVK 运行，且不支持 DLSS。建议选择 DirectX 11 或 12。"
+          }
+        }
+      }
+    },
+    "Games with kernel anti-cheat" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Giochi con anti-cheat a livello kernel"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "使用内核级反作弊的游戏"
+          }
+        }
+      }
+    },
+    "General" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Generale"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "常规"
+          }
+        }
+      }
+    },
+    "Good to know" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Da sapere"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "须知"
+          }
+        }
+      }
+    },
     "Graphics" : {
       "localizations" : {
         "it" : {
@@ -3742,6 +4238,86 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "图形"
+          }
+        }
+      }
+    },
+    "Guide" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Guida"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "指南"
+          }
+        }
+      }
+    },
+    "Hides raw HID devices from the game, so pads only show up through SDL. Try it if a game sees one controller twice or ignores yours." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nasconde al gioco i dispositivi HID grezzi, così i pad appaiono solo tramite SDL. Provalo se un gioco vede un controller due volte o ignora il tuo."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "对游戏隐藏原始 HID 设备，手柄只会通过 SDL 显示。如果游戏把同一个手柄识别成两个，或忽略你的手柄，可以试试。"
+          }
+        }
+      }
+    },
+    "High Resolution" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Alta risoluzione"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "高分辨率"
+          }
+        }
+      }
+    },
+    "How finely motion is tracked between frames. Performance is the lightest, Quality the most precise, Balanced in between." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Quanto è fine il tracciamento del movimento tra i fotogrammi. Prestazioni è il più leggero, Qualità il più preciso, Bilanciato sta nel mezzo."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "帧之间运动追踪的精细程度。“性能”最轻量，“画质”最精确，“均衡”介于两者之间。"
+          }
+        }
+      }
+    },
+    "How the game's DirectX reaches your GPU. Automatic picks per game. D3DMetal (Apple's Game Porting Toolkit) runs DirectX 11 and 12 and is the default. DXMT runs DirectX 10 and 11 directly on Metal. DXVK runs DirectX 9 to 11 through Vulkan. WineD3D is Wine's own translation, for very old games." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Come il DirectX del gioco raggiunge la tua GPU. Automatico sceglie per ogni gioco. D3DMetal (il Game Porting Toolkit di Apple) esegue DirectX 11 e 12 ed è l'opzione predefinita. DXMT esegue DirectX 10 e 11 direttamente su Metal. DXVK esegue DirectX da 9 a 11 tramite Vulkan. WineD3D è la traduzione di Wine, per i giochi molto vecchi."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "游戏的 DirectX 如何到达你的 GPU。“自动”会按游戏选择。D3DMetal（Apple 的 Game Porting Toolkit）运行 DirectX 11 和 12，为默认选项。DXMT 直接在 Metal 上运行 DirectX 10 和 11。DXVK 通过 Vulkan 运行 DirectX 9 到 11。WineD3D 是 Wine 自带的转换层，适用于很老的游戏。"
           }
         }
       }
@@ -3790,6 +4366,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "在你 Mac 上的 Steam 中。"
+          }
+        }
+      }
+    },
+    "In your Steam library, right-click the game and choose Properties…" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nella libreria di Steam, fai clic con il tasto destro sul gioco e scegli Proprietà…"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在 Steam 游戏库中，右键点击游戏，然后选择“属性…”。"
           }
         }
       }
@@ -3950,6 +4542,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "已安装"
+          }
+        }
+      }
+    },
+    "Installed Files" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "File installati"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已安装文件"
           }
         }
       }
@@ -4210,6 +4818,38 @@
         }
       }
     },
+    "Let games read controllers directly (Recommended on Mac. Turn off only for Steam Input remapping)" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lascia che i giochi leggano direttamente i controller (consigliato su Mac, disattiva solo per la rimappatura di Steam Input)"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "允许游戏直接读取控制器（Mac 上推荐，仅在需要 Steam Input 按键映射时关闭）"
+          }
+        }
+      }
+    },
+    "Lets the game offer NVIDIA DLSS. Apple's MetalFX does the upscaling, and DLSS Frame Generation runs on MetalFX too. Turn DLSS on in the game's own settings as well." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Permette al gioco di offrire NVIDIA DLSS. L'upscaling è fatto da MetalFX di Apple, e anche la Frame Generation DLSS gira su MetalFX. Attiva DLSS anche nelle impostazioni del gioco."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "让游戏提供 NVIDIA DLSS 选项。放大由 Apple 的 MetalFX 完成，DLSS 帧生成也基于 MetalFX 运行。同时请在游戏自己的设置中开启 DLSS。"
+          }
+        }
+      }
+    },
     "Library" : {
       "localizations" : {
         "it" : {
@@ -4402,6 +5042,54 @@
         }
       }
     },
+    "Manage" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gestisci"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "管理"
+          }
+        }
+      }
+    },
+    "Metal HUD" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Metal HUD"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Metal 性能监视器"
+          }
+        }
+      }
+    },
+    "MetalFX Upscaling (Samples from the resolution the game is set to)" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Upscaling MetalFX (ingrandisce l'immagine dalla risoluzione impostata nel gioco)"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "MetalFX 超分辨率（以游戏设置的分辨率为采样来源）"
+          }
+        }
+      }
+    },
     "Missing components: %@. Run make app-payload and build the app again." : {
       "localizations" : {
         "it" : {
@@ -4446,6 +5134,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "缺少：%@。请点击“安装”，为当前 macOS 用户恢复这些文件。"
+          }
+        }
+      }
+    },
+    "Mode" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Modalità"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "模式"
           }
         }
       }
@@ -4510,6 +5214,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "移动到 Bridgeplay 文件夹失败"
+          }
+        }
+      }
+    },
+    "Native Mac games" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Giochi nativi per Mac"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "原生 Mac 游戏"
           }
         }
       }
@@ -4782,6 +5502,54 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "好"
+          }
+        }
+      }
+    },
+    "Off" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Disattivato"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "关闭"
+          }
+        }
+      }
+    },
+    "On by default. Mac Steam has no virtual gamepad for Windows games, so games read the pad themselves. Turn it off only to use Steam Input's button remapping." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Attivo per impostazione predefinita. Steam per Mac non ha un gamepad virtuale per i giochi Windows, quindi i giochi leggono il pad da soli. Disattivalo solo per usare la rimappatura dei tasti di Steam Input."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "默认开启。Mac 版 Steam 没有适用于 Windows 游戏的虚拟手柄，所以游戏自己读取手柄。仅在需要 Steam Input 的按键映射时才关闭。"
+          }
+        }
+      }
+    },
+    "Only on native Mac games, next to Metal HUD and Frame Generation. Raw HID suits Unity, SDL and Unreal games, GameController uses Apple's framework, and Off leaves controllers alone." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Solo per i giochi nativi per Mac, accanto a Metal HUD e Generazione fotogrammi. Raw HID va bene per i giochi Unity, SDL e Unreal, GameController usa il framework di Apple e Disattivato lascia stare i controller."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "仅限原生 Mac 游戏，位于 Metal HUD 和帧生成旁边。Raw HID 适合 Unity、SDL 和 Unreal 游戏，GameController 使用 Apple 的框架，关闭则不处理控制器。"
           }
         }
       }
@@ -5122,6 +5890,22 @@
         }
       }
     },
+    "Privacy" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Privacy"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "隐私"
+          }
+        }
+      }
+    },
     "Private Size" : {
       "localizations" : {
         "it" : {
@@ -5138,6 +5922,38 @@
         }
       }
     },
+    "Properties…" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Proprietà…"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "属性…"
+          }
+        }
+      }
+    },
+    "Protect UI (keeps static HUD and menus sharp)" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Proteggi interfaccia (mantiene nitidi HUD e menu statici)"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "保护界面（保持静态 HUD 和菜单清晰）"
+          }
+        }
+      }
+    },
     "Putting Steam back as it was also failed, so Steam may not start: %@ Use Repair Steam to restore it." : {
       "localizations" : {
         "it" : {
@@ -5150,6 +5966,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "将 Steam 恢复原状同样失败，因此 Steam 可能无法启动：%@ 请使用“修复 Steam”进行恢复。"
+          }
+        }
+      }
+    },
+    "Quality" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Qualità"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "画质"
           }
         }
       }
@@ -5714,6 +6546,22 @@
         }
       }
     },
+    "Remove from Favorites" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rimuovi dai preferiti"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "从收藏夹中移除"
+          }
+        }
+      }
+    },
     "Remove from List" : {
       "localizations" : {
         "it" : {
@@ -6210,6 +7058,22 @@
         }
       }
     },
+    "Select compatibility tool" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Seleziona strumento di compatibilità"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "选择兼容性工具"
+          }
+        }
+      }
+    },
     "Select your copy of Steam." : {
       "localizations" : {
         "it" : {
@@ -6370,6 +7234,22 @@
         }
       }
     },
+    "Show all compatibility tools" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mostra tutti gli strumenti di compatibilità"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "显示所有兼容性工具"
+          }
+        }
+      }
+    },
     "Show in Finder" : {
       "localizations" : {
         "it" : {
@@ -6414,6 +7294,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "在访达中显示所选游戏容器。"
+          }
+        }
+      }
+    },
+    "Shown with Automatic or DXMT. Renders below your display's resolution and scales up with MetalFX: 1.5×, 1.72×, 2× or 3×. Off keeps the resolution set in the game." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Visibile con Automatico o DXMT. Renderizza sotto la risoluzione dello schermo e ingrandisce con MetalFX: 1.5×, 1.72×, 2× o 3×. Disattivato mantiene la risoluzione impostata nel gioco."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在“自动”或 DXMT 下显示。以低于显示器的分辨率渲染，再用 MetalFX 放大：1.5×、1.72×、2× 或 3×。关闭则保持游戏中设置的分辨率。"
           }
         }
       }
@@ -7157,6 +8053,22 @@
         }
       }
     },
+    "Steam's own switch. It also lists tools made for Linux, which do not run on a Mac. Leave it off." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "È un interruttore di Steam. Elenca anche strumenti fatti per Linux, che non girano su Mac. Lascialo disattivato."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "这是 Steam 自带的开关。它还会列出为 Linux 制作的工具，这些工具无法在 Mac 上运行。请保持关闭。"
+          }
+        }
+      }
+    },
     "Steam's update removed Bridgeplay, so Windows games won't start." : {
       "localizations" : {
         "it" : {
@@ -7221,6 +8133,22 @@
         }
       }
     },
+    "Takes what did not move, like a HUD or a menu, straight from the real frame instead of warping it." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Prende ciò che non si è mosso, come un HUD o un menu, direttamente dal fotogramma reale invece di deformarlo."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "没有移动的部分（如 HUD 或菜单）直接取自真实帧，而不是做扭曲处理。"
+          }
+        }
+      }
+    },
     "Task Manager" : {
       "localizations" : {
         "it" : {
@@ -7233,6 +8161,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "任务管理器"
+          }
+        }
+      }
+    },
+    "Tells the game the processor supports AVX2, which some recent games need to start." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dice al gioco che il processore supporta AVX2, necessario per avviarsi ad alcuni giochi recenti."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "告知游戏处理器支持 AVX2，部分较新的游戏需要它才能启动。"
           }
         }
       }
@@ -7665,6 +8609,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "下载的 Winetricks 在校验后发生了变化，因此未运行。请重试以重新下载。"
+          }
+        }
+      }
+    },
+    "The first launch takes longer" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Il primo avvio richiede più tempo"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "首次启动需要更长时间"
           }
         }
       }
@@ -8245,6 +9205,22 @@
         }
       }
     },
+    "Updates" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aggiornamenti"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "更新"
+          }
+        }
+      }
+    },
     "Use This" : {
       "localizations" : {
         "it" : {
@@ -8373,6 +9349,22 @@
         }
       }
     },
+    "Vulkan in a game's own settings" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vulkan nelle impostazioni del gioco"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "游戏自身设置中的 Vulkan"
+          }
+        }
+      }
+    },
     "Waiting for you to sign in. Bridgeplay never sees your password." : {
       "localizations" : {
         "it" : {
@@ -8385,6 +9377,54 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "正在等待你登录。Bridgeplay 不会看到你的密码。"
+          }
+        }
+      }
+    },
+    "When motion is too fast to track, shows the nearest real frame instead of a smeared one." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Quando il movimento è troppo veloce da seguire, mostra il fotogramma reale più vicino invece di uno sfocato."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "运动太快无法追踪时，显示最接近的真实帧，而不是带拖影的帧。"
+          }
+        }
+      }
+    },
+    "Which engine runs the game. Default is Bridgeplay's own: WineCX 11.17 with msync and D3DMetal. WineHQ 11.15 is there for games that want DXMT or DXVK. Pick a Proton build only if you know it runs on a Mac." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Quale motore esegue il gioco. Quello predefinito è di Bridgeplay: WineCX 11.17 con msync e D3DMetal. WineHQ 11.15 serve ai giochi che vogliono DXMT o DXVK. Scegli una build di Proton solo se sai che gira su Mac."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "由哪个引擎运行游戏。默认是 Bridgeplay 自带的：WineCX 11.17，配合 msync 和 D3DMetal。WineHQ 11.15 供需要 DXMT 或 DXVK 的游戏使用。只有确定某个 Proton 版本能在 Mac 上运行时才选它。"
+          }
+        }
+      }
+    },
+    "Windows games install and start from your Steam library like Mac games. Each game's Bridgeplay settings are in Steam, on its Properties page, and every one is explained below." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "I giochi Windows si installano e si avviano dalla libreria di Steam come quelli per Mac. Le impostazioni Bridgeplay di ogni gioco sono in Steam, nella sua pagina Proprietà, e sono tutte spiegate qui sotto."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Windows 游戏和 Mac 游戏一样，直接在 Steam 库中安装和启动。每个游戏的 Bridgeplay 设置都在 Steam 中该游戏的“属性”页面，下面逐一说明。"
           }
         }
       }
