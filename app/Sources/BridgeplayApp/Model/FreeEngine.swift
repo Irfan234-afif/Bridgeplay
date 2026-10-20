@@ -84,7 +84,7 @@ enum FreeEngine {
         bundleName: "WineHQ 11.15.app",
         wineTree: "Wine Devel.app/Contents/Resources/wine",
         renderer: dxmt,
-        macDriver: "68d1c10cb4ec80beb2e97dcb8df5f81768f4f6e62848932d6bee5270dcf54982",
+        macDriver: "d95fe40b6321ba8a34933a6b394af6d75547220a7168896c357af3a32377b08f",
         stock: [
             "x86_64-windows/d3d10core.dll": "ff08e21a331e4160779ae140b0fd67c25f1557803b0f865467025a55e6133800",
             "x86_64-windows/d3d11.dll": "66d08df71bdb897b55d6f5d12f44b90846dec362641baab2100c0cdf6615c809",

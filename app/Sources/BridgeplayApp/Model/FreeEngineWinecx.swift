@@ -192,7 +192,7 @@ enum FreeEngineWinecx {
         audio: [
             WinecxBundledFile(resource: "winecoreaudio-winecx-11.17", ext: "so",
                               path: "lib/wine/x86_64-unix/winecoreaudio.so",
-                              sha256: "3bef8bfcee8bc02947ffca07794ec9cb74c7d15f2d88d00f7924f5e50727b8c3"),
+                              sha256: "680b267e8cf41af0868de4adf7f6760615a434a4be06b4ab0cfeece2d9240faa"),
         ],
         runner: RunnerBuild(
             bundleVersion: "winecx-11.17",
