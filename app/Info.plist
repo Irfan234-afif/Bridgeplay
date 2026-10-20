@@ -27,20 +27,30 @@
 	<key>CFBundleShortVersionString</key>
 	<string>0.0.0</string>
 	<key>CFBundleVersion</key>
-	<string>0.0.0</string>
+	<string>0</string>
 	<key>LSApplicationCategoryType</key>
 	<string>public.app-category.utilities</string>
 	<key>LSMinimumSystemVersion</key>
 	<string>15.0</string>
+	<key>NSDownloadsFolderUsageDescription</key>
+	<string>Bridgeplay looks in Downloads for Apple's Game Porting Toolkit disk image so you don't have to find it.</string>
 	<key>NSHighResolutionCapable</key>
 	<true/>
 	<key>NSPrincipalClass</key>
 	<string>NSApplication</string>
+	<key>NotProtonVersion</key>
+	<string>0.0.0</string>
+	<key>SUAutomaticallyUpdate</key>
+	<true/>
 	<key>SUEnableAutomaticChecks</key>
-	<false/>
+	<true/>
 	<key>SUFeedURL</key>
 	<string>https://github.com/raymondchins/Bridgeplay/releases/latest/download/appcast.xml</string>
 	<key>SUPublicEDKey</key>
 	<string>KrO6vVqAJozBSnfrLuyhBU/Kfhg8klI8ftl7CQ2sV98=</string>
+	<key>SUScheduledCheckInterval</key>
+	<integer>86400</integer>
+	<key>SUVerifyUpdateBeforeExtraction</key>
+	<true/>
 </dict>
 </plist>

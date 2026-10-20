@@ -7,9 +7,9 @@
 # Source: NotProtonNot/NotProton (remote upstream). The fork this one started from,
 # leonseemann/NotProton-WineHQ, was deleted in October 2026. Upstream is merged with a merge commit, never
 # rebased or taken with -X theirs, so local commits stay as they are. The only conflict
-# resolved automatically is dylib/version.h: the result is upstream's base version with
-# this fork's "-winehq.N-ray.M" suffix, M bumped so Sparkle sees a newer build. Any
-# other conflict aborts that merge and leaves the tree untouched.
+# resolved automatically is dylib/version.h: Bridgeplay's lines are kept and
+# NOTPROTON_VERSION takes upstream's value. Any other conflict aborts that merge and
+# leaves the tree untouched. After a merge, scripts/bump-version.sh minor is committed.
 
 set -eu
 
@@ -40,6 +40,10 @@ version_of() {
 	sed -n 's/^#define NOTPROTON_VERSION "\(.*\)"/\1/p'
 }
 
+product_of() {
+	sed -n 's/^#define BRIDGEPLAY_VERSION "\(.*\)"/\1/p'
+}
+
 pending=""
 count=$(git rev-list --count "HEAD..upstream/main")
 [ "$count" -eq 0 ] || pending=" upstream/main:$count"
@@ -51,7 +55,7 @@ fi
 echo "==> new upstream commits:$pending"
 [ "$check_only" -eq 0 ] || exit 2
 
-ours_before=$(version_of <dylib/version.h)
+ours_before=$(product_of <dylib/version.h)
 for entry in $pending; do
 	ref=${entry%%:*}
 	echo "==> merging $ref"
@@ -68,26 +72,17 @@ for entry in $pending; do
 		exit 1
 	fi
 	theirs=$(git show "$ref:dylib/version.h" | version_of)
-	base=${theirs%%-*}
-	suffix=${ours_before#*-}
-	ray=${suffix##*-ray.}
-	next="$base-${suffix%-ray.*}-ray.$((ray + 1))"
-	printf '%s\n' "// Build version string" "#ifndef NOTPROTON_VERSION_H" "#define NOTPROTON_VERSION_H" "" \
-		"#define NOTPROTON_VERSION \"$next\"" "" "#endif // NOTPROTON_VERSION_H" >dylib/version.h
+	git checkout -q --ours dylib/version.h
+	sed -i '' "s/^#define NOTPROTON_VERSION \".*\"/#define NOTPROTON_VERSION \"$theirs\"/" dylib/version.h
 	git add dylib/version.h
 	git commit -q --no-edit
-	echo "==> version $ours_before -> $next"
+	echo "==> kept Bridgeplay's version.h, NotProton $theirs"
 done
 
-ours_after=$(version_of <dylib/version.h)
-if [ "$ours_after" = "$ours_before" ]; then
-	# The merges were clean but a release still needs a newer version than the last one.
-	suffix=${ours_before#*-}
-	ray=${suffix##*-ray.}
-	next="${ours_before%-ray.*}-ray.$((ray + 1))"
-	sed -i '' "s/^#define NOTPROTON_VERSION \".*\"/#define NOTPROTON_VERSION \"$next\"/" dylib/version.h
-	git commit -q -m "chore: bump version to $next after upstream merge" dylib/version.h
-	echo "==> version $ours_before -> $next"
+# Every upstream merge ships as a new minor Bridgeplay release.
+if [ "$(product_of <dylib/version.h)" = "$ours_before" ]; then
+	scripts/bump-version.sh minor
+	git commit -q -m "chore(release): bump Bridgeplay to $(product_of <dylib/version.h) after upstream merge" dylib/version.h
 fi
 
 echo "==> merged. Build and test, then publish with scripts/release-local.sh"

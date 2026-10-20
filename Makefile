@@ -712,10 +712,12 @@ app-payload: $(TARGET) $(OVERLAY_SHIM) $(ICONMAKER) $(APPINFO) $(GAME_HOST) $(GA
 APP_BUNDLE  := $(OUT_DIR)/Bridgeplay.app
 APP_BUNDLE_PAYLOAD := $(APP_BUNDLE)/Contents/Resources/NotProtonApp_NotProtonApp.bundle/Contents/Resources/payload
 APP_ZIP     := $(OUT_DIR)/Bridgeplay.zip
-APP_VERSION := $(shell sed -n 's/^\#define NOTPROTON_VERSION "\(.*\)"/\1/p' dylib/version.h)
-# Sparkle ignores everything after a '-', so 1.1.4-winehq.1-ray.2 would compare equal to
-# ray.1. CFBundleVersion gets a dotted number instead: 1.1.4-winehq.1-ray.2 -> 1.1.4.2.
-APP_BUILD := $(shell echo '$(APP_VERSION)' | sed -E 's/^([0-9.]+)-.*-ray\.([0-9]+)$$/\1.\2/; s/-.*//')
+# dylib/version.h: Bridgeplay semver for CFBundleShortVersionString, the release counter
+# for CFBundleVersion (Sparkle orders updates by it; 32 is newer than the old 1.1.9.31),
+# and the NotProton release it is based on. See docs/RELEASING.md.
+APP_VERSION  := $(shell sed -n 's/^\#define BRIDGEPLAY_VERSION "\(.*\)"/\1/p' dylib/version.h)
+APP_BUILD    := $(shell sed -n 's/^\#define BRIDGEPLAY_BUILD \([0-9][0-9]*\)$$/\1/p' dylib/version.h)
+APP_UPSTREAM := $(shell sed -n 's/^\#define NOTPROTON_VERSION "\(.*\)"/\1/p' dylib/version.h)
 
 APP_SIGN_ID ?= -
 
@@ -752,10 +754,13 @@ app: app-payload $(ICON_CAR)
 	swift build --package-path app -c release
 	rm -rf "$(APP_BUNDLE)"
 	@mkdir -p "$(APP_BUNDLE)/Contents/MacOS" "$(APP_BUNDLE)/Contents/Resources"
+	@if [ -z "$(APP_VERSION)" ] || [ -z "$(APP_BUILD)" ] || [ -z "$(APP_UPSTREAM)" ]; then \
+		echo "dylib/version.h needs BRIDGEPLAY_VERSION, BRIDGEPLAY_BUILD and NOTPROTON_VERSION" >&2; exit 1; fi
 	cp app/Info.plist "$(APP_BUNDLE)/Contents/Info.plist"
 	/usr/libexec/PlistBuddy -c \
 		"Set :CFBundleShortVersionString $(APP_VERSION)" -c \
-		"Set :CFBundleVersion $(APP_BUILD)" \
+		"Set :CFBundleVersion $(APP_BUILD)" -c \
+		"Set :NotProtonVersion $(APP_UPSTREAM)" \
 		"$(APP_BUNDLE)/Contents/Info.plist"
 	cp "$$(swift build --package-path app -c release --show-bin-path)/NotProtonApp" \
 		"$(APP_BUNDLE)/Contents/MacOS/NotProtonApp"
@@ -787,7 +792,7 @@ app: app-payload $(ICON_CAR)
 	@echo "==> Payload complete in the bundle"
 	codesign -f -s "$(APP_SIGN_ID)" "$(APP_BUNDLE)"
 	codesign --verify --strict "$(APP_BUNDLE)"
-	@echo "==> Built $(APP_BUNDLE) ($(APP_VERSION))"
+	@echo "==> Built $(APP_BUNDLE) ($(APP_VERSION) build $(APP_BUILD), NotProton $(APP_UPSTREAM))"
 
 app-zip: app
 	rm -f "$(APP_ZIP)"

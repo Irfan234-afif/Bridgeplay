@@ -42,6 +42,8 @@ struct NotProtonApp: App {
                         checkSteamPatch("timer")
                     }
                 }
+                .onChange(of: status.snapshot?.steam, initial: true) { refreshAfterUpdate() }
+                .onChange(of: status.isIdle) { refreshAfterUpdate() }
                 .sheet(isPresented: $showsSetup) {
                     SetupAssistantView()
                         .environment(status)
@@ -61,7 +63,8 @@ struct NotProtonApp: App {
     private var menus: some Commands {
         CommandGroup(replacing: .newItem) {}
 
-        CommandGroup(after: .appInfo) {
+        CommandGroup(replacing: .appInfo) {
+            Button("About Bridgeplay") { AboutPanel.show() }
             Button("Check for Updates…") { updater.check() }
         }
 
@@ -120,6 +123,13 @@ struct NotProtonApp: App {
         }
 
         prefixMenu
+    }
+
+    // After Sparkle relaunches into a newer build, bring the patch in Steam up to date
+    // once it is safe to; the setup assistant handles a first install itself.
+    private func refreshAfterUpdate() {
+        guard !showsSetup else { return }
+        Task { await PostUpdateRefresh.runIfNeeded(status) }
     }
 
     @CommandsBuilder
