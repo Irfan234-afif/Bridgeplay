@@ -17,7 +17,7 @@ with tempfile.TemporaryDirectory(prefix="dsb-host-") as tmp:
     (prefix / "dosdevices/s:").symlink_to(t / "Games", target_is_directory=True)
     (prefix / "dosdevices/c:").symlink_to("../drive_c", target_is_directory=True)
     (prefix / "dosdevices/z:").symlink_to("/", target_is_directory=True)
-    loader = t / "Application Support/notproton/launchers/999/Game.app/Contents/MacOS/wine"
+    loader = t / "Application Support/bridgeplay/launchers/999/Game.app/Contents/MacOS/wine"
     loader.parent.mkdir(parents=True)
     loader.write_text("")
     loader.chmod(0o755)
@@ -116,6 +116,31 @@ with tempfile.TemporaryDirectory(prefix="dsb-host-") as tmp:
         subprocess.check_output(
             [str(t / "probe"), temp_loader, str(exe)],
             env=dict(env, NOTPROTON_GAME_LOADER=str(other_loader)),
+            text=True,
+        ).strip()
+        == "original"
+    )
+    # A home the app has not moved over yet keeps its launchers under notproton.
+    legacy_loader = t / "Application Support/notproton/launchers/999/Game.app/Contents/MacOS/wine"
+    legacy_loader.parent.mkdir(parents=True)
+    legacy_loader.write_text("")
+    legacy_loader.chmod(0o755)
+    assert (
+        subprocess.check_output(
+            [str(t / "probe"), temp_loader, str(exe)],
+            env=dict(env, NOTPROTON_GAME_LOADER=str(legacy_loader)),
+            text=True,
+        ).strip()
+        == "game"
+    )
+    elsewhere = t / "Application Support/other/launchers/999/Game.app/Contents/MacOS/wine"
+    elsewhere.parent.mkdir(parents=True)
+    elsewhere.write_text("")
+    elsewhere.chmod(0o755)
+    assert (
+        subprocess.check_output(
+            [str(t / "probe"), temp_loader, str(exe)],
+            env=dict(env, NOTPROTON_GAME_LOADER=str(elsewhere)),
             text=True,
         ).strip()
         == "original"

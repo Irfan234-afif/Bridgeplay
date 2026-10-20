@@ -5,14 +5,15 @@
 
 For each app id in GAMES the LaunchOptions value becomes
 
-    ~/.notproton/np-native NP_PAD_MODE=<mode> [SDL_JOYSTICK_MFI=0] \
+    ~/.bridgeplay/np-native NP_PAD_MODE=<mode> [SDL_JOYSTICK_MFI=0] \
         MTL_HUD_ENABLED=1 [other VAR=VALUE kept from the old prefix] \
         %command% <game flags that followed %command%>
 
 The old prefix may be the `/usr/bin/arch ... -e VAR=VALUE` form, a
 `/usr/bin/env VAR=VALUE` form, plain `VAR=VALUE` tokens or an earlier np-native
-line; anything else is reported and that app is left untouched. Running it
-twice changes nothing the second time.
+line, including one under the pre-3.0 ~/.notproton/np-native path; anything
+else is reported and that app is left untouched. Running it twice changes
+nothing the second time.
 
 Steam rewrites localconfig.vdf on exit, so the script refuses to run while
 steam_osx is up. --allow-running exists for tests on a copy and is refused
@@ -29,7 +30,8 @@ import sys
 import tempfile
 import time
 
-NP_NATIVE = os.path.join(os.path.expanduser("~"), ".notproton", "np-native")
+NP_NATIVE = os.path.join(os.path.expanduser("~"), ".bridgeplay", "np-native")
+LEGACY_NP_NATIVE = os.path.join(os.path.expanduser("~"), ".notproton", "np-native")
 STEAM_DIR = os.path.join(os.path.expanduser("~"), "Library", "Application Support", "Steam")
 
 # app id -> pad mode (from the per-game research in native-games.json)
@@ -58,7 +60,7 @@ NO_MFI = {"1145350", "570"}
 MANAGED = {"DYLD_INSERT_LIBRARIES", "NP_PAD_MODE", "SDL_JOYSTICK_MFI", "MTL_HUD_ENABLED"}
 ASSIGN = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*=")
 NP_NAME = re.compile(r"^[A-Z_][A-Z0-9_]*$")  # what np-native accepts
-WRAPPERS = {"/usr/bin/arch", "/usr/bin/env", "arch", "env", NP_NATIVE}
+WRAPPERS = {"/usr/bin/arch", "/usr/bin/env", "arch", "env", NP_NATIVE, LEGACY_NP_NATIVE}
 ARCH_FLAGS = {"-arm64", "-x86_64", "-arm64e", "-i386"}
 
 LINE = re.compile(r'^(?P<ind>\s*)"(?P<key>(?:[^"\\]|\\.)*)"(?:(?P<sep>\s+)"(?P<val>(?:[^"\\]|\\.)*)")?\s*$')

@@ -29,6 +29,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <strings.h>
+#include <sys/stat.h>
 
 #define PAGE_GD 0x01
 #define PAGE_SIM 0x02
@@ -447,8 +448,12 @@ static void db_load_once(void) {
     } else {
         const char *home = getenv("HOME");
         if (home) {
+            // The notproton folder is read until the app moves it to bridgeplay.
             char buf[1024];
-            snprintf(buf, sizeof buf, "%s/Library/Application Support/notproton/gamecontrollerdb.txt", home);
+            struct stat st;
+            snprintf(buf, sizeof buf, "%s/Library/Application Support/bridgeplay", home);
+            const char *dir = stat(buf, &st) == 0 ? "bridgeplay" : "notproton";
+            snprintf(buf, sizeof buf, "%s/Library/Application Support/%s/gamecontrollerdb.txt", home, dir);
             db_load_file(buf);
         }
     }

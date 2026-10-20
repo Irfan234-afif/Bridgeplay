@@ -76,7 +76,10 @@ static const char *game_loader_for(const char *path, char *const argv[]) {
     }
     const char *loader_suffix = ".app/Contents/MacOS/wine";
     size_t loader_length = strlen(loader), suffix_length = strlen(loader_suffix);
-    if (!strstr(loader, "/Application Support/notproton/launchers/") ||
+    // Launchers live in the bridgeplay support folder, or in the notproton one on a home
+    // the app has not moved over yet.
+    if ((!strstr(loader, "/Application Support/bridgeplay/launchers/") &&
+         !strstr(loader, "/Application Support/notproton/launchers/")) ||
         loader_length < suffix_length ||
         strcmp(loader + loader_length - suffix_length, loader_suffix)) {
         return NULL;
