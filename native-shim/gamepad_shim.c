@@ -437,6 +437,206 @@ static void np_IOHIDDeviceRegisterInputReportWithTimeStampCallback(
 INTERPOSE(np_IOHIDDeviceRegisterInputReportWithTimeStampCallback,
           IOHIDDeviceRegisterInputReportWithTimeStampCallback)
 
+// ---- One device per pad -----------------------------------------------------------------
+
+// The DeviceUsagePairs dicts extend_matching adds also match pads the game's own dicts
+// match (a DualSense is a Gamepad by primary usage and by usage pair), and IOHIDManager
+// then hands out a second IOHIDDeviceRef for the same service: every pad showed up twice.
+// Devices are told apart by their registry entry ID, and only the first ref per manager
+// reaches the game, through IOHIDManagerCopyDevices and the matching and removal callbacks.
+
+#define MAX_HIDDEN 64
+#define MAX_DELIVERED 64
+
+struct hidden_slot {
+    IOHIDManagerRef manager;          // not retained; only compared
+    IOHIDDeviceRef device;            // retained; NULL = free slot
+};
+
+struct delivered_slot {
+    IOHIDManagerRef manager;          // not retained; only compared; NULL = free slot
+    IOHIDDeviceRef device;            // not retained; only compared
+    uint64_t id;
+};
+
+static pthread_mutex_t dedup_lock = PTHREAD_MUTEX_INITIALIZER;
+static struct hidden_slot hidden[MAX_HIDDEN];          // second refs a matching callback held back
+static struct delivered_slot delivered[MAX_DELIVERED];
+
+static void remember_hidden(IOHIDManagerRef manager, IOHIDDeviceRef device) {
+    pthread_mutex_lock(&dedup_lock);
+    struct hidden_slot *slot = NULL;
+    for (int i = 0; i < MAX_HIDDEN; i++) {
+        if (hidden[i].device == device && hidden[i].manager == manager) {
+            pthread_mutex_unlock(&dedup_lock);
+            return;
+        }
+        if (!hidden[i].device && !slot) slot = &hidden[i];
+    }
+    if (slot) {   // full: the game may get a removal for a device it never saw, which it ignores
+        slot->manager = manager;
+        slot->device = (IOHIDDeviceRef)CFRetain(device);
+    }
+    pthread_mutex_unlock(&dedup_lock);
+}
+
+// 1 when this manager's matching callback held the device back.
+static int take_hidden(IOHIDManagerRef manager, IOHIDDeviceRef device) {
+    IOHIDDeviceRef release = NULL;
+    pthread_mutex_lock(&dedup_lock);
+    for (int i = 0; i < MAX_HIDDEN && !release; i++)
+        if (hidden[i].device == device && hidden[i].manager == manager) {
+            release = hidden[i].device;
+            hidden[i].device = NULL;
+            hidden[i].manager = NULL;
+        }
+    pthread_mutex_unlock(&dedup_lock);
+    if (release) CFRelease(release);
+    return release != NULL;
+}
+
+static uint64_t entry_id(IOHIDDeviceRef device) {
+    uint64_t id = 0;
+    io_service_t service = device ? IOHIDDeviceGetService(device) : MACH_PORT_NULL;
+    if (service == MACH_PORT_NULL || IORegistryEntryGetRegistryEntryID(service, &id) != KERN_SUCCESS)
+        return 0;
+    return id;
+}
+
+// 1 when this manager already gave the game another ref to the same service; else records
+// the device as delivered.
+static int duplicate(IOHIDManagerRef manager, IOHIDDeviceRef device) {
+    uint64_t id = entry_id(device);
+    if (!id) return 0;
+    pthread_mutex_lock(&dedup_lock);
+    struct delivered_slot *slot = NULL;
+    for (int i = 0; i < MAX_DELIVERED; i++) {
+        struct delivered_slot *d = &delivered[i];
+        if (d->manager == manager && d->id == id) {
+            int dup = d->device != device;
+            pthread_mutex_unlock(&dedup_lock);
+            return dup;
+        }
+        if (!d->manager && !slot) slot = d;
+    }
+    if (slot) {   // full: a duplicate may get through, as before
+        slot->manager = manager;
+        slot->device = device;
+        slot->id = id;
+    }
+    pthread_mutex_unlock(&dedup_lock);
+    return 0;
+}
+
+static void undeliver(IOHIDManagerRef manager, IOHIDDeviceRef device) {
+    pthread_mutex_lock(&dedup_lock);
+    for (int i = 0; i < MAX_DELIVERED; i++)
+        if (delivered[i].manager == manager && delivered[i].device == device) {
+            delivered[i].manager = NULL;
+            delivered[i].device = NULL;
+            delivered[i].id = 0;
+        }
+    pthread_mutex_unlock(&dedup_lock);
+}
+
+static CFSetRef copy_devices(const void *caller, IOHIDManagerRef manager) {
+    CFSetRef all = IOHIDManagerCopyDevices(manager);
+    if (!all || !serve(caller)) return all;
+    CFIndex count = CFSetGetCount(all);
+    const void **items = count > 0 ? malloc((size_t)count * sizeof *items) : NULL;
+    CFMutableSetRef kept = items ? CFSetCreateMutable(kCFAllocatorDefault, count, &kCFTypeSetCallBacks)
+                                 : NULL;
+    if (!kept) {
+        free(items);
+        return all;
+    }
+    uint64_t *ids = calloc((size_t)count, sizeof *ids);
+    if (!ids) {
+        free(items);
+        CFRelease(kept);
+        return all;
+    }
+    CFSetGetValues(all, items);
+    int dropped = 0, n = 0;
+    for (CFIndex i = 0; i < count; i++) {
+        IOHIDDeviceRef device = (IOHIDDeviceRef)items[i];
+        uint64_t id = entry_id(device);
+        int seen = 0;
+        for (int j = 0; j < n && id && !seen; j++) seen = ids[j] == id;
+        if (seen) {
+            dropped++;
+            continue;
+        }
+        if (id) ids[n++] = id;
+        CFSetAddValue(kept, device);
+    }
+    free(ids);
+    free(items);
+    if (!dropped) {
+        CFRelease(kept);
+        return all;
+    }
+    CFRelease(all);
+    if (CFSetGetCount(kept) == 0) {   // the API's own answer when nothing matches
+        CFRelease(kept);
+        return NULL;
+    }
+    return kept;
+}
+
+static CFSetRef np_IOHIDManagerCopyDevices(IOHIDManagerRef manager) {
+    return copy_devices(CALLER, manager);
+}
+INTERPOSE(np_IOHIDManagerCopyDevices, IOHIDManagerCopyDevices)
+
+static struct manager_slot matchers[MAX_MANAGERS];
+
+static void relay_match(void *context, IOReturn result, void *sender, IOHIDDeviceRef device) {
+    struct manager_slot *m = context;
+    pthread_mutex_lock(&lock);
+    IOHIDDeviceCallback cb = m->manager == sender ? m->cb : NULL;
+    void *ctx = m->ctx;
+    pthread_mutex_unlock(&lock);
+    if (!cb) return;
+    if (duplicate(sender, device)) {
+        remember_hidden(sender, device);
+        return;
+    }
+    cb(ctx, result, sender, device);
+}
+
+static void register_matching(const void *caller, IOHIDManagerRef manager,
+                              IOHIDDeviceCallback callback, void *context) {
+    if (!manager || !serve(caller)) {
+        IOHIDManagerRegisterDeviceMatchingCallback(manager, callback, context);
+        return;
+    }
+    struct manager_slot *m = NULL, *free_slot = NULL;
+    pthread_mutex_lock(&lock);
+    for (int i = 0; i < MAX_MANAGERS && !m; i++) {
+        if (matchers[i].manager == manager) m = &matchers[i];
+        else if (!matchers[i].manager && !free_slot) free_slot = &matchers[i];
+    }
+    if (!m) m = free_slot;
+    if (m) {
+        m->manager = manager;
+        m->cb = callback;
+        m->ctx = context;
+    }
+    pthread_mutex_unlock(&lock);
+    if (m && callback)
+        IOHIDManagerRegisterDeviceMatchingCallback(manager, relay_match, m);
+    else     // unregister, or out of slots: the game's own arguments
+        IOHIDManagerRegisterDeviceMatchingCallback(manager, callback, context);
+}
+
+static void np_IOHIDManagerRegisterDeviceMatchingCallback(IOHIDManagerRef manager,
+                                                          IOHIDDeviceCallback callback,
+                                                          void *context) {
+    register_matching(CALLER, manager, callback, context);
+}
+INTERPOSE(np_IOHIDManagerRegisterDeviceMatchingCallback, IOHIDManagerRegisterDeviceMatchingCallback)
+
 // ---- Removal -----------------------------------------------------------------------
 
 static void relay_removal(void *context, IOReturn result, void *sender, IOHIDDeviceRef device) {
@@ -445,6 +645,9 @@ static void relay_removal(void *context, IOReturn result, void *sender, IOHIDDev
     IOHIDDeviceCallback cb = m->manager == sender ? m->cb : NULL;
     void *ctx = m->ctx;
     pthread_mutex_unlock(&lock);
+    // A second ref the game was never shown is not removed for it either.
+    if (take_hidden(sender, device)) cb = NULL;
+    else undeliver(sender, device);
     // The game's callback first: it may still read the (spoofed) identity of the pad.
     if (cb) cb(ctx, result, sender, device);
     forget_device(device);
@@ -582,6 +785,8 @@ static const struct { const char *name; const void *original; void *replacement;
     HOOK(IOHIDManagerSetDeviceMatching),
     HOOK(IOHIDManagerSetDeviceMatchingMultiple),
     HOOK(IOHIDManagerRegisterDeviceRemovalCallback),
+    HOOK(IOHIDManagerRegisterDeviceMatchingCallback),
+    HOOK(IOHIDManagerCopyDevices),
 #undef HOOK
 };
 
