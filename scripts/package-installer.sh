@@ -95,6 +95,34 @@ need_file "$ENGINE_CACHE/engines/$dxvk_archive" "$dxvk_sha"
 [ -d "$GPTK_DIR/external/D3DMetal.framework" ] || die "missing $GPTK_DIR/external/D3DMetal.framework"
 [ -d "$GPTK_DIR/wine" ] || die "missing $GPTK_DIR/wine"
 
+# GPTK is Apple's: every Mach-O file in it must carry Apple's own signature (anchor apple),
+# so a modified or swapped copy in the support folder is never shipped. The Windows DLLs
+# under wine/ are PE files that codesign cannot check.
+gptk_apple_signed() {
+	codesign --verify --strict --deep -R='anchor apple' "$1" 2>/dev/null \
+		|| die "$1 is not signed by Apple (codesign -R 'anchor apple'), refusing to ship it"
+}
+echo "==> checking Apple's signature on GPTK"
+gptk_apple_signed "$GPTK_DIR/external/D3DMetal.framework"
+gptk_list=$(mktemp)
+trap 'rm -f "$gptk_list"' EXIT
+find "$GPTK_DIR" -type f ! -path '*/D3DMetal.framework/*' >"$gptk_list"
+gptk_macho=0
+while IFS= read -r f; do
+	case "$(file -b "$f")" in
+		Mach-O*) gptk_apple_signed "$f"; gptk_macho=$((gptk_macho + 1)) ;;
+	esac
+done <"$gptk_list"
+[ "$gptk_macho" -gt 0 ] || die "no Mach-O files in $GPTK_DIR besides D3DMetal.framework (libd3dshared.dylib missing?)"
+
+# --- gamefixes --------------------------------------------------------------------
+
+# Per-game confs come from gamefixes/, the same files the app ships into
+# gamefixes-default/, so the installer can never carry a divergent copy. default.conf (the
+# global file in the user's gamefixes/) is installer-only and lives in installer/config/.
+ls gamefixes/*.conf >/dev/null 2>&1 || die "no gamefixes/*.conf in the repository"
+[ -s installer/config/gamefixes/default.conf ] || die "missing installer/config/gamefixes/default.conf"
+
 # --- stage ------------------------------------------------------------------------
 
 echo "==> staging $stage"
@@ -105,8 +133,13 @@ ditto "$APP" "$stage/Bridgeplay.app"
 cp installer/Install.command "installer/BACA DULU.txt" installer/README.txt "$stage/"
 chmod 755 "$stage/Install.command"
 cp LICENSE LICENSE.* NOTICE "$stage/"
+# DXMT (LGPL-2.1, plus its pre-0.80 licence) and DXVK (zlib) ship in cache/engines/, so
+# their licence texts ship too, taken from upstream at the pinned commits (installer/licenses/).
+cp installer/licenses/* "$stage/"
 cp "$GPTK_DIR/License.rtf" "$stage/GPTK-License.rtf"
 rsync -a --exclude .DS_Store installer/config/ "$stage/config/"
+mkdir -p "$stage/config/gamefixes-default"
+cp gamefixes/*.conf "$stage/config/gamefixes-default/"
 rsync -a --exclude .DS_Store "$GPTK_DIR/" "$stage/gptk/"
 cp "$ENGINE_CACHE/$winecx_rel" "$stage/cache/$winecx_rel"
 cp "$ENGINE_CACHE/engines/$dxmt_archive" "$ENGINE_CACHE/engines/$dxvk_archive" "$stage/cache/engines/"
