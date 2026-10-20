@@ -50,6 +50,13 @@ struct PrefixStoreTests {
         #expect(libraries.last?.compatdata.lastPathComponent == "compatdata")
     }
 
+    // The migration unescaped these and Prefixes/Uninstall did not, so the two disagreed.
+    @Test("Library paths come back with Steam's escapes undone")
+    func libraryPathsAreUnescaped() {
+        let text = "\t\t\"path\"\t\t\"/Volumes/A \\\"B\\\"/C\\\\D\"\n\t\t\"Path\"\t\t\"/Volumes/E\"\n\t\t\"label\"\t\t\"path\"\n"
+        #expect(PrefixStore.libraryPaths(in: text) == ["/Volumes/A \"B\"/C\\D", "/Volumes/E"])
+    }
+
     @Test("A missing or empty file still yields the default library")
     func fallsBackToTheDefaultLibrary() throws {
         let dir = try scratchDirectory("pfx")

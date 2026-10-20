@@ -441,13 +441,7 @@ struct BrandMigration: Sendable {
     func libraries() -> [URL] {
         let vdf = steamUserData.appending(path: "steamapps/libraryfolders.vdf")
         let text = (try? String(contentsOf: vdf, encoding: .utf8)) ?? ""
-        var roots = [steamUserData]
-        for line in text.components(separatedBy: "\n") {
-            guard let (key, value, _) = Self.keyValue(line), key.caseInsensitiveCompare("path") == .orderedSame
-            else { continue }
-            let path = value.replacingOccurrences(of: "\\\\", with: "\\").replacingOccurrences(of: "\\\"", with: "\"")
-            roots.append(URL(filePath: path))
-        }
+        let roots = [steamUserData] + PrefixStore.libraryPaths(in: text).map { URL(filePath: $0) }
         var seen: Set<String> = []
         return roots.filter { seen.insert($0.path(percentEncoded: false).trimmingSuffix("/")).inserted }
     }
