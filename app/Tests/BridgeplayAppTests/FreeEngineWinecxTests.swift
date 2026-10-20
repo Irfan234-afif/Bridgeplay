@@ -28,24 +28,24 @@ struct FreeEngineWinecxTests {
         #expect(release.bundleName == "\(build.releaseVersion).app")
     }
 
-    @Test("11.17 is the current release with its own tool; 11.15 keeps bridgeplay-winecx")
+    @Test("11.17 is the current release with its own tool; 11.15 keeps bridgeplay-proton-winecx")
     func currentAndPrevious() throws {
         #expect(FreeEngineWinecx.current.build == "winecx-11.17")
         #expect(FreeEngineWinecx.previous.build == "winecx-11.15")
         #expect(FreeEngineWinecx.runnerBuild == FreeEngineWinecx.current.runner)
-        #expect(FreeEngineWinecx.current.runner.tools.map(\.name) == ["bridgeplay-winecx-11.17"])
-        #expect(FreeEngineWinecx.previous.runner.tools.map(\.name) == ["bridgeplay-winecx"])
+        #expect(FreeEngineWinecx.current.runner.tools.map(\.name) == ["bridgeplay-proton-winecx-11.17"])
+        #expect(FreeEngineWinecx.previous.runner.tools.map(\.name) == ["bridgeplay-proton-winecx"])
         let current = FreeEngineWinecx.current.runner
         let previous = FreeEngineWinecx.previous.runner
 
-        // Installing 11.17 adds a tool and never moves bridgeplay-winecx, which every
+        // Installing 11.17 adds a tool and never moves bridgeplay-proton-winecx, which every
         // existing prefix's build record ties to winecx-11.15. 11.17 lists first, so it is
         // what games without a mapping get.
         let both = SupportedRunners.tools(for: [current, previous])
-        #expect(both.map(\.name) == ["bridgeplay-winecx-11.17", "bridgeplay-winecx"])
+        #expect(both.map(\.name) == ["bridgeplay-proton-winecx-11.17", "bridgeplay-proton-winecx"])
         #expect(both.map(\.build) == ["winecx-11.17", "winecx-11.15"])
         #expect(SupportedRunners.tools(for: [previous]).map(\.build) == ["winecx-11.15"])
-        #expect(SupportedRunners.tools(for: [current]).map(\.name) == ["bridgeplay-winecx-11.17"])
+        #expect(SupportedRunners.tools(for: [current]).map(\.name) == ["bridgeplay-proton-winecx-11.17"])
     }
 
     @Test("Both free engines stay separate builds with their own loaders and tools")

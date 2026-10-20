@@ -124,7 +124,7 @@ struct CompatToolOrderTests {
         let tools = SupportedRunners.tools(for: [
             try build("26.3.0.39832"), try build("27.0.0.40921-fex"),
         ])
-        #expect(tools.map(\.name) == ["bridgeplay-fex", "bridgeplay-fex-rosetta", "bridgeplay-26.3"])
+        #expect(tools.map(\.name) == ["bridgeplay-proton-fex", "bridgeplay-proton-fex-rosetta", "bridgeplay-proton-26.3"])
         #expect(tools.map(\.build) == ["27.0.0.40921-fex", "27.0.0.40921-fex", "26.3.0.39832"])
     }
 
@@ -132,9 +132,9 @@ struct CompatToolOrderTests {
     func noFEX() throws {
         let builds = [try build("27.0.0.41069-fex"), try build("26.3.0.39832")]
         let fresh = SupportedRunners.tools(for: builds, fexAvailable: false)
-        #expect(fresh.map(\.name) == ["bridgeplay-fex-rosetta-41069", "bridgeplay-26.3"])
-        let kept = SupportedRunners.tools(for: builds, fexAvailable: false, keeping: ["bridgeplay-fex-41069"])
-        #expect(kept.map(\.name) == ["bridgeplay-fex-41069", "bridgeplay-fex-rosetta-41069", "bridgeplay-26.3"])
+        #expect(fresh.map(\.name) == ["bridgeplay-proton-fex-rosetta-41069", "bridgeplay-proton-26.3"])
+        let kept = SupportedRunners.tools(for: builds, fexAvailable: false, keeping: ["bridgeplay-proton-fex-41069"])
+        #expect(kept.map(\.name) == ["bridgeplay-proton-fex-41069", "bridgeplay-proton-fex-rosetta-41069", "bridgeplay-proton-26.3"])
     }
 
     @Test("Each Preview keeps its own tools when both are set up")
@@ -142,7 +142,7 @@ struct CompatToolOrderTests {
         let tools = SupportedRunners.tools(for: [
             try build("27.0.0.40921-fex"), try build("27.0.0.40921"),
         ])
-        #expect(tools.map(\.name) == ["bridgeplay-fex", "bridgeplay-fex-rosetta", "bridgeplay-preview"])
+        #expect(tools.map(\.name) == ["bridgeplay-proton-fex", "bridgeplay-proton-fex-rosetta", "bridgeplay-proton-preview"])
         #expect(tools.map(\.build) == ["27.0.0.40921-fex", "27.0.0.40921-fex", "27.0.0.40921"])
         #expect(Set(tools.map(\.display)).count == tools.count)
     }
@@ -150,7 +150,7 @@ struct CompatToolOrderTests {
     @Test("The Rosetta-only Preview can hold the legacy name")
     func rosettaPreviewAlone() throws {
         let tools = SupportedRunners.tools(for: [try build("27.0.0.40921")], legacy: .build("27.0.0.40921"))
-        #expect(tools.map(\.name) == ["bridgeplay"])
+        #expect(tools.map(\.name) == ["bridgeplay-proton"])
         #expect(tools.first?.tool.flavor == .rosetta)
     }
 
@@ -158,21 +158,17 @@ struct CompatToolOrderTests {
     func explicitHolder() throws {
         let builds = [try build("27.0.0.40921-fex"), try build("27.0.0.40921")]
         let held = SupportedRunners.tools(for: builds, legacy: .build("27.0.0.40921"))
-        #expect(held.map(\.name) == ["bridgeplay", "bridgeplay-fex", "bridgeplay-fex-rosetta"])
+        #expect(held.map(\.name) == ["bridgeplay-proton", "bridgeplay-proton-fex", "bridgeplay-proton-fex-rosetta"])
         #expect(held.first?.build == "27.0.0.40921")
         let none = SupportedRunners.tools(for: builds, legacy: .nobody)
-        #expect(none.map(\.name) == ["bridgeplay-fex", "bridgeplay-fex-rosetta", "bridgeplay-preview"])
+        #expect(none.map(\.name) == ["bridgeplay-proton-fex", "bridgeplay-proton-fex-rosetta", "bridgeplay-proton-preview"])
     }
 
     @Test("Every tool name is one the dylib accepts")
     func namesParse() {
         for tool in SupportedRunners.all.flatMap(\.tools) {
-            #expect(tool.name.hasPrefix("bridgeplay"))
-            // dylib/feats/compat.c: Steam maps Cloud's Windows path roots into the prefix only
-            // for a tool whose name contains "proton". The bridgeplay-* names do not.
-            withKnownIssue("bridgeplay-* tool names lack \"proton\", which Steam AutoCloud keys on") {
-                #expect(tool.name.contains("proton"))
-            }
+            #expect(tool.name.hasPrefix("bridgeplay-proton"))
+            #expect(tool.name.contains("proton"))
             #expect(tool.name.allSatisfy { $0.isLetter || $0.isNumber || "._-".contains($0) })
             #expect(!tool.display.contains { "\"\\".contains($0) || $0.isNewline })
         }
@@ -182,7 +178,7 @@ struct CompatToolOrderTests {
     func contents() throws {
         let tools = SupportedRunners.tools(for: [try build("26.3.0.39832")])
         #expect(CompatToolList.contents(tools)
-            == "bridgeplay-26.3\t26.3.0.39832\trosetta\tCrossOver 26.3\n")
+            == "bridgeplay-proton-26.3\t26.3.0.39832\trosetta\tCrossOver 26.3\n")
     }
 }
 

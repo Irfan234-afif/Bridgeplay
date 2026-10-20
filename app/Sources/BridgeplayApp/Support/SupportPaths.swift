@@ -153,14 +153,16 @@ enum SupportPaths {
     }
 }
 
-// Steam compatibility tool names. Bridgeplay writes bridgeplay-*; builds before 3.0 wrote
-// notproton-*, and those folders stay Bridgeplay's until BrandMigration renames them.
+// Steam compatibility tool names. Bridgeplay writes bridgeplay-proton-*; builds before 3.0
+// wrote notproton-*, and those folders stay Bridgeplay's until BrandMigration renames them.
+// Steam maps Cloud's Windows path roots into the prefix only for a tool whose name contains
+// "proton" (see dylib/feats/compat.c), so both prefixes keep it.
 enum ToolName {
-    static let prefix = "bridgeplay"
+    static let prefix = "bridgeplay-proton"
     static let legacyPrefix = "notproton"
 
-    // notproton-winecx-11.17 -> bridgeplay-winecx-11.17, notproton -> bridgeplay. Any other
-    // name, including one already migrated, comes back unchanged.
+    // notproton-winecx-11.17 -> bridgeplay-proton-winecx-11.17, notproton -> bridgeplay-proton.
+    // Any other name, including one already migrated, comes back unchanged.
     static func migrated(_ name: String) -> String {
         guard isLegacy(name) else { return name }
         return prefix + name.dropFirst(legacyPrefix.count)

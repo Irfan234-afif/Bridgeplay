@@ -122,7 +122,7 @@ enum CompatToolList {
             for: builds, legacy: holder, fexAvailable: fexAvailable, keeping: kept))
     }
 
-    // 1.0.x used the single 'notproton' tool name (now 'bridgeplay') and wrote no tool list, so the
+    // 1.0.x used the single 'notproton' tool name (now 'bridgeplay-proton') and wrote no tool list, so the
     // runners/current symlink is the record of which version of CrossOver was deployed.
     static func legacyHolder(
         builds: [RunnerBuild], listed: String?, runners: URL = SupportPaths.runners

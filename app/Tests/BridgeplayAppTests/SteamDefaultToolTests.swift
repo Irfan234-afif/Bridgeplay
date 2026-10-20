@@ -37,8 +37,8 @@ struct SteamDefaultToolTests {
     @Test("Adds CompatToolMapping with the default when Steam has none")
     func addsMapping() throws {
         let text = Self.head + "\n\t\t\t\t\"SentryFile\"\t\t\"x\"\n" + Self.tail
-        let result = try #require(SteamDefaultTool.updated(text, tool: "bridgeplay-winecx-11.17"))
-        #expect(result == Self.head + "\n\t\t\t\t\"CompatToolMapping\"\n\t\t\t\t{\n" + Self.entry("bridgeplay-winecx-11.17")
+        let result = try #require(SteamDefaultTool.updated(text, tool: "bridgeplay-proton-winecx-11.17"))
+        #expect(result == Self.head + "\n\t\t\t\t\"CompatToolMapping\"\n\t\t\t\t{\n" + Self.entry("bridgeplay-proton-winecx-11.17")
             + "\n\t\t\t\t}\n\t\t\t\t\"SentryFile\"\t\t\"x\"\n" + Self.tail)
     }
 

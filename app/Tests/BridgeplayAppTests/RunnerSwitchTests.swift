@@ -108,7 +108,7 @@ struct RunnerPrepareTests {
         #expect(toolList(runners) == CompatToolList.contents(
             SupportedRunners.tools(for: [Self.release, Self.fex])
         ))
-        #expect(toolList(runners)?.hasPrefix("bridgeplay-fex\t27.0.0.40921-fex\tfex\t") == true)
+        #expect(toolList(runners)?.hasPrefix("bridgeplay-proton-fex\t27.0.0.40921-fex\tfex\t") == true)
 
         let again = try prepare(Self.release, runners: runners, calls: calls)
         #expect(!again.toolsChanged)
@@ -216,7 +216,7 @@ struct RunnerPrepareTests {
         defer { try? FileManager.default.removeItem(at: runners) }
         let fm = FileManager.default
         let compat = runners.appending(path: "compatibilitytools.d")
-        for name in ["bridgeplay-gone", "GE-Proton"] {
+        for name in ["bridgeplay-proton-gone", "GE-Proton"] {
             try fm.createDirectory(at: compat.appending(path: name), withIntermediateDirectories: true)
             try Data("#!/bin/sh\n".utf8).write(to: compat.appending(path: "\(name)/run"))
         }
@@ -225,7 +225,7 @@ struct RunnerPrepareTests {
 
         let kept = try #require(toolList(runners)).split(separator: "\n").compactMap { $0.split(separator: "\t").first }
         #expect(!kept.isEmpty)
-        #expect(!fm.fileExists(atPath: compat.appending(path: "bridgeplay-gone").path(percentEncoded: false)))
+        #expect(!fm.fileExists(atPath: compat.appending(path: "bridgeplay-proton-gone").path(percentEncoded: false)))
         #expect(fm.fileExists(atPath: compat.appending(path: "GE-Proton").path(percentEncoded: false)))
     }
 
@@ -248,7 +248,7 @@ struct RunnerPrepareTests {
         }
         let listed = try #require(toolList(runners)).split(separator: "\n").compactMap { $0.split(separator: "\t").first }
         #expect(!listed.isEmpty)
-        #expect(listed.allSatisfy { $0.hasPrefix("bridgeplay") })
+        #expect(listed.allSatisfy { $0.hasPrefix("bridgeplay-proton") })
     }
 
     @Test("A tool list written before 3.0 still names the legacy holder")
@@ -272,7 +272,7 @@ struct RunnerPrepareTests {
 
     private func holder(_ runners: URL) -> String? {
         toolList(runners)?.split(separator: "\n").map { $0.split(separator: "\t") }
-            .first { $0.first == "bridgeplay" }.map { String($0[1]) }
+            .first { $0.first == "bridgeplay-proton" }.map { String($0[1]) }
     }
 
     @Test("A 1.0 install keeps the legacy name on the build runners/current pointed at")
@@ -290,7 +290,7 @@ struct RunnerPrepareTests {
 
         try sync(runners)
         #expect(holder(runners) == Self.rosetta.id)
-        #expect(toolList(runners)?.contains("bridgeplay-fex\t\(Self.fex.id)\tfex\t") == true)
+        #expect(toolList(runners)?.contains("bridgeplay-proton-fex\t\(Self.fex.id)\tfex\t") == true)
     }
 
     @Test("Without FEX support a 1.0 FEX install keeps its legacy name")
@@ -331,8 +331,8 @@ struct RunnerPrepareTests {
         )
         try sync(runners)
         #expect(holder(runners) == Self.fex.id)
-        #expect(toolList(runners)?.contains("bridgeplay-preview\t\(Self.rosetta.id)\t") == true)
-        #expect(toolList(runners)?.contains("bridgeplay-fex-rosetta\t\(Self.fex.id)\t") == true)
+        #expect(toolList(runners)?.contains("bridgeplay-proton-preview\t\(Self.rosetta.id)\t") == true)
+        #expect(toolList(runners)?.contains("bridgeplay-proton-fex-rosetta\t\(Self.fex.id)\t") == true)
     }
 
     @Test("A fresh install gives the legacy name to nobody")
@@ -342,8 +342,8 @@ struct RunnerPrepareTests {
 
         try sync(runners)
         #expect(holder(runners) == nil)
-        #expect(toolList(runners)?.hasPrefix("bridgeplay-fex-41069\t\(Self.fex41069.id)\tfex\t") == true)
-        #expect(toolList(runners)?.contains("bridgeplay-preview-41069\t\(Self.preview41069.id)\t") == true)
+        #expect(toolList(runners)?.hasPrefix("bridgeplay-proton-fex-41069\t\(Self.fex41069.id)\tfex\t") == true)
+        #expect(toolList(runners)?.contains("bridgeplay-proton-preview-41069\t\(Self.preview41069.id)\t") == true)
     }
 
     @Test("A 1.0.3 install keeps the legacy name on 41069")
@@ -359,7 +359,7 @@ struct RunnerPrepareTests {
         #expect(holder(runners) == Self.preview41069.id)
         try sync(runners)
         #expect(holder(runners) == Self.preview41069.id)
-        #expect(toolList(runners)?.contains("bridgeplay-fex-41069\t\(Self.fex41069.id)\tfex\t") == true)
+        #expect(toolList(runners)?.contains("bridgeplay-proton-fex-41069\t\(Self.fex41069.id)\tfex\t") == true)
     }
 
     @Test("A Preview listed under its own name does not take the legacy name later")

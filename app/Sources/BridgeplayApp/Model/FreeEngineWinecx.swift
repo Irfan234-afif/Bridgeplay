@@ -78,8 +78,8 @@ enum FreeEngineWinecx {
 
     static let step = "Download free WineCX engine"
 
-    // What the WineCX row installs. It gets its own tool, bridgeplay-winecx-11.17, beside
-    // the 11.15 release, which keeps bridgeplay-winecx: every existing prefix is claimed by
+    // What the WineCX row installs. It gets its own tool, bridgeplay-proton-winecx-11.17, beside
+    // the 11.15 release, which keeps bridgeplay-proton-winecx: every existing prefix is claimed by
     // winecx-11.15, so the default tool only moves once 11.17 is verified on real games.
     static let current = v1117
     static let previous = v1115
@@ -208,7 +208,7 @@ enum FreeEngineWinecx {
                 .i386Windows: "8ad83740df2da5e79ed435e4bc57e82b4b6a4b984fbec73e1160ca81dfce1b44",
             ],
             tools: [
-                CompatTool(name: "bridgeplay-winecx-11.17", flavor: .rosetta, display: "WineCX 11.17 (msync, D3DMetal)"),
+                CompatTool(name: "bridgeplay-proton-winecx-11.17", flavor: .rosetta, display: "WineCX 11.17 (msync, D3DMetal)"),
             ],
             isFree: true
         ),
@@ -251,7 +251,7 @@ enum FreeEngineWinecx {
 
     // runtime 4.5.125 is the last wine1115 build (winecx 5b45f45, built from winecx-gptk
     // 7a0349b, minos 26.0). The same bytes are mirrored on dappermint/Whisky, which is what
-    // Whisky itself downloads. It keeps the bridgeplay-winecx tool.
+    // Whisky itself downloads. It keeps the bridgeplay-proton-winecx tool.
     static let v1115 = WinecxRelease(
         build: "winecx-11.15",
         runtime: "4.5.125",
@@ -299,7 +299,7 @@ enum FreeEngineWinecx {
                 .i386Windows: "23ee72664f172d38d76ecb8969d5c5af7e6828864dfe298338ed0e773910bc5d",
             ],
             tools: [
-                CompatTool(name: "bridgeplay-winecx", flavor: .rosetta, display: "WineCX 11.15 (msync, D3DMetal)"),
+                CompatTool(name: "bridgeplay-proton-winecx", flavor: .rosetta, display: "WineCX 11.15 (msync, D3DMetal)"),
             ],
             isFree: true
         ),

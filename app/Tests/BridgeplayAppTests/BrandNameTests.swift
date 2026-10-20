@@ -6,29 +6,30 @@ import Testing
 @Suite("Bridgeplay names and the ones before 3.0")
 struct BrandNameTests {
 
-    @Test("A legacy tool name maps to its bridgeplay spelling; any other name is unchanged")
+    @Test("A legacy tool name maps to its bridgeplay-proton spelling; any other name is unchanged")
     func migratesToolNames() {
-        #expect(ToolName.migrated("notproton") == "bridgeplay")
-        #expect(ToolName.migrated("notproton-winecx-11.17") == "bridgeplay-winecx-11.17")
-        #expect(ToolName.migrated("notproton-fex-rosetta-41073") == "bridgeplay-fex-rosetta-41073")
-        #expect(ToolName.migrated("bridgeplay-winecx") == "bridgeplay-winecx")
+        #expect(ToolName.migrated("notproton") == "bridgeplay-proton")
+        #expect(ToolName.migrated("notproton-winecx-11.17") == "bridgeplay-proton-winecx-11.17")
+        #expect(ToolName.migrated("notproton-fex-rosetta-41073") == "bridgeplay-proton-fex-rosetta-41073")
+        #expect(ToolName.migrated("bridgeplay-proton-winecx") == "bridgeplay-proton-winecx")
         #expect(ToolName.migrated("GE-Proton9-1") == "GE-Proton9-1")
         #expect(ToolName.migrated("proton-notproton") == "proton-notproton")
     }
 
     @Test("Both spellings are Bridgeplay's tools, nothing else is")
     func recognisesBothPrefixes() {
-        #expect(ToolName.isOurs("bridgeplay"))
-        #expect(ToolName.isOurs("bridgeplay-winecx-11.17"))
+        #expect(ToolName.isOurs("bridgeplay-proton"))
+        #expect(!ToolName.isOurs("bridgeplay"))
+        #expect(ToolName.isOurs("bridgeplay-proton-winecx-11.17"))
         #expect(ToolName.isOurs("notproton"))
         #expect(ToolName.isOurs("notproton-26.3"))
         #expect(!ToolName.isOurs("GE-Proton9-1"))
         #expect(!ToolName.isOurs("proton_9"))
         #expect(ToolName.isLegacy("notproton-winecx"))
-        #expect(!ToolName.isLegacy("bridgeplay-winecx"))
+        #expect(!ToolName.isLegacy("bridgeplay-proton-winecx"))
     }
 
-    @Test("Every tool Bridgeplay serves is named bridgeplay")
+    @Test("Every tool Bridgeplay serves is named bridgeplay-proton, so Steam Cloud maps its saves")
     func servedToolsUseTheNewPrefix() {
         let names = SupportedRunners.all.flatMap(\.tools).map(\.name)
             + FreeEngineWinecx.current.runner.tools.map(\.name)
@@ -37,6 +38,7 @@ struct BrandNameTests {
         #expect(!names.isEmpty)
         for name in names {
             #expect(name.hasPrefix(ToolName.prefix), "\(name)")
+            #expect(name.contains("proton"), "\(name)")
         }
     }
 

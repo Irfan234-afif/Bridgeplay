@@ -96,16 +96,16 @@ enum SupportedRunners {
 
     // First entry is what windows-only games get when Steam has no mapping.
     static let toolPreference = [
-        legacyToolName, "bridgeplay-fex", "bridgeplay-fex-rosetta", "bridgeplay-preview",
-        "bridgeplay-fex-41069", "bridgeplay-fex-rosetta-41069", "bridgeplay-preview-41069",
-        "bridgeplay-fex-41073", "bridgeplay-fex-rosetta-41073", "bridgeplay-preview-41073", "bridgeplay-26.3", "bridgeplay-winecx-11.17",
-        "bridgeplay-winecx", "bridgeplay-winehq",
+        legacyToolName, "bridgeplay-proton-fex", "bridgeplay-proton-fex-rosetta", "bridgeplay-proton-preview",
+        "bridgeplay-proton-fex-41069", "bridgeplay-proton-fex-rosetta-41069", "bridgeplay-proton-preview-41069",
+        "bridgeplay-proton-fex-41073", "bridgeplay-proton-fex-rosetta-41073", "bridgeplay-proton-preview-41073", "bridgeplay-proton-26.3", "bridgeplay-proton-winecx-11.17",
+        "bridgeplay-proton-winecx", "bridgeplay-proton-winehq",
     ]
 
     // The single tool name 1.0.x used, 'notproton' before 3.0.
-    static let legacyToolName = "bridgeplay"
+    static let legacyToolName = "bridgeplay-proton"
 
-    // The only builds that can own the 'bridgeplay' tool name.
+    // The only builds that can own the 'bridgeplay-proton' tool name.
     static let legacyHolders = ["27.0.0.40921-fex", "27.0.0.40921", "27.0.0.41069-fex", "27.0.0.41069"]
 
     enum LegacyHolder: Equatable, Sendable {
@@ -153,7 +153,7 @@ enum SupportedRunners {
                 .i386Windows: "e641d7b2e81ee13877823494679ba2d87e0d61b8a87e8a1ce92b4fe73631ae74",
             ],
             tools: [
-                CompatTool(name: "bridgeplay-26.3", flavor: .rosetta, display: "CrossOver 26.3"),
+                CompatTool(name: "bridgeplay-proton-26.3", flavor: .rosetta, display: "CrossOver 26.3"),
             ],
             rebuilds: [
                 // crossoverchina.com
@@ -184,7 +184,7 @@ enum SupportedRunners {
                 .i386Windows: "25bfde1f50ee96485763968ef10b9d9ad35e38214232f17ebdc009b098af44a0",
             ],
             tools: [
-                CompatTool(name: "bridgeplay-preview", flavor: .rosetta, display: "CrossOver 2026 08 21-X86 - Rosetta"),
+                CompatTool(name: "bridgeplay-proton-preview", flavor: .rosetta, display: "CrossOver 2026 08 21-X86 - Rosetta"),
             ]
         ),
         RunnerBuild(
@@ -203,8 +203,8 @@ enum SupportedRunners {
                 .aarch64Windows: "f40810193a5ef2520774288f354a8604f5ba91828315f643b3ee6688b873dc3f",
             ],
             tools: [
-                CompatTool(name: "bridgeplay-fex", flavor: .fex, display: "CrossOver 2026 08 21-ARM64 - FEX"),
-                CompatTool(name: "bridgeplay-fex-rosetta", flavor: .rosetta, display: "CrossOver 2026 08 21-ARM64 - Rosetta"),
+                CompatTool(name: "bridgeplay-proton-fex", flavor: .fex, display: "CrossOver 2026 08 21-ARM64 - FEX"),
+                CompatTool(name: "bridgeplay-proton-fex-rosetta", flavor: .rosetta, display: "CrossOver 2026 08 21-ARM64 - Rosetta"),
             ]
         ),
         RunnerBuild(
@@ -221,7 +221,7 @@ enum SupportedRunners {
                 .i386Windows: "0d8e3ebb57b3173f675eef5e3a0950052c592efa10a7a10193b0beb811b55ea5",
             ],
             tools: [
-                CompatTool(name: "bridgeplay-preview-41069", flavor: .rosetta, display: "CrossOver 2026 10 06-X86 - Rosetta"),
+                CompatTool(name: "bridgeplay-proton-preview-41069", flavor: .rosetta, display: "CrossOver 2026 10 06-X86 - Rosetta"),
             ]
         ),
         RunnerBuild(
@@ -240,8 +240,8 @@ enum SupportedRunners {
                 .aarch64Windows: "7623c0b33350f511b431d39c7ec0c0d4f5def4183acef0eee5d4a5c694898956",
             ],
             tools: [
-                CompatTool(name: "bridgeplay-fex-41069", flavor: .fex, display: "CrossOver 2026 10 06-ARM64 - FEX"),
-                CompatTool(name: "bridgeplay-fex-rosetta-41069", flavor: .rosetta, display: "CrossOver 2026 10 06-ARM64 - Rosetta"),
+                CompatTool(name: "bridgeplay-proton-fex-41069", flavor: .fex, display: "CrossOver 2026 10 06-ARM64 - FEX"),
+                CompatTool(name: "bridgeplay-proton-fex-rosetta-41069", flavor: .rosetta, display: "CrossOver 2026 10 06-ARM64 - Rosetta"),
             ]
         ),
         RunnerBuild(
@@ -258,7 +258,7 @@ enum SupportedRunners {
                 .i386Windows: "88f9a1d16dd7127100eab902156390ec2a5ec67770cfddd3fd3f1237c9965309",
             ],
             tools: [
-                CompatTool(name: "bridgeplay-winehq", flavor: .rosetta, display: "WineHQ 11.15 - Rosetta"),
+                CompatTool(name: "bridgeplay-proton-winehq", flavor: .rosetta, display: "WineHQ 11.15 - Rosetta"),
             ],
             isFree: true
         ),
@@ -276,7 +276,7 @@ enum SupportedRunners {
                 .i386Windows: "7d3df0ee9dd61693293ba74a8d2c588b4dce26fb7f7a78c0c5ed5bdc58869e14",
             ],
             tools: [
-                CompatTool(name: "bridgeplay-preview-41073", flavor: .rosetta, display: "CrossOver 2026 10 15-X86 - Rosetta"),
+                CompatTool(name: "bridgeplay-proton-preview-41073", flavor: .rosetta, display: "CrossOver 2026 10 15-X86 - Rosetta"),
             ]
         ),
         RunnerBuild(
@@ -295,8 +295,8 @@ enum SupportedRunners {
                 .aarch64Windows: "2efb13f3303adc2c8ee61b93e027e4e94730a2e6b0162c7e6aebd4104200f07c",
             ],
             tools: [
-                CompatTool(name: "bridgeplay-fex-41073", flavor: .fex, display: "CrossOver 2026 10 15-ARM64 - FEX"),
-                CompatTool(name: "bridgeplay-fex-rosetta-41073", flavor: .rosetta, display: "CrossOver 2026 10 15-ARM64 - Rosetta"),
+                CompatTool(name: "bridgeplay-proton-fex-41073", flavor: .fex, display: "CrossOver 2026 10 15-ARM64 - FEX"),
+                CompatTool(name: "bridgeplay-proton-fex-rosetta-41073", flavor: .rosetta, display: "CrossOver 2026 10 15-ARM64 - Rosetta"),
             ]
         ),
     ] + FreeEngineWinecx.runnerBuilds

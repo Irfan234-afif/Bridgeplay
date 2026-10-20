@@ -36,7 +36,7 @@ struct UninstallTests {
         var compatTools: [URL] {
             SupportPaths.Steam.ourTools(in: compatTool.deletingLastPathComponent())
         }
-        var secondTool: URL { compatTool.deletingLastPathComponent().appending(path: "bridgeplay-26.3") }
+        var secondTool: URL { compatTool.deletingLastPathComponent().appending(path: "bridgeplay-proton-26.3") }
         var foreignTool: URL { compatTool.deletingLastPathComponent().appending(path: "GE-Proton9-1") }
 
         var outerPlist: URL { app.appending(path: "Contents/Info.plist") }
@@ -54,14 +54,14 @@ struct UninstallTests {
         let macOS = app.appending(path: "Contents/MacOS")
         let inner = root.appending(path: "inner")
         let legacyCompat = inner.appending(path: "legacycompat")
-        // Named as before 3.0, beside bridgeplay-26.3: uninstalling removes both spellings.
+        // Named as before 3.0, beside bridgeplay-proton-26.3: uninstalling removes both spellings.
         let compatTool = root.appending(path: "compatibilitytools.d/notproton")
         let support = root.appending(path: "bridgeplay")
         let caches = root.appending(path: "valve-packages")
 
         let tools = compatTool.deletingLastPathComponent()
         for dir in [macOS, inner, legacyCompat, compatTool, support, caches,
-                    tools.appending(path: "bridgeplay-26.3"), tools.appending(path: "GE-Proton9-1")] {
+                    tools.appending(path: "bridgeplay-proton-26.3"), tools.appending(path: "GE-Proton9-1")] {
             try files.createDirectory(at: dir, withIntermediateDirectories: true)
         }
 
