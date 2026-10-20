@@ -46,6 +46,19 @@ enum SetupChecks {
         try Shell.check("/usr/bin/osascript", ["-e", script])
     }
 
+    // osascript's own error text ("execution error: User canceled. (-128)") means nothing to
+    // most people, so the two common cases get plain sentences.
+    static func rosettaFailure(_ error: Error) -> String {
+        let text = error.localizedDescription
+        if text.contains("(-128)") || text.localizedCaseInsensitiveContains("user canceled") {
+            return String(localized: "Rosetta wasn't installed because the password window was closed. Press Install to try again.")
+        }
+        if text.contains("(-60005)") || text.contains("(-60007)") {
+            return String(localized: "Rosetta wasn't installed because macOS didn't accept the password. Use the name and password of an administrator of this Mac.")
+        }
+        return String(localized: "Rosetta wasn't installed. Check your internet connection and try again.")
+    }
+
     static var loginUsers: URL {
         SupportPaths.Steam.userData.appending(path: "config/loginusers.vdf")
     }
@@ -91,6 +104,12 @@ enum DiskImage {
 // WinecxD3DMetal.locate looks in first.
 enum GPTKImport {
     static var downloads: URL { SupportPaths.home.appending(path: "Downloads", directoryHint: .isDirectory) }
+
+    // Downloads is only read while no Game Porting Toolkit is installed, so a Mac that has one
+    // never sees the Downloads folder access prompt.
+    static func candidatesIfMissing(installed: Bool, scan: () -> [URL] = { candidates() }) -> [URL] {
+        installed ? [] : scan()
+    }
 
     // Apple names the image Game_Porting_Toolkit_<version>.dmg; the newest name sorts last.
     static func candidates(in folder: URL = downloads) -> [URL] {

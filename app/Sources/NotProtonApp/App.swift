@@ -25,7 +25,22 @@ struct NotProtonApp: App {
                     if prefixes.hasLoaded { Task { await prefixes.load() } }
                 }
                 .onChange(of: status.snapshot == nil, initial: true) {
-                    if SetupAssistant.shouldShow(status.snapshot) { showsSetup = true }
+                    if SetupAssistant.shouldShow(status.snapshot) {
+                        showsSetup = true
+                    } else if status.snapshot != nil {
+                        checkSteamPatch("launch")
+                    }
+                }
+                // A Steam client update rewrites Steam.app and drops Bridgeplay with it, so
+                // look again whenever the user comes back and every few minutes.
+                .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
+                    checkSteamPatch("foreground")
+                }
+                .task {
+                    while !Task.isCancelled {
+                        try? await Task.sleep(for: SteamPatchKeeper.pollInterval)
+                        checkSteamPatch("timer")
+                    }
                 }
                 .sheet(isPresented: $showsSetup) {
                     SetupAssistantView()
@@ -35,6 +50,11 @@ struct NotProtonApp: App {
         }
         .defaultSize(width: 900, height: 760)
         .commands { menus }
+    }
+
+    private func checkSteamPatch(_ trigger: String) {
+        guard status.snapshot != nil else { return }
+        Task { await status.checkSteamPatch(trigger: trigger, setupShowing: showsSetup) }
     }
 
     @CommandsBuilder

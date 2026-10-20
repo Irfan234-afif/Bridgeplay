@@ -75,3 +75,35 @@ struct SetupAssistantTests {
         #expect(!SetupAssistant.shouldShow(nil, defaults: defaults))
     }
 }
+
+@Suite("Setup checks")
+struct SetupChecksTests {
+
+    @Test("Downloads is not read when a Game Porting Toolkit is already installed")
+    func downloadsScanGated() {
+        var scans = 0
+        let scan: () -> [URL] = { scans += 1; return [URL(filePath: "/Downloads/Game_Porting_Toolkit_3.0.dmg")] }
+        #expect(GPTKImport.candidatesIfMissing(installed: true, scan: scan).isEmpty)
+        #expect(scans == 0)
+        #expect(GPTKImport.candidatesIfMissing(installed: false, scan: scan).count == 1)
+        #expect(scans == 1)
+    }
+
+    @Test("Rosetta failures read as plain sentences")
+    func rosettaMessages() {
+        let cancelled = CommandFailure(command: "osascript", status: 1, stderr: "0:120: execution error: User canceled. (-128)")
+        #expect(SetupChecks.rosettaFailure(cancelled).contains("password window was closed"))
+        let denied = CommandFailure(command: "osascript", status: 1, stderr: "execution error: The administrator user name or password was incorrect. (-60005)")
+        #expect(SetupChecks.rosettaFailure(denied).contains("administrator"))
+        let other = CommandFailure(command: "osascript", status: 1, stderr: "softwareupdate: network down")
+        let message = SetupChecks.rosettaFailure(other)
+        #expect(!message.contains("osascript"))
+        #expect(message.contains("internet"))
+    }
+
+    @Test("The App Management advice explains the switch that looks on after an update")
+    func appManagementAdvice() {
+        #expect(Remedy.appManagement.advice.contains("App Management"))
+        #expect(Remedy.appManagement.advice.contains("off and on again"))
+    }
+}

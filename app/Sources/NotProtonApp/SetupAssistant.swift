@@ -43,14 +43,18 @@ final class SetupAssistant {
     let freeBytes = SetupChecks.freeBytes()
 
     // Graphics
-    var gptk: WinecxD3DMetal.Payload? = WinecxD3DMetal.locate()
-    var gptkImages: [URL] = GPTKImport.candidates()
+    var gptk: WinecxD3DMetal.Payload?
+    var gptkImages: [URL]
     var skippedGraphics = false
 
     // Steam
     var steamInstalled = SteamBundle.isPresent
     var signedIn = SetupChecks.steamSignedIn()
     @ObservationIgnored private var signInWatch: Task<Void, Never>?
+
+    // The keychain identity that keeps Steam's controller permission across updates.
+    enum TrustState: Equatable { case unknown, needed, working, done, declined(String) }
+    var trust: TrustState = .unknown
 
     // Finish
     var tasks: [SetupTask] = SetupAssistant.plannedTasks
@@ -62,6 +66,12 @@ final class SetupAssistant {
         SetupTask(id: "engine", title: String(localized: "Set up the WineCX engine")),
         SetupTask(id: "default", title: String(localized: "Make WineCX Steam's default")),
     ]
+
+    init() {
+        let located = WinecxD3DMetal.locate()
+        gptk = located
+        gptkImages = GPTKImport.candidatesIfMissing(installed: located != nil)
+    }
 
     var macReady: Bool { appleSilicon && macOSSupported && rosettaInstalled && hasSpace }
     var hasSpace: Bool { (freeBytes ?? .max) >= SetupChecks.requiredBytes }
@@ -79,7 +89,10 @@ final class SetupAssistant {
         guard let next = Step(rawValue: step.rawValue + 1) else { return }
         message = nil
         step = next
-        if step == .steam { watchSignIn() }
+        if step == .steam {
+            watchSignIn()
+            Task { await checkTrust() }
+        }
     }
 
     func back() {
@@ -96,7 +109,8 @@ final class SetupAssistant {
         do {
             try await Task.detached(priority: .userInitiated) { try SetupChecks.installRosetta() }.value
         } catch {
-            message = String(localized: "Rosetta wasn't installed. \(error.localizedDescription)")
+            AppLog.note("setup: Rosetta install failed: \(error.localizedDescription)")
+            message = SetupChecks.rosettaFailure(error)
         }
         rosettaInstalled = SetupChecks.rosettaInstalled()
     }
@@ -147,6 +161,29 @@ final class SetupAssistant {
             }
         }
     }
+
+    func checkTrust() async {
+        guard trust == .unknown else { return }
+        let present = await Task.detached(priority: .utility) { LocalSigning.existingHash() != nil }.value
+        if trust == .unknown { trust = present ? .done : .needed }
+    }
+
+    // One click, no password: see LocalSigning for why no prompt is needed. A failure keeps
+    // ad hoc signing, which works but loses the controller permission on every update.
+    func trustThisMac() async {
+        guard trust != .working, trust != .done else { return }
+        trust = .working
+        do {
+            _ = try await Task.detached(priority: .userInitiated) { try LocalSigning.ensure() }.value
+            trust = .done
+        } catch {
+            AppLog.note("setup: signing identity not created: \(error.localizedDescription)")
+            trust = .declined(Self.untrustedNote)
+        }
+    }
+
+    static let untrustedNote =
+        String(localized: "Not set up. Bridgeplay still works, but after each update you'll need to allow your controller again.")
 
     // MARK: Finish
 
