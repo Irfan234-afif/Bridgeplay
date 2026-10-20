@@ -411,7 +411,8 @@ struct PrefixToolsTests {
 
         #expect(helper.upperBound == gate.lowerBound)
         #expect(gate.upperBound < alert.lowerBound)
-        #expect(source.ranges(of: "osascript").count == 1, "an alert bypasses show_alert")
+        // The first-launch notice uses osascript too, but as a notification, not an alert.
+        #expect(source.ranges(of: "display alert").count == 1, "an alert bypasses show_alert")
 
         let calls = source.ranges(of: "  show_alert \"")
         #expect(!calls.isEmpty)

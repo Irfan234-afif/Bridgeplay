@@ -32,12 +32,14 @@ struct LocalizationTests {
             == "Aperto Wine Configuration in Zuma Deluxe.")
     }
 
-    @Test("A string not yet translated into one language shows English there")
-    func pendingTranslationFallsBack() throws {
+    // l10ncheck keeps every catalogued string translated, so the fallback is shown with a
+    // string the catalog does not have.
+    @Test("A string without a translation shows English")
+    func missingTranslationFallsBack() throws {
         let zh = try #require(chinese)
         let it = try #require(italian)
-        #expect(String(localized: "The trial version is not supported.", bundle: zh)
-            == "The trial version is not supported.")
+        #expect(String(localized: "Not in the string catalog", bundle: zh) == "Not in the string catalog")
+        #expect(String(localized: "The trial version is not supported.", bundle: zh) == "不支持试用版。")
         #expect(String(localized: "The trial version is not supported.", bundle: it)
             == "La versione di prova non è supportata.")
     }
