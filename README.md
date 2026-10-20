@@ -18,14 +18,14 @@
 <br>
 
 <p align="center">
-  <img src="docs/readme/bento.png" alt="What Bridgeplay does: plays inside Steam, up to 3x the frames, DLSS answered by MetalFX, DirectX 12 on Metal, any controller, full Retina, one-click install" width="100%">
+  <img src="docs/readme/bento.png" alt="What Bridgeplay does: plays natively inside Steam, up to 3x the frames, DLSS answered by MetalFX, DirectX 12 on Metal, any controller, full Retina, one-click install" width="100%">
 </p>
 
 ## What it does
 
 | | |
 |---|---|
-| **Plays inside Steam** | Windows games sit in your Mac Steam library and start with Play, like Mac games. |
+| **Plays natively inside Steam** | Windows games sit in your Mac Steam library and start with Play, like Mac games. |
 | **DirectX 12 on Metal** | Apple's Game Porting Toolkit 4 (D3DMetal) runs DirectX 11 and 12 on your Mac's GPU. |
 | **DLSS, answered by MetalFX** | Games see a DLSS-capable card, so the option shows up. Apple's MetalFX does the upscaling, and DLSS Frame Generation runs on MetalFX interpolation. |
 | **Up to 3× the frames** | Built-in frame generation (2×, 3×, adaptive) for any game, native Mac games included, switched on per game from Steam's properties. |
@@ -34,8 +34,7 @@
 | **One-click install** | Open the installer and a Setup Assistant handles Rosetta, Steam and permissions. |
 
 <p align="center">
-  <img src="docs/readme/tour-steam.png" alt="A Windows game in the Mac Steam library, with Play" width="49%">
-  <img src="docs/readme/tour-props.png" alt="Steam's Compatibility panel with Bridgeplay graphics and frame generation settings" width="49%">
+  <img src="docs/readme/tour.png" alt="Seamless Mac gaming, unleashed: a Windows game in the Mac Steam library, ready to Play" width="100%">
 </p>
 <p align="center"><sub>Illustrations of the real screens.</sub></p>
 
@@ -62,7 +61,15 @@ Also running on the same setup: Street Fighter 6, Mortal Kombat 1, The Last of U
 3. **Follow the Setup Assistant**: Rosetta, graphics, Steam sign-in and one permission.
 4. **Press Play** on any Windows game in Steam.
 
+<p align="center">
+  <img src="docs/readme/install.png" alt="The Setup Assistant working through Your Mac, Rosetta, Graphics, Steam and Set Up" width="100%">
+</p>
+
 ## Requirements
+
+<p align="center">
+  <a href="https://bridgeplay.dev/#specs"><img src="docs/readme/specs.png" alt="Check your Mac in one click on bridgeplay.dev, next to the minimum requirements" width="100%"></a>
+</p>
 
 | | |
 |---|---|
@@ -82,6 +89,10 @@ Bridgeplay runs inside the native macOS Steam client and registers itself as a S
 Building from source: see [docs/DEVELOPING.md](docs/DEVELOPING.md) and [docs/BUILD-LOCAL.md](docs/BUILD-LOCAL.md). The one-click installer lives in [`installer/`](installer/).
 
 ## Credits
+
+<p align="center">
+  <img src="docs/readme/credits.png" alt="Bridgeplay in the middle, tying together your Windows game, Steam for Mac, NotProton, WineCX, D3DMetal, Rosetta 2 and Apple Silicon" width="100%">
+</p>
 
 Bridgeplay is a fork of [NotProton](https://github.com/NotProtonNot/NotProton) (GPL-3.0), built on CodeWeavers' [WineCX](https://www.codeweavers.com/crossover) and Apple's [Game Porting Toolkit](https://developer.apple.com/games/game-porting-toolkit/).
 
