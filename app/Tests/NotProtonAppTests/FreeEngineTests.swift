@@ -225,7 +225,7 @@ struct FreeEngineTests {
         #expect(dxmt.sha256 == "8de0d5b7eb2b96315f6ec8e259c05423ab43212e776196147b30d9f44927f7f0")
         #expect(dxmt.tree == "e94c312")
         #expect(dxmt.bases.map(\.absoluteString)
-            == ["https://github.com/raymondchins/NotProton-WineHQ/releases/download/dxmt-e94c312"])
+            == ["https://github.com/raymondchins/Bridgeplay/releases/download/dxmt-e94c312"])
         // docs/DXMT.md, minus nvapi64, nvngx and the WIP d3d12.
         #expect(dxmt.files == [
             "x86_64-unix/winemetal.so": "1d0a1258cbb696e1323d1fde77ebef7fedf5ea32a554bb777a9916321dedc195",
