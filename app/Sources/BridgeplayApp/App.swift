@@ -10,11 +10,6 @@ struct BridgeplayApp: App {
     @State private var showsSetup = false
     private let updater = AppUpdater.shared
 
-    init() {
-        AppLog.start()
-        MigrationLaunch.shared.logLaunchResult()
-    }
-
     var body: some Scene {
         Window("Bridgeplay", id: "main") {
             RootView(pane: $pane)

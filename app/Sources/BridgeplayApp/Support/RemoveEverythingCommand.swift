@@ -4,7 +4,7 @@ enum RemoveEverythingCommand {
     static let flag = "--remove-everything"
 
     static func run() -> Never {
-        Task.detached { exit(await perform()) }
+        Task.detached { exit(AppLog.finished(await perform())) }
         dispatchMain()
     }
 
@@ -25,6 +25,7 @@ enum RemoveEverythingCommand {
             )
             return result.partialRemoval == nil ? 0 : 1
         } catch {
+            AppLog.note("command line failed: \(failureMessage(error))")
             FileHandle.standardError.write(Data("\(failureMessage(error))\n".utf8))
             return 1
         }
