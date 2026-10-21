@@ -49,8 +49,8 @@ for pcm, grace in ((False, 75), (False, 0), (True, 0)):
                 addr,
             )
 
-        end = time.monotonic() + 1.2
-        while time.monotonic() < end:
+        # A fixed count, not a 1.2 s window: slow CI hosts oversleep.
+        for _ in range(110):
             send(curve)
             send(off)
             time.sleep(0.01)
