@@ -9,6 +9,7 @@ on upstream `9ada9fe`; this records local evidence, not a maintainer-signed rele
 | Full product build | Passed: Dobby, native components, bridge, fonts, payload and code-signed Bridgeplay.app |
 | Installer Swift Testing suites | 30 tests in two suites passed, including build resets and read-only prior backups |
 | Localization | Main app: 660 strings; installer: 55 strings, translated into Italian and Simplified Chinese |
+| Opt-in Setup Assistant snapshots | All three tests passed separately: motion frames, six wizard steps and Status page; the caller created the frames output directory first |
 | Existing Setup Assistant visual comparison | Six reference/candidate snapshots; static content panes match pixel-for-pixel, excluding animated rail and changing free-space value |
 | Final local release DMG | 781,225 bytes; below the 5 MiB packaging budget |
 | `codesign --verify --strict --deep` on installer app | Passed (ad hoc local signature) |
