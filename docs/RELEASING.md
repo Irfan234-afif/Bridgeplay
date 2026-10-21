@@ -1,7 +1,10 @@
 # Releasing Bridgeplay
 
-Every release is a GitHub release of `raymondchins/Bridgeplay` carrying `Bridgeplay.zip` and
-`appcast.xml`. The one-click `Bridgeplay-Installer.zip` lives on its own prerelease, tag
+Every release is a GitHub release of `raymondchins/Bridgeplay` carrying `Bridgeplay.zip`,
+`appcast.xml` and the small native installer, `Bridgeplay-Setup.zip` (a ZIP, not a DMG, so
+Gatekeeper asks for Open Anyway once instead of twice). The native installer also downloads the `installer`
+release's `Bridgeplay-Installer.zip` for GPTK, the engine and the configs, checked against
+the `Bridgeplay-Installer.zip.sig` that `release-local.sh` signs and uploads beside it. The one-click `Bridgeplay-Installer.zip` lives on its own prerelease, tag
 `installer` (bridgeplay.dev/download redirects to
 `releases/download/installer/Bridgeplay-Installer.zip`). It carries no app: `Install.command`
 downloads the Latest release's `Bridgeplay.zip` when it runs, so `release-local.sh` uploads
@@ -53,14 +56,17 @@ a newer install and leaves it alone. `VersioningTests` guards both.
    ```
    `scripts/sync-upstream.sh` already bumps the patch after an upstream merge.
 2. Push to `main` of `raymondchins/Bridgeplay` (the script refuses anything else).
-3. Optionally rehearse: `scripts/release-local.sh --dry-run` writes the zip and appcast to
+3. Optionally rehearse: `scripts/release-local.sh --dry-run` writes the zip, appcast and
+   an ad hoc native installer ZIP to
    `out/release/` from an app already built with `make app`, without publishing or reading
    the keychain.
 4. Release: `scripts/release-local.sh` (notes default to the commit subjects since the
    previous `vX.Y.Z` release; pass a string to override). It builds with
    `scripts/build-local.sh --checks`, signs the app with the `Bridgeplay Release` identity
    (see Signing), signs the zip with the EdDSA key in the login keychain, writes an appcast with `minimumSystemVersion` 26.0, packages the installer from the
-   same app (`scripts/package-installer.sh`) and publishes `vX.Y.Z` as Latest with all three.
+   same app (`scripts/package-installer.sh`). It also builds the native installer ZIP with the same
+   release identity and attaches it beside the product ZIP and appcast on `vX.Y.Z` Latest.
+   The existing bundled installer ZIP remains on the separate `installer` tag.
 
 Any other release in the repository (a DXMT build, say) must be created with
 `--latest=false`, or the feed URL stops serving `appcast.xml` until the next app release.

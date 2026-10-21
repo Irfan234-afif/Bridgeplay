@@ -36,8 +36,8 @@ conversion.
 | No supported controller, or more than one | Keep the original path. |
 | `DSB_DISABLED=1 %command%` | Bypass the bridge for this launch. |
 
-Use Steam's per-game Compatibility setting **Let games read controllers
-directly** for games with their own DualSense support. The bridge forwards
+Use the setting **Let games read controllers directly** in the game's
+Steam Properties › Bridgeplay for games with their own DualSense support. The bridge forwards
 input (including sensor data), supported output reports for triggers and
 lights, traditional rumble, and haptic PCM supplied by the game. Trigger
 effects and gyro-to-aim mappings depend on the game's implementation.

@@ -56,7 +56,7 @@ Wine uses the last entry for a DLL in `WINEDLLOVERRIDES`. The order is: backend,
 The backend is picked in this order:
 
 1. `BRIDGEPLAY_BACKEND=<name>` (or `NOTPROTON_BACKEND`) in the launch options
-2. `CX_GRAPHICS_BACKEND` in the launch options, which the Steam panel's Graphics menu sets.
+2. `CX_GRAPHICS_BACKEND` in the launch options, which the Graphics menu in the game's Steam Properties › Bridgeplay sets.
    Any case is accepted. `d3dmetal`, `dxmt` and `dxvk` map to themselves, and `wined3d`,
    `opengl` and `wine` map to `wined3d`. Other values are logged and ignored
 3. `BACKEND=` in a conf file
@@ -76,7 +76,7 @@ forwarders are that engine's `dxgi`, `d3d10`, `d3d11` and `d3d12` builtins and W
 are set aside. So on that engine:
 
 - the default, and auto-detection for D3D11 and D3D12 games alike, is `d3dmetal`
-- `wined3d`, from any source (launch options, the Steam panel, a conf, the last launch), is
+- `wined3d`, from any source (launch options, the Bridgeplay tab in Steam, a conf, the last launch), is
   logged as not available and runs `d3dmetal`
 - a missing `dxmt` falls back to `d3dmetal`, and so does a `dxmt` or `dxvk` that cannot be
   staged into the prefix
@@ -150,7 +150,7 @@ with variable names as they are (`BRIDGEPLAY_FRAMEGEN=2`, `NP_PAD_MODE=hid`, `MT
 1. `~/Library/Application Support/bridgeplay/gamefixes/native-default.conf`, for every native game
 2. `~/Library/Application Support/bridgeplay/gamefixes/native/<appid>.conf`, which wins per key
 
-The Steam panel for such a game shows the Metal HUD, Frame Generation and the controller
+The Bridgeplay tab in Steam Properties for such a game shows the Metal HUD, Frame Generation and the controller
 layer (`NP_PAD_MODE`: `hid`, `gc` or `off`). It writes the launch options as
 `<home>/.bridgeplay/np-native VAR=VALUE ... %command% <game args>`, and rewrites the older
 `/usr/bin/arch -arm64 -x86_64 -e VAR=VALUE ... %command%` form into that one, dropping its

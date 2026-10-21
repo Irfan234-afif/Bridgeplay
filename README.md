@@ -71,6 +71,8 @@ To add yours: after you play, Bridgeplay asks once per game *How did it run?* On
 3. **Follow the Setup Assistant**: Rosetta, graphics, Steam sign-in and a couple of standard macOS prompts.
 4. **Press Play** on any Windows game in Steam. The first time you use a controller, allow Steam's Input Monitoring request.
 
+Each game's Bridgeplay settings (graphics backend, Metal HUD, DLSS, frame generation, controllers) are in Steam: right-click the game, **Properties… › Bridgeplay**.
+
 Updates install themselves: Bridgeplay, its patch in Steam and the engine. **Refresh** on the Status page checks on demand.
 
 The installer includes Apple's Game Porting Toolkit redistributables under Apple's license, which allows non-commercial distribution only. Bridgeplay is free and non-commercial.
