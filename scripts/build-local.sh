@@ -244,7 +244,9 @@ ci_slug=${BRIDGEPLAY_CI_REPO:-raymondchins/Bridgeplay}
 ci_passed() {
 	command -v gh >/dev/null 2>&1 || return 1
 	for sha in $(git -C "$repo" rev-list --max-count=5 HEAD); do
-		git -C "$repo" diff --quiet "$sha" HEAD -- . ':(exclude)dylib/version.h' || continue
+		# app.yml skips pushes that only touch Markdown or docs/, so those don't count either.
+		git -C "$repo" diff --quiet "$sha" HEAD -- . ':(exclude)dylib/version.h' \
+			':(exclude,glob)**/*.md' ':(exclude)docs' || continue
 		gh run list -R "$ci_slug" -w app --commit "$sha" --status success --limit 1 \
 			--json headSha -q '.[].headSha' 2>/dev/null | grep -q . && { echo "$sha"; return 0; }
 	done

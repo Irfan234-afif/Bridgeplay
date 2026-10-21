@@ -891,7 +891,16 @@ CI_CHECKS := mincheck l10ncheck \
 	seedcheck gamefixescheck padcheck np-native-tests native-shim-tests \
 	app-tests game-host-check dualsense-check steam-rumble-check
 
-.PHONY: ci-checks
+# app.yml runs the checks that need the built app in its build job and the rest in a
+# parallel job; both lists together are CI_CHECKS.
+CI_CHECKS_BUILT := mincheck l10ncheck app-tests
+CI_CHECKS_SOURCE := $(filter-out $(CI_CHECKS_BUILT),$(CI_CHECKS))
+
+.PHONY: ci-checks ci-checks-built ci-checks-source
+ci-checks-built:
+	@$(MAKE) -s ci-checks CI_CHECKS="$(CI_CHECKS_BUILT)"
+ci-checks-source:
+	@$(MAKE) -s ci-checks CI_CHECKS="$(CI_CHECKS_SOURCE)"
 ci-checks:
 	@failed=""; \
 	for t in $(CI_CHECKS); do \

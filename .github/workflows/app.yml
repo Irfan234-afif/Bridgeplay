@@ -1,17 +1,29 @@
 name: app
 
+# Markdown and docs/ changes build nothing. scripts/build-local.sh skips the same paths
+# when it reuses a passing run for a release.
 on:
   push:
     branches: [main]
+    paths: ["**", "!**/*.md", "!docs/**"]
   pull_request:
+    paths: ["**", "!**/*.md", "!docs/**"]
   workflow_dispatch:
 
 permissions:
   contents: read
 
+# A newer push to the same PR replaces the run; pushes to main all finish.
+concurrency:
+  group: app-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 env:
   DOBBY_COMMIT: "5dfc8546954ce3b3198132ab13fddb89ee92cdd7"
   FONT_TOOLS: "afdko==4.0.3 fonttools==4.66.1"
+  HOMEBREW_NO_AUTO_UPDATE: "1"
+  HOMEBREW_NO_INSTALL_CLEANUP: "1"
+  HOMEBREW_NO_INSTALLED_DEPENDENTS_CHECK: "1"
 
 jobs:
   build:
@@ -27,9 +39,6 @@ jobs:
           xcodebuild -version
           swift --version
           echo "macOS SDK $(xcrun --sdk macosx --show-sdk-version)"
-
-      - name: Install cross compilers
-        run: brew install mingw-w64 bison flex
 
       - name: Clone Dobby at the pinned commit
         run: |
@@ -47,7 +56,37 @@ jobs:
         if: steps.dobby-cache.outputs.cache-hit != 'true'
         run: make dobby
 
+      - name: Build the dylib
+        run: make all
+
+      - name: Build the overlay shim
+        run: make overlay-shim
+
+      - name: Build helpers
+        run: make iconmaker appinfo
+
+      # The five files app-payload stages from the Wine build (BRIDGE_FILES). A hit skips
+      # the cross compilers, the Wine trees and the bridge build.
+      # CEILING: the key hashes the bridge sources, not the Makefile recipe or brew's
+      # mingw version — bump the "v1" if either changes what the bridge build produces.
+      - name: Restore the built bridge
+        id: bridge-cache
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: |
+            scratch/wine-build-dual/programs/steam.exe/x86_64-windows/steam.exe
+            scratch/wine-build-dual/dlls/lsteamclient/x86_64-windows/lsteamclient.dll
+            scratch/wine-build-dual/dlls/lsteamclient/lsteamclient.so
+            scratch/wine-build-dual/dlls/lsteamclient/i386-windows/lsteamclient.dll
+            scratch/wine-build-arm64/dlls/lsteamclient/lsteamclient.so
+          key: bridge-v1-xcode-27-${{ hashFiles('bridge/**', 'lsteamclient/**', 'steam-shim/**') }}
+
+      - name: Install cross compilers
+        if: steps.bridge-cache.outputs.cache-hit != 'true'
+        run: brew install mingw-w64 bison flex
+
       - name: Restore the Wine trees
+        if: steps.bridge-cache.outputs.cache-hit != 'true'
         id: wine-cache
         uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
         with:
@@ -58,25 +97,18 @@ jobs:
           key: wine-xcode-27-${{ hashFiles('bridge/setup-wine-tree.sh', 'bridge/register-components.diff') }}
 
       - name: Restore Proton tarball cache
+        if: steps.bridge-cache.outputs.cache-hit != 'true'
         uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
         with:
           path: scratch/proton-lsc
           key: proton-tarball-${{ hashFiles('lsteamclient/fetch.sh') }}
 
-      - name: Build the dylib
-        run: make all
-
-      - name: Build the overlay shim
-        run: make overlay-shim
-
-      - name: Build helpers
-        run: make iconmaker appinfo
-
       - name: Build the bridge
+        if: steps.bridge-cache.outputs.cache-hit != 'true'
         run: make bridge
 
       - name: Save the Wine trees
-        if: steps.wine-cache.outputs.cache-hit != 'true'
+        if: steps.bridge-cache.outputs.cache-hit != 'true' && steps.wine-cache.outputs.cache-hit != 'true'
         uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
         with:
           path: |
@@ -85,7 +117,15 @@ jobs:
             scratch/wine-build-arm64
           key: wine-xcode-27-${{ hashFiles('bridge/setup-wine-tree.sh', 'bridge/register-components.diff') }}
 
+      - name: Restore the built fonts
+        id: fonts-cache
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: build/fonts
+          key: fonts-v1-${{ hashFiles('fonts/**') }}-${{ env.FONT_TOOLS }}
+
       - name: Install font tools
+        if: steps.fonts-cache.outputs.cache-hit != 'true'
         run: |
           brew install fontforge gpatch
           python3 -m venv scratch/fontvenv
@@ -93,6 +133,7 @@ jobs:
           echo "$PWD/scratch/fontvenv/bin" >> "$GITHUB_PATH"
 
       - name: Build the fonts
+        if: steps.fonts-cache.outputs.cache-hit != 'true'
         run: make fonts
 
       - name: Stage the app payload
@@ -101,9 +142,9 @@ jobs:
       - name: Build the app
         run: make app
 
-      # The one check list, shared with scripts/build-local.sh --checks
-      - name: Run the checks
-        run: make ci-checks
+      # The checks job runs the rest of the one check list (make ci-checks).
+      - name: Run the checks that need the built app
+        run: make ci-checks-built
 
       - name: Package the app bundle
         run: |
@@ -115,3 +156,17 @@ jobs:
         with:
           name: Bridgeplay
           path: out/artifact
+
+  checks:
+    name: source checks
+    runs-on: xcode-27
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      - name: Select Xcode
+        run: sudo xcode-select -s /Applications/Xcode_27.0.app
+
+      # Each check builds what it needs; none reads the app build.
+      - name: Run the checks
+        run: make ci-checks-source
