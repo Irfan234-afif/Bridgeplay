@@ -19,7 +19,7 @@ bump differs), skips them;
 
 | Define | Meaning | In the app | In the appcast |
 |---|---|---|---|
-| `BRIDGEPLAY_VERSION` | Bridgeplay semver: patch for fixes, minor for an upstream NotProton merge or new features, major for breaks | `CFBundleShortVersionString`, About, Status | `sparkle:shortVersionString`, tag `v<version>` |
+| `BRIDGEPLAY_VERSION` | Bridgeplay semver: patch for fixes and routine upstream NotProton merges, minor for features players notice, major only for breaks (prefix, save or install layout). Bundle changes into one release rather than bumping per merge | `CFBundleShortVersionString`, About, Status | `sparkle:shortVersionString`, tag `v<version>` |
 | `BRIDGEPLAY_BUILD` | +1 on every release; Sparkle orders updates by it | `CFBundleVersion` | `sparkle:version` |
 | `NOTPROTON_VERSION` | the upstream release this is based on, exactly as upstream ships it | `NotProtonVersion`, About ("based on NotProton 1.2.0") | release notes |
 
