@@ -281,12 +281,12 @@ static int out_expand(np_out_t *o, const char *replace, const np_cap_t *caps) {
 #define NP_LIBRARY_WINDOWS_HINT NP_WEB_TEXT( \
     "Show only games that run on Windows and do not have a macOS version", \
     "Show only games that run on Windows and do not have a macOS version", \
-    "Show only games that run on Windows and do not have a macOS version")
+    "Mostra solo i giochi che funzionano su Windows e non hanno una versione macOS")
 
 #define NP_LIBRARY_WINDOWS_SUMMARY NP_WEB_TEXT( \
     "Runs on Windows, no Mac OS version", \
     "Runs on Windows, no Mac OS version", \
-    "Runs on Windows, no Mac OS version")
+    "Funziona su Windows, nessuna versione macOS")
 
 #define NP_CX_OPTIONS_CSS \
     "\".MSCXPanel{margin-top:10px}" \
@@ -421,7 +421,7 @@ static int out_expand(np_out_t *o, const char *replace, const np_cap_t *caps) {
     "T([\"BRIDGEPLAY_RAW_CONTROLLERS\"],npL(\"Let games read controllers directly (Recommended on Mac. Turn off only for Steam Input remapping)\"," \
     "\"允许游戏直接读取控制器（Mac 上推荐，仅在需要 Steam Input 按键映射时关闭）\"," \
     "\"Lascia che i giochi leggano direttamente i controller (consigliato su Mac, disattiva solo per la rimappatura di Steam Input)\"),\"1\",\"\")," \
-    "T([\"BRIDGEPLAY_DISABLE_HIDRAW\"],npL(\"Disable hidraw\",\"停用 hidraw\",\"Disable hidraw\"),\"1\",\"\")" \
+    "T([\"BRIDGEPLAY_DISABLE_HIDRAW\"],npL(\"Disable hidraw\",\"停用 hidraw\",\"Disattiva hidraw\"),\"1\",\"\")" \
     "]},\"ctl\")," \
     "fex&&(0," RT ".jsx)(" BARREL ".XY,{label:\"FEX\"," \
     "children:X(\"FEX_X87REDUCEDPRECISION\"," \
