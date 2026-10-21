@@ -7,7 +7,8 @@ Every release is a GitHub release of `raymondchins/Bridgeplay` carrying `Bridgep
 downloads the Latest release's `Bridgeplay.zip` when it runs, so `release-local.sh` uploads
 the installer again only when its fingerprint (every file it ships) changes, which is when
 the engines, GPTK, the configs or the installer itself change. A release whose sources
-already passed `make ci-checks` (only the version bump differs) skips them;
+already passed `make ci-checks`, here or in the `app` workflow on GitHub (only the version
+bump differs), skips them;
 `BRIDGEPLAY_FORCE_CHECKS=1` runs them anyway. Installed apps read
 `https://github.com/raymondchins/Bridgeplay/releases/latest/download/appcast.xml`
 (`SUFeedURL`), so whatever release is marked **Latest** is the update feed.
@@ -39,6 +40,9 @@ installation. `VersioningTests` guards both.
 
 ## Steps
 
+0. Push the changes first and wait for the `app` workflow to pass on them
+   (`gh run watch -R raymondchins/Bridgeplay`, about 10 minutes, free on this public repo).
+   The release then reuses that result instead of running the checks again here.
 1. Bump and commit:
    ```sh
    scripts/bump-version.sh patch        # or minor / major

@@ -237,6 +237,26 @@ if [ "$run_checks" -eq 1 ] && [ -n "$fingerprint" ] && [ "${BRIDGEPLAY_FORCE_CHE
 	checks_reused=1
 fi
 
+# The app workflow runs the same make ci-checks on every push to main, so a release whose
+# sources (version.h aside) match a commit that workflow passed skips them too: push, let
+# CI pass, bump, release. Needs gh; without it, or with no passing run, the checks run here.
+ci_slug=${BRIDGEPLAY_CI_REPO:-raymondchins/Bridgeplay}
+ci_passed() {
+	command -v gh >/dev/null 2>&1 || return 1
+	for sha in $(git -C "$repo" rev-list --max-count=5 HEAD); do
+		git -C "$repo" diff --quiet "$sha" HEAD -- . ':(exclude)dylib/version.h' || continue
+		gh run list -R "$ci_slug" -w app --commit "$sha" --status success --limit 1 \
+			--json headSha -q '.[].headSha' 2>/dev/null | grep -q . && { echo "$sha"; return 0; }
+	done
+	return 1
+}
+if [ "$run_checks" -eq 1 ] && [ -n "$fingerprint" ] && [ "${BRIDGEPLAY_FORCE_CHECKS:-0}" != 1 ] \
+	&& ci_sha=$(ci_passed); then
+	echo "==> [check] skipped: GitHub CI (app) passed make ci-checks on $(printf '%.7s' "$ci_sha"), same sources (BRIDGEPLAY_FORCE_CHECKS=1 runs them)"
+	run_checks=0
+	checks_reused=1
+fi
+
 check_failures=""
 if [ "$run_checks" -eq 1 ]; then
 	check_log=$LOG_DIR/checks.log
