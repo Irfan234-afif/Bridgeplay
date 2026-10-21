@@ -237,18 +237,21 @@ if [ "$run_checks" -eq 1 ] && [ -n "$fingerprint" ] && [ "${BRIDGEPLAY_FORCE_CHE
 	checks_reused=1
 fi
 
-# The app workflow runs the same make ci-checks on every push to main, so a release whose
-# sources (version.h aside) match a commit that workflow passed skips them too: push, let
-# CI pass, bump, release. Needs gh; without it, or with no passing run, the checks run here.
+# The app workflow runs the same make ci-checks on every push to main and beta, so a release
+# whose sources (version.h and docs aside) match a commit that workflow passed skips them
+# too: push, let CI pass, bump, release. Needs gh; without it, or with no passing run, the
+# checks run here. A docs-only run is green with its build and checks skipped, so a run
+# counts only when both jobs ran and succeeded (scripts/ci-run-passed.sh).
 ci_slug=${BRIDGEPLAY_CI_REPO:-raymondchins/Bridgeplay}
 ci_passed() {
 	command -v gh >/dev/null 2>&1 || return 1
 	for sha in $(git -C "$repo" rev-list --max-count=5 HEAD); do
-		# app.yml skips pushes that only touch Markdown or docs/, so those don't count either.
-		git -C "$repo" diff --quiet "$sha" HEAD -- . ':(exclude)dylib/version.h' \
-			':(exclude,glob)**/*.md' ':(exclude)docs' || continue
-		gh run list -R "$ci_slug" -w app --commit "$sha" --status success --limit 1 \
-			--json headSha -q '.[].headSha' 2>/dev/null | grep -q . && { echo "$sha"; return 0; }
+		# Only docs (.github/docs-only-paths) and version.h may differ from that commit.
+		# A failing step means "can't tell", never "same".
+		changed=$(git -C "$repo" -c core.quotePath=false diff --name-only --no-renames "$sha" HEAD) || continue
+		code=$(printf '%s\n' "$changed" | sh "$repo/scripts/ci-code-paths.sh") || continue
+		! printf '%s' "$code" | grep -vqx 'dylib/version.h' || continue
+		sh "$repo/scripts/ci-run-passed.sh" "$ci_slug" "$sha" && { echo "$sha"; return 0; }
 	done
 	return 1
 }

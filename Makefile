@@ -74,7 +74,7 @@ DEPS := $(OBJS:.o=.d)
         overlay-shim-bench iconmaker icon \
         appinfo helpers-install ntdll-resolve bridge runcheck compatcheck \
         compatsvc-check shortcutcheck scriptcheck envcheck buildcheck settingscheck routecheck bridgecheck gamedrivecheck \
-        gamefixescheck launchercheck padcheck launch-shell activatecheck compat-reported-check FORCE
+        gamefixescheck launchercheck padcheck launch-shell activatecheck cicheck compat-reported-check FORCE
 
 APP_PAYLOAD := app/Sources/BridgeplayApp/Resources/payload
 
@@ -87,7 +87,7 @@ dylib: $(TARGET)
 $(APP_PAYLOAD):
 	@mkdir -p $(APP_PAYLOAD)
 
-TEST_PATHS := dylib/tests overlay-shim/tests app/Tests
+TEST_PATHS := dylib/tests overlay-shim/tests app/Tests scripts/tests
 
 tests-list:
 	@for p in $(TEST_PATHS); do echo $$p; done
@@ -100,6 +100,10 @@ runcheck:
 		$(call SKIP,runcheck,shellcheck); exit 0; fi; \
 	shellcheck dylib/feats/compat_run.sh && sh -n dylib/feats/compat_run.sh && \
 	echo "==> runcheck: the run script lints and parses clean"
+
+cicheck:
+	@if [ ! -f scripts/tests/cicheck.sh ]; then $(call SKIP,cicheck,scripts/tests/cicheck.sh); exit 0; fi; \
+	sh scripts/tests/cicheck.sh
 
 .PHONY: seedcheck
 seedcheck:
@@ -893,7 +897,7 @@ CI_CHECKS := mincheck l10ncheck \
 	sigcheck callscheck webpatch-fixtures peicon-fixtures panel-behavior spawn-env \
 	activatecheck compatcheck compatsvc-check shortcutcheck launch-shell envcheck \
 	buildcheck settingscheck routecheck bridgecheck gamedrivecheck launchercheck \
-	seedcheck gamefixescheck padcheck compat-reported-check np-native-tests native-shim-tests \
+	seedcheck gamefixescheck cicheck padcheck compat-reported-check np-native-tests native-shim-tests \
 	app-tests game-host-check dualsense-check steam-rumble-check
 
 # app.yml runs the checks that need the built app in its build job and the rest in a
