@@ -360,7 +360,7 @@ struct SetupAssistantView: View {
                       toggle: Binding(get: { model.highResolution }, set: { model.setGameDefault(.highResolution, $0) })),
                       symbol: "display")
         }
-        Text("Both start off. You can change them here later, or for one game in its Steam Properties › Compatibility.")
+        Text("Both start off. You can change them here later, or for one game in its Steam Properties › Bridgeplay.")
             .font(BP.sans(12))
             .foregroundStyle(BP.fg3)
             .fixedSize(horizontal: false, vertical: true)

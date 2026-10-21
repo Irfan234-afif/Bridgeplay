@@ -972,18 +972,18 @@
         }
       }
     },
-    "A game's own Steam Properties › Compatibility settings win over these." : {
+    "A game's own settings in Steam Properties › Bridgeplay win over these." : {
       "localizations" : {
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Le impostazioni di un gioco in Proprietà di Steam › Compatibilità hanno la precedenza su queste."
+            "value" : "Le impostazioni di un gioco in Proprietà di Steam › Bridgeplay hanno la precedenza su queste."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "单个游戏在 Steam 属性 › 兼容性中的设置优先于这里。"
+            "value" : "单个游戏在 Steam 属性 › Bridgeplay 中的设置优先于这里。"
           }
         }
       }
@@ -1980,18 +1980,18 @@
         }
       }
     },
-    "Both start off. You can change them here later, or for one game in its Steam Properties › Compatibility." : {
+    "Both start off. You can change them here later, or for one game in its Steam Properties › Bridgeplay." : {
       "localizations" : {
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Entrambe partono disattivate. Puoi cambiarle qui più tardi, o per un singolo gioco in Proprietà di Steam › Compatibilità."
+            "value" : "Entrambe partono disattivate. Puoi cambiarle qui più tardi, o per un singolo gioco in Proprietà di Steam › Bridgeplay."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "两项默认关闭。之后可以在这里更改，也可以在单个游戏的 Steam 属性 › 兼容性中更改。"
+            "value" : "两项默认关闭。之后可以在这里更改，也可以在单个游戏的 Steam 属性 › Bridgeplay 中更改。"
           }
         }
       }
@@ -2655,18 +2655,18 @@
         }
       }
     },
-    "Choose Compatibility. Bridgeplay's settings follow Steam Play on that page." : {
+    "Choose Bridgeplay. Steam Play's engine picker is at the top, Bridgeplay's settings below it." : {
       "localizations" : {
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Scegli Compatibilità. Le impostazioni di Bridgeplay seguono Steam Play in quella pagina."
+            "value" : "Scegli Bridgeplay. In alto c'è il selettore del motore di Steam Play, sotto ci sono le impostazioni di Bridgeplay."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "选择“兼容性”。Bridgeplay 的设置就在该页面 Steam Play 下方。"
+            "value" : "选择“Bridgeplay”。顶部是 Steam Play 的引擎选择，下方是 Bridgeplay 的设置。"
           }
         }
       }
@@ -2779,22 +2779,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "请先关闭 Steam，再继续。"
-          }
-        }
-      }
-    },
-    "Compatibility" : {
-      "localizations" : {
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Compatibilità"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "兼容性"
           }
         }
       }
@@ -4018,18 +4002,18 @@
         }
       }
     },
-    "Every setting on the Compatibility page" : {
+    "Every setting on the Bridgeplay tab" : {
       "localizations" : {
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Tutte le impostazioni della pagina Compatibilità"
+            "value" : "Tutte le impostazioni della scheda Bridgeplay"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "兼容性页面上的所有设置"
+            "value" : "Bridgeplay 标签页上的所有设置"
           }
         }
       }
