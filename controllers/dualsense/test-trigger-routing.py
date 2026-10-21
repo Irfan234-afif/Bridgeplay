@@ -25,8 +25,10 @@ for pcm, grace in ((False, 75), (False, 0), (True, 0)):
                 token.hex(),
                 "--status",
                 str(status),
+                # Stopped by terminate() below. A short lifetime ran out on slow CI hosts
+                # before the loop did, and its shutdown "off" failed the timing check.
                 "--seconds",
-                "5",
+                "30",
             ]
             + (["--pcm"] if pcm else []),
             stdout=subprocess.PIPE,
