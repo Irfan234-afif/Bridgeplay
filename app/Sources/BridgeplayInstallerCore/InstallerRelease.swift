@@ -342,6 +342,7 @@ public enum InstallerError: LocalizedError, Sendable {
     case installLocked
     case appValidation(String)
     case replacementFailure(String)
+    case componentsFailure(String)
 
     public var errorDescription: String? {
         switch self {
@@ -361,6 +362,7 @@ public enum InstallerError: LocalizedError, Sendable {
         case .installLocked: "Another Bridgeplay installation is in progress. Finish it before trying again."
         case .appValidation(let detail): "The downloaded Bridgeplay app could not be validated. \(detail)"
         case .replacementFailure(let detail): "Bridgeplay could not replace the existing app. \(detail)"
+        case .componentsFailure(let detail): "Steam, the graphics or the engine could not be set up. \(detail)"
         }
     }
 }

@@ -244,14 +244,14 @@ if [ "$dry_run" -eq 1 ]; then
 else
     scripts/package-native-installer.sh
 fi
-cp out/Bridgeplay-Installer.dmg "$out/bridgeplay/Bridgeplay-Installer.dmg"
+cp out/Bridgeplay-Setup.zip "$out/bridgeplay/Bridgeplay-Setup.zip"
 
 title="Bridgeplay $version"
 body=$(printf '%s\n\nBuild %s, based on NotProton %s.\n' "$notes" "$build" "$upstream")
 echo "==> $title (build $build), notes since ${previous:-the beginning}:"
 printf '%s\n' "$notes" | sed 's/^/    /'
 run gh release create "$tag" "$out/bridgeplay/Bridgeplay.zip" "$out/bridgeplay/appcast.xml" \
-    "$out/bridgeplay/Bridgeplay-Installer.dmg" \
+    "$out/bridgeplay/Bridgeplay-Setup.zip" \
 	-R "$slug" --target "$(git rev-parse HEAD)" --title "$title" --notes "$body" --latest
 if [ "$legacy" -eq 1 ]; then
 	# Only a carrier for the feed: the tag goes on that repository's default branch, since
@@ -273,12 +273,24 @@ if [ -n "$installer_fp" ] && [ "$installer_fp" = "$published_fp" ]; then
 else
 	scripts/package-installer.sh
 	mv out/Bridgeplay-Installer.zip "$out/bridgeplay/Bridgeplay-Installer.zip"
+	# Bridgeplay Installer.app downloads this zip for GPTK, the engine and the configs and
+	# checks it against "<EdDSA signature> <length>" in the .sig beside it (InstallerComponents).
+	# A dry run doesn't read the keychain, so it writes no signature.
+	if [ "$dry_run" -eq 0 ]; then
+		installer_signed=$("$sparkle/sign_update" "$out/bridgeplay/Bridgeplay-Installer.zip") \
+			|| die "could not sign the installer zip"
+		installer_sig=$(printf '%s\n' "$installer_signed" | sed -nE 's/.*edSignature="([^"]+)".*length="([0-9]+)".*/\1 \2/p')
+		[ -n "$installer_sig" ] || die "sign_update printed no signature for the installer zip"
+		printf '%s\n' "$installer_sig" >"$out/bridgeplay/Bridgeplay-Installer.zip.sig"
+	fi
 	installer_body=$(printf 'The one-click installer behind bridgeplay.dev/download. It downloads the latest Bridgeplay when it runs.\n\nFingerprint: %s\n' "$installer_fp")
 	if gh release view "$installer_tag" -R "$slug" >/dev/null 2>&1; then
-		run gh release upload "$installer_tag" "$out/bridgeplay/Bridgeplay-Installer.zip" -R "$slug" --clobber
+		run gh release upload "$installer_tag" "$out/bridgeplay/Bridgeplay-Installer.zip" \
+			"$out/bridgeplay/Bridgeplay-Installer.zip.sig" -R "$slug" --clobber
 		run gh release edit "$installer_tag" -R "$slug" --notes "$installer_body"
 	else
-		run gh release create "$installer_tag" "$out/bridgeplay/Bridgeplay-Installer.zip" -R "$slug" \
+		run gh release create "$installer_tag" "$out/bridgeplay/Bridgeplay-Installer.zip" \
+			"$out/bridgeplay/Bridgeplay-Installer.zip.sig" -R "$slug" \
 			--target "$(git rev-parse HEAD)" --title "Bridgeplay Installer" --notes "$installer_body" \
 			--prerelease --latest=false
 	fi

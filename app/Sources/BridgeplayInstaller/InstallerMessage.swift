@@ -20,6 +20,7 @@ enum InstallerMessage {
         case .installLocked: return tr("Another installation is in progress, or the installer lock cannot be accessed. Try again after it finishes.")
         case .appValidation: return tr("The downloaded application did not pass validation. Your installed application has been kept.")
         case .replacementFailure: return tr("The application could not be replaced. Check the app and its previous-version backup in Applications before trying again.")
+        case .componentsFailure(let detail): return tr("Bridgeplay is installed, but Steam, Apple's graphics or the engine could not be set up. Try again.") + "\n\n" + detail
         }
     }
 }

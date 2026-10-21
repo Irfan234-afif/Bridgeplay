@@ -5,6 +5,11 @@ public enum InstallationState: Sendable, Equatable {
     case notInstalled
     case updateAvailable(currentBuild: Int, currentVersion: String, release: InstallerRelease)
     case upToDate(build: Int, version: String)
+
+    public var isCurrent: Bool {
+        if case .upToDate = self { return true }
+        return false
+    }
 }
 
 /// Detects and safely replaces the Bridgeplay app bundle. Game setup stays in the app.

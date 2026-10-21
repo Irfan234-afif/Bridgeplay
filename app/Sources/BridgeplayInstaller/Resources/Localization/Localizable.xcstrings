@@ -67,6 +67,22 @@
         }
       }
     },
+    "Apple's Game Porting Toolkit and the WineCX engine. The download is checked against Bridgeplay's signature before anything is installed." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Game Porting Toolkit di Apple e il motore WineCX. Il download viene verificato con la firma di Bridgeplay prima di installare qualsiasi cosa."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apple 的 Game Porting Toolkit 和 WineCX 引擎。安装前会用 Bridgeplay 的签名校验下载内容。"
+          }
+        }
+      }
+    },
     "Bridgeplay Installer" : {
       "localizations" : {
         "it" : {
@@ -79,6 +95,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Program Installer Bridgeplay"
+          }
+        }
+      }
+    },
+    "Bridgeplay is installed, but Steam, Apple's graphics or the engine could not be set up. Try again." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bridgeplay è installato, ma non è stato possibile configurare Steam, la grafica di Apple o il motore. Riprova."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bridgeplay 已安装，但无法设置 Steam、Apple 图形组件或引擎。请重试。"
           }
         }
       }
@@ -211,6 +243,22 @@
         }
       }
     },
+    "Copying Apple's graphics, the engine and settings" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Copia della grafica di Apple, del motore e delle impostazioni"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在复制 Apple 图形组件、引擎和设置"
+          }
+        }
+      }
+    },
     "Could not reach the release server. Check your connection and try again." : {
       "localizations" : {
         "en" : {
@@ -281,6 +329,22 @@
         }
       }
     },
+    "Downloading graphics and engine" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Scaricamento di grafica e motore"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在下载图形组件和引擎"
+          }
+        }
+      }
+    },
     "Eject installer and move DMG to Trash" : {
       "localizations" : {
         "it" : {
@@ -309,6 +373,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "完成"
+          }
+        }
+      }
+    },
+    "Finish setting up Bridgeplay" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Completa la configurazione di Bridgeplay"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "完成 Bridgeplay 的设置"
           }
         }
       }
@@ -441,6 +521,38 @@
         }
       }
     },
+    "Installing Steam from Valve" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Installazione di Steam da Valve"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在从 Valve 安装 Steam"
+          }
+        }
+      }
+    },
+    "Installing Steam, Apple's graphics, the engine and the default settings. Please keep the installer open." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Installazione di Steam, della grafica di Apple, del motore e delle impostazioni predefinite. Tieni aperto il programma di installazione."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在安装 Steam、Apple 图形组件、引擎和默认设置。请保持安装程序打开。"
+          }
+        }
+      }
+    },
     "Kept in place" : {
       "localizations" : {
         "it" : {
@@ -521,18 +633,18 @@
         }
       }
     },
-    "Open Bridgeplay to continue setup or check its Status page for component updates. Engine and graphics downloads are handled there." : {
+    "Open Bridgeplay to finish setup: Rosetta, Steam sign-in and a couple of standard macOS prompts." : {
       "localizations" : {
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Apri Bridgeplay per continuare la configurazione o controllare gli aggiornamenti dei componenti nella pagina Stato. Da lì puoi scaricare motore e grafica."
+            "value" : "Apri Bridgeplay per completare la configurazione: Rosetta, accesso a Steam e un paio di richieste standard di macOS."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "打开 Bridgeplay 继续设置，或在“状态”页面检查组件更新。你可以在那里下载引擎和图形组件。"
+            "value" : "打开 Bridgeplay 完成设置：Rosetta、登录 Steam，以及几个常规的 macOS 提示。"
           }
         }
       }
@@ -591,6 +703,22 @@
         }
       }
     },
+    "Setting up Bridgeplay" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Configurazione di Bridgeplay"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在设置 Bridgeplay"
+          }
+        }
+      }
+    },
     "Something went wrong" : {
       "localizations" : {
         "it" : {
@@ -603,6 +731,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "出了点问题"
+          }
+        }
+      }
+    },
+    "Steam, Apple's graphics and the WineCX engine are installed too, since this Mac doesn't have them yet." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vengono installati anche Steam, la grafica di Apple e il motore WineCX, perché questo Mac non li ha ancora."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "由于这台 Mac 还没有 Steam、Apple 图形组件和 WineCX 引擎，它们也会一并安装。"
           }
         }
       }
@@ -789,22 +933,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "版本信息无效。请稍后重试。"
-          }
-        }
-      }
-    },
-    "The source DMG could not be identified. You can eject it and move it to Trash in Finder." : {
-      "localizations" : {
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Impossibile identificare il DMG di origine. Puoi espellerlo e spostarlo nel Cestino dal Finder."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "无法识别来源 DMG。你可以在 Finder 中将其推出并移到废纸篓。"
           }
         }
       }

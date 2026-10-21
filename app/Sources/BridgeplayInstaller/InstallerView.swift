@@ -7,9 +7,9 @@ struct InstallerView: View {
     private var title: String {
         switch model.stage {
         case .checking: tr("Check your installation")
-        case .review: model.updating ? tr("Update Bridgeplay") : tr("Install Bridgeplay")
-        case .downloading: tr("Downloading Bridgeplay")
-        case .installing: tr("Installing Bridgeplay")
+        case .review: model.isCurrent ? tr("Finish setting up Bridgeplay") : model.updating ? tr("Update Bridgeplay") : tr("Install Bridgeplay")
+        case .downloading: model.settingUp ? tr("Downloading graphics and engine") : tr("Downloading Bridgeplay")
+        case .installing: model.settingUp ? tr("Setting up Bridgeplay") : tr("Installing Bridgeplay")
         case .done: model.isCurrent ? tr("Bridgeplay is up to date") : tr("Bridgeplay is ready")
         case .failed: tr("Installation could not continue")
         }
@@ -66,9 +66,13 @@ struct InstallerView: View {
         switch model.stage {
         case .checking: tr("Checking the latest release and the application on this Mac.")
         case .review: tr("The application goes in Applications. Your settings, game prefixes and saves are kept.")
-        case .downloading: tr("Only the application is downloaded here. Its signature is checked before installation.")
-        case .installing: tr("Verifying and replacing the application. Please keep the installer open.")
-        case .done: tr("Open Bridgeplay to continue setup or check its Status page for component updates. Engine and graphics downloads are handled there.")
+        case .downloading: model.settingUp
+            ? tr("Apple's Game Porting Toolkit and the WineCX engine. The download is checked against Bridgeplay's signature before anything is installed.")
+            : tr("Only the application is downloaded here. Its signature is checked before installation.")
+        case .installing: model.settingUp
+            ? tr("Installing Steam, Apple's graphics, the engine and the default settings. Please keep the installer open.")
+            : tr("Verifying and replacing the application. Please keep the installer open.")
+        case .done: tr("Open Bridgeplay to finish setup: Rosetta, Steam sign-in and a couple of standard macOS prompts.")
         case .failed: tr("Review the details below, then try again. The installer does not remove your game data.")
         }
     }
@@ -136,14 +140,16 @@ struct InstallerView: View {
                     row(tr("Download"), value: bytes(total), icon: "network")
                 }
             }
-            Text(tr("Close Bridgeplay before updating. Steam setup and any required permissions are handled by Bridgeplay after installation."))
+            Text(model.components == nil
+                 ? tr("Close Bridgeplay before updating. Steam setup and any required permissions are handled by Bridgeplay after installation.")
+                 : tr("Steam, Apple's graphics and the WineCX engine are installed too, since this Mac doesn't have them yet."))
                 .font(BP.sans(12)).foregroundStyle(BP.fg3).fixedSize(horizontal: false, vertical: true)
         case .downloading, .installing:
             SetupCard {
                 VStack(alignment: .leading, spacing: 14) {
                     HStack(spacing: 10) {
                         ProgressView().controlSize(.small)
-                        Text(model.stage == .downloading ? tr("Downloading") : tr("Verifying and installing"))
+                        Text(model.stage == .downloading ? tr("Downloading") : model.componentStatus ?? tr("Verifying and installing"))
                             .font(BP.sans(13, .semibold))
                     }
                     if model.stage == .downloading {
@@ -163,11 +169,11 @@ struct InstallerView: View {
                 row(tr("Game data"), value: tr("Kept in place"), icon: "externaldrive")
             }
             Toggle(tr("Open Bridgeplay"), isOn: $model.openBridgeplay).font(BP.sans(13))
-            Toggle(tr("Eject installer and move DMG to Trash"), isOn: $model.removeInstaller)
-                .font(BP.sans(13)).disabled(model.cleanupSource == nil)
-            if model.cleanupSource == nil {
-                Text(tr("The source DMG could not be identified. You can eject it and move it to Trash in Finder."))
-                    .font(BP.sans(12)).foregroundStyle(BP.fg3).fixedSize(horizontal: false, vertical: true)
+            // Only when run from a DMG. From the ZIP the installer stays in Downloads: moving it
+            // to Trash would ask for access to the Downloads folder, one more prompt.
+            if model.cleanupSource != nil {
+                Toggle(tr("Eject installer and move DMG to Trash"), isOn: $model.removeInstaller)
+                    .font(BP.sans(13))
             }
         case .failed: EmptyView()
         }
@@ -197,7 +203,7 @@ struct InstallerView: View {
             Spacer()
             switch model.stage {
             case .review:
-                Button(model.updating ? tr("Update") : tr("Install")) { model.start() }
+                Button(model.updating && !model.isCurrent ? tr("Update") : tr("Install")) { model.start() }
                     .buttonStyle(.pillLarge).keyboardShortcut(.defaultAction)
             case .failed:
                 Button(tr("Try Again")) { model.retry() }.buttonStyle(.pillLarge).keyboardShortcut(.defaultAction)

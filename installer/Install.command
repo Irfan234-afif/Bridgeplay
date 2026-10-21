@@ -7,6 +7,12 @@
 # permission and the Steam setup. Assembled into a zip by scripts/package-installer.sh.
 set -uo pipefail
 
+# Bridgeplay Installer.app runs this script too, after it has installed the app itself:
+# BRIDGEPLAY_INSTALL_APP=0 skips the app, BRIDGEPLAY_NONINTERACTIVE=1 never waits for Enter
+# and leaves opening Bridgeplay and the Terminal window to the caller.
+install_app=${BRIDGEPLAY_INSTALL_APP:-1}
+noninteractive=${BRIDGEPLAY_NONINTERACTIVE:-0}
+
 here="$(cd "$(dirname "$0")" && pwd)"
 support="$HOME/Library/Application Support/bridgeplay"
 caches="$HOME/Library/Caches/bridgeplay"
@@ -27,7 +33,11 @@ if [ ! -d "$caches" ] && [ -d "$legacy_caches" ]; then
 fi
 
 say()  { printf '\n\033[1;32m==>\033[0m %s\n' "$*"; }
-die()  { printf '\n\033[1;31mGagal:\033[0m %s\n' "$*" >&2; read -r -p "Tekan Enter untuk menutup..." _; exit 1; }
+die()  {
+    printf '\n\033[1;31mGagal:\033[0m %s\n' "$*" >&2
+    [ "$noninteractive" = 1 ] || read -r -p "Tekan Enter untuk menutup..." _
+    exit 1
+}
 
 # Valve's official macOS Steam installer, and the Team ID Valve signs Steam.app with.
 steam_url="https://cdn.cloudflare.steamstatic.com/client/installer/steam.dmg"
@@ -58,7 +68,7 @@ major="$(sw_vers -productVersion | cut -d. -f1)"
 [ -w /Applications ] || die "Akun ini tidak bisa menulis ke folder Applications. Login dengan akun admin, lalu jalankan Install.command lagi."
 # An installer from before the app was left out still carries Bridgeplay.app; use it.
 app_src="$here/Bridgeplay.app"
-if [ ! -d "$app_src" ]; then
+if [ "$install_app" = 1 ] && [ ! -d "$app_src" ]; then
     say "Mengunduh Bridgeplay versi terbaru..."
     app_tmp="$(mktemp -d)"
     curl -fL --retry 3 --connect-timeout 20 --progress-bar -o "$app_tmp/Bridgeplay.zip" "$app_url" \
@@ -72,18 +82,20 @@ if [ ! -d "$app_src" ]; then
         || die "Tanda tangan Bridgeplay yang diunduh tidak valid. Jalankan Install.command lagi."
 fi
 
-say "Memasang Bridgeplay..."
-# quit is asynchronous: wait until the app has gone before its bundle is removed.
-osascript -e 'tell application id "com.bridgeplay.Bridgeplay" to quit' >/dev/null 2>&1 || true
-waited=0
-while pgrep -qx BridgeplayApp; do
-    [ "$waited" -lt 30 ] || die "Bridgeplay masih berjalan. Tutup Bridgeplay dulu, lalu jalankan Install.command lagi."
-    sleep 1
-    waited=$((waited + 1))
-done
-rm -rf /Applications/Bridgeplay.app || die "Bridgeplay lama tidak bisa dihapus dari Applications."
-ditto "$app_src" /Applications/Bridgeplay.app || die "Bridgeplay gagal disalin ke Applications."
-xattr -dr com.apple.quarantine /Applications/Bridgeplay.app 2>/dev/null || true
+if [ "$install_app" = 1 ]; then
+    say "Memasang Bridgeplay..."
+    # quit is asynchronous: wait until the app has gone before its bundle is removed.
+    osascript -e 'tell application id "com.bridgeplay.Bridgeplay" to quit' >/dev/null 2>&1 || true
+    waited=0
+    while pgrep -qx BridgeplayApp; do
+        [ "$waited" -lt 30 ] || die "Bridgeplay masih berjalan. Tutup Bridgeplay dulu, lalu jalankan Install.command lagi."
+        sleep 1
+        waited=$((waited + 1))
+    done
+    rm -rf /Applications/Bridgeplay.app || die "Bridgeplay lama tidak bisa dihapus dari Applications."
+    ditto "$app_src" /Applications/Bridgeplay.app || die "Bridgeplay gagal disalin ke Applications."
+    xattr -dr com.apple.quarantine /Applications/Bridgeplay.app 2>/dev/null || true
+fi
 
 if [ ! -d /Applications/Steam.app ]; then
     say "Steam belum terpasang. Mengunduh installer Steam resmi dari Valve..."
@@ -164,6 +176,7 @@ xattr -dr com.apple.quarantine "$support" 2>/dev/null || true
 defaults delete com.bridgeplay.Bridgeplay setupAssistantFinished >/dev/null 2>&1 || true
 
 say "Selesai. Bridgeplay terbuka, ikuti Setup Assistant-nya."
+[ "$noninteractive" = 1 ] && exit 0
 open /Applications/Bridgeplay.app
 sleep 2
 osascript -e 'tell application "Terminal" to close (every window whose name contains "Install.command")' >/dev/null 2>&1 &

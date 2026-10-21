@@ -1,4 +1,4 @@
-# Native installer DMG
+# Native installer
 
 The native installer is an optional small bootstrap for a new installation or an app
 update. It downloads the existing Bridgeplay release, verifies its Sparkle EdDSA signature
@@ -13,7 +13,7 @@ make native-installer
 
 This builds the `BridgeplayInstaller` SwiftPM product for arm64, copies its two resource
 bundles and font license files, compiles installer translations, renders the existing
-Bridgeplay mark as the icon, signs the app and packages `out/Bridgeplay-Installer.dmg`.
+Bridgeplay mark as the icon, signs the app and packages `out/Bridgeplay-Setup.zip`, a ZIP with only the app in it (a downloaded DMG makes Gatekeeper ask twice).
 The default is an ad hoc local build. `BRIDGEPLAY_SIGN_IDENTITY` selects the maintainer's
 signing identity. The default size budget is 5 MiB; a larger artifact fails packaging.
 `BRIDGEPLAY_INSTALLER_MAX_BYTES` can override the budget for a deliberate size review.

@@ -1,5 +1,8 @@
 #!/bin/sh
-# Build a small native bootstrap DMG without Wine, GPTK or the product payload.
+# Build the small native bootstrap without Wine, GPTK or the product payload, as a ZIP with
+# the app and READ ME FIRST.html, which shows how to get past Gatekeeper. A downloaded DMG is
+# checked by Gatekeeper on its own, then the app in it again: two Open Anyway prompts. A ZIP
+# is not, so the app is the only one.
 set -eu
 repo=$(cd "$(dirname "$0")/.." && pwd)
 cd "$repo"
@@ -7,7 +10,7 @@ identity=${BRIDGEPLAY_SIGN_IDENTITY:--}
 configuration=${CONFIGURATION:-release}
 out="$repo/out/native-installer"
 app="$out/Bridgeplay Installer.app"
-dmg="$repo/out/Bridgeplay-Installer.dmg"
+zip="$repo/out/Bridgeplay-Setup.zip"
 
 swift build --package-path app -c "$configuration" --product BridgeplayInstaller --arch arm64
 bin=$(swift build --package-path app -c "$configuration" --show-bin-path --arch arm64)
@@ -73,13 +76,27 @@ codesign --verify --strict --deep "$bundle"
 # Only replace previous local packaging outputs after a complete bundle is available.
 rm -rf "$app"
 ditto "$bundle" "$app"
-hdiutil create -quiet -volname 'Bridgeplay Installer' -srcfolder "$stage" -format UDZO -ov "$dmg"
-codesign --force --sign "$identity" "$dmg"
-size=$(stat -f '%z' "$dmg")
+# READ ME FIRST.html carries its Geist font inline, so it is one file.
+package="$stage/package"
+mkdir -p "$package"
+ditto "$app" "$package/Bridgeplay Installer.app"
+python3 - "$repo/installer/native/READ ME FIRST.html" "$repo/app/Sources/BridgeplayUI/Resources/Fonts" "$package/READ ME FIRST.html" <<'PYTHON'
+import base64
+import pathlib
+import re
+import sys
+page, fonts, out = pathlib.Path(sys.argv[1]), pathlib.Path(sys.argv[2]), pathlib.Path(sys.argv[3])
+def font(match):
+    return "data:font/woff2;base64," + base64.b64encode((fonts / (match.group(1) + ".woff2")).read_bytes()).decode()
+out.write_text(re.sub(r"\{\{font:(\w+)\}\}", font, page.read_text()))
+PYTHON
+rm -f "$zip"
+(cd "$package" && ditto -c -k --norsrc --noextattr . "$zip")
+size=$(stat -f '%z' "$zip")
 limit=${BRIDGEPLAY_INSTALLER_MAX_BYTES:-5242880}
 if [ "$size" -gt "$limit" ]; then
-    echo "Installer DMG exceeds size budget: $size > $limit bytes" >&2
+    echo "Installer ZIP exceeds size budget: $size > $limit bytes" >&2
     exit 1
 fi
-printf 'DMG: %s\nSize: %s bytes (budget %s)\n' "$dmg" "$size" "$limit"
-shasum -a 256 "$dmg"
+printf 'ZIP: %s\nSize: %s bytes (budget %s)\n' "$zip" "$size" "$limit"
+shasum -a 256 "$zip"

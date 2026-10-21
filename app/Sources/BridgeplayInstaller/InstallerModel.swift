@@ -18,6 +18,12 @@ final class InstallerModel {
     var openBridgeplay = true
     var removeInstaller = true
     var finishing = false
+    // Steam, GPTK and the engine, when this Mac lacks them (InstallerComponents).
+    var components: InstallerComponents?
+    var settingUp = false
+    var componentStatus: String?
+    // Bytes already downloaded in earlier steps, so progress counts toward one total.
+    private var downloadedBefore: Int64 = 0
     let preview: String?
     private var release: InstallerRelease?
     private var operation: Task<Void, Never>?
@@ -82,12 +88,16 @@ final class InstallerModel {
             try Task.checkCancellation()
             release = fetched
             version = fetched.shortVersion
-            total = fetched.archiveLength
+            components = InstallerComponents.needed() ? try await InstallerComponents.latest() : nil
+            try Task.checkCancellation()
             let state = try service.state(for: fetched)
+            total = (state.isCurrent ? 0 : fetched.archiveLength) + (components?.length ?? 0)
             switch state {
             case .notInstalled: installedVersion = nil; stage = .review
             case .updateAvailable(_, let current, _): installedVersion = current; stage = .review
-            case .upToDate(_, let current): installedVersion = current; version = current; isCurrent = true; stage = .done
+            case .upToDate(_, let current):
+                installedVersion = current; version = current; isCurrent = true
+                stage = components == nil ? .done : .review
             }
         } catch is CancellationError {
             stage = .review
@@ -101,26 +111,46 @@ final class InstallerModel {
             stage = .downloading
             failure = nil
             received = 0
+            downloadedBefore = 0
             progress = nil
             let work = FileManager.default.temporaryDirectory.appendingPathComponent("bridgeplay-install-\(UUID().uuidString)")
             defer { try? FileManager.default.removeItem(at: work) }
             do {
                 try FileManager.default.createDirectory(at: work, withIntermediateDirectories: true)
-                let archive = try await release.download(to: work) { [weak self] value in
+                let report: @Sendable (InstallerDownloadProgress) -> Void = { [weak self] value in
                     Task { @MainActor in
                         guard let self, self.stage == .downloading else { return }
-                        self.received = value.received
-                        self.total = value.total
-                        self.progress = value.total.flatMap { $0 > 0 ? Double(value.received) / Double($0) : nil }
+                        self.received = self.downloadedBefore + value.received
+                        self.progress = self.total.flatMap { $0 > 0 ? Double(self.received) / Double($0) : nil }
                     }
                 }
-                try Task.checkCancellation()
-                stage = .installing
-                progress = nil
-                let service = self.service
-                _ = try await Task.detached(priority: .userInitiated) {
-                    try service.install(release: release, archive: archive)
-                }.value
+                if !isCurrent {
+                    let archive = try await release.download(to: work, progress: report)
+                    try Task.checkCancellation()
+                    stage = .installing
+                    progress = nil
+                    let service = self.service
+                    _ = try await Task.detached(priority: .userInitiated) {
+                        try service.install(release: release, archive: archive)
+                    }.value
+                }
+                if let components {
+                    settingUp = true
+                    downloadedBefore = isCurrent ? 0 : release.archiveLength
+                    stage = .downloading
+                    let archive = try await components.download(to: work, progress: report)
+                    try Task.checkCancellation()
+                    stage = .installing
+                    progress = nil
+                    componentStatus = nil
+                    try await Task.detached(priority: .userInitiated) {
+                        try InstallerComponents.install(archive: archive, work: work) { line in
+                            Task { @MainActor [weak self] in self?.componentStatus = Self.status(line) }
+                        }
+                    }.value
+                    self.components = nil
+                }
+                isCurrent = false
                 stage = .done
             } catch is CancellationError {
                 stage = .review
@@ -157,6 +187,13 @@ final class InstallerModel {
             if removeInstaller, let cleanupSource { try InstallerCleanup.schedule(cleanupSource) }
             NSApplication.shared.terminate(nil)
         } catch { failure = error.localizedDescription; finishing = false }
+    }
+
+    // Install.command's "==>" steps, in the installer's words.
+    nonisolated static func status(_ line: String) -> String? {
+        if line.contains("Steam") { return tr("Installing Steam from Valve") }
+        if line.contains("Game Porting Toolkit") { return tr("Copying Apple's graphics, the engine and settings") }
+        return nil
     }
 
     private func fail(_ error: Error) {
