@@ -727,6 +727,24 @@ APP_UPSTREAM := $(shell sed -n 's/^\#define NOTPROTON_VERSION "\(.*\)"/\1/p' dyl
 # designated requirement, and the macOS permissions keyed to it, survive updates.
 APP_SIGN_ID ?= $(or $(BRIDGEPLAY_SIGN_IDENTITY),-)
 
+# Every Mach-O file in the bundled payload, path:identifier. `make app` signs them with
+# APP_SIGN_ID under these identifiers before the app's own signature, so a release gives
+# each one a certificate-based designated requirement as well. The build rules above keep
+# signing ad hoc for tests and `make deploy`. Existing com.notproton.* identifiers stay.
+PAYLOAD_SIGN_IDS := \
+	notproton.dylib:com.bridgeplay.notproton \
+	overlay-shim.dylib:com.bridgeplay.overlay-shim \
+	iconmaker:com.bridgeplay.iconmaker \
+	appinfo:com.bridgeplay.appinfo \
+	game-host.dylib:com.notproton.game-host \
+	prepare-game-loader:com.notproton.game-metadata \
+	controllers/dualsense/bridge.dylib:com.notproton.dualsense.bridge \
+	controllers/dualsense/broker:com.notproton.dualsense.broker \
+	controllers/dualsense/launch:com.notproton.dualsense.launch \
+	controllers/steam-input/rumble.dylib:com.notproton.steam-input.rumble \
+	bridge/x86_64-unix-lsteamclient.so:com.bridgeplay.lsteamclient \
+	bridge/aarch64-unix-lsteamclient.so:com.bridgeplay.lsteamclient
+
 # The icon name must match CFBundleIconFile/CFBundleIconName in app/Info.plist.
 ICON_NAME := Bridgeplay
 ICON_MARK := helpers/icon/bridgeplay-mark.svg
@@ -796,6 +814,19 @@ app: app-payload $(ICON_CAR)
 		exit 1; \
 	fi
 	@echo "==> Payload complete in the bundle"
+	@payload="$(APP_BUNDLE_PAYLOAD)"; \
+	for spec in $(PAYLOAD_SIGN_IDS); do \
+		codesign -f -s "$(APP_SIGN_ID)" -i "$${spec##*:}" "$$payload/$${spec%%:*}" || exit 1; \
+	done; \
+	unlisted=$$(find "$$payload" -type f | while read -r f; do \
+		case "$$(file -b "$$f")" in (Mach-O*) ;; (*) continue ;; esac; \
+		case " $(PAYLOAD_SIGN_IDS) " in (*" $${f#"$$payload"/}:"*) ;; (*) echo "$${f#"$$payload"/}" ;; esac; \
+	done); \
+	if [ -n "$$unlisted" ]; then \
+		echo "==> payload Mach-O files missing from PAYLOAD_SIGN_IDS in the Makefile:" >&2; \
+		echo "$$unlisted" | sed 's/^/        /' >&2; \
+		exit 1; \
+	fi
 	@# Inside out, so Sparkle's helpers carry the same identity as the app. No hardened
 	@# runtime: library validation needs a Team ID, which a self-signed identity has none of.
 	@sparkle="$(APP_BUNDLE)/Contents/Frameworks/Sparkle.framework/Versions/B"; \

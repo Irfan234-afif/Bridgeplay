@@ -25,7 +25,8 @@ user is a hardening request, not a vulnerability, but it is still welcome as an 
 
 ## Known trade-offs
 
-- Bridgeplay is ad hoc signed and not notarized, and the installer removes the download's
+- Bridgeplay releases are signed with a self-signed certificate (no Apple Developer ID)
+  and not notarized, and the installer removes the download's
   quarantine flag. Download it only from https://bridgeplay.dev or the GitHub releases.
 - Steam is re-signed so it can load Bridgeplay, which removes Valve's hardened runtime.
 - Updates are verified with an EdDSA signature (`SUPublicEDKey`) before they are installed.

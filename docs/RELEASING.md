@@ -86,16 +86,52 @@ Two signatures, for different things:
   every build signed with that certificate.
 
 `make app` signs with `APP_SIGN_ID`, which defaults to `$BRIDGEPLAY_SIGN_IDENTITY` and
-then to ad hoc (`-`), so any checkout still builds. Sparkle's helpers (`Autoupdate`,
-`Updater.app`, its XPC services) are signed with the same identity, inside out. There is no
-hardened runtime: library validation needs a Team ID, which a self-signed certificate does
-not have. `scripts/release-local.sh` uses `BRIDGEPLAY_SIGN_IDENTITY` (default
+then to ad hoc (`-`), so any checkout still builds. Everything inside is signed with the
+same identity first, inside out: Sparkle's helpers (`Autoupdate`, `Updater.app`, its XPC
+services) and every Mach-O file in the payload, each under the explicit identifier
+`PAYLOAD_SIGN_IDS` in the Makefile gives it. `make app` stops if the payload holds a Mach-O
+file that list does not name, so a new helper needs an entry there. There is no hardened
+runtime: library validation needs a Team ID, which a self-signed certificate does not have. `scripts/release-local.sh` uses `BRIDGEPLAY_SIGN_IDENTITY` (default
 `Bridgeplay Release`), refuses ad hoc, stops if the identity is not in the keychain, prints
 the designated requirement and stops unless it is the certificate form signed by that
 identity. Changing the identity or its certificate, or marking it trusted (which can turn
 `certificate leaf` into `certificate root`), changes the requirement, and every user has to
 grant App Management once more. The first release signed this way does that once as well,
 coming from ad hoc.
+
+### The payload helpers
+
+| Payload file | Identifier | Runs as |
+|---|---|---|
+| `notproton.dylib` | `com.bridgeplay.notproton` | inside Steam; the app re-signs Steam's copy with the local identity below |
+| `overlay-shim.dylib`, `game-host.dylib` | `com.bridgeplay.overlay-shim`, `com.notproton.game-host` | inserted into the game's Wine loader |
+| `controllers/dualsense/bridge.dylib`, `controllers/steam-input/rumble.dylib` | `com.notproton.dualsense.bridge`, `com.notproton.steam-input.rumble` | inserted into the game's Wine loader |
+| `controllers/dualsense/launch`, `controllers/dualsense/broker` | `com.notproton.dualsense.launch`, `com.notproton.dualsense.broker` | child processes of the run script |
+| `iconmaker`, `appinfo`, `prepare-game-loader` | `com.bridgeplay.iconmaker`, `com.bridgeplay.appinfo`, `com.notproton.game-metadata` | command-line tools the run script calls |
+| `bridge/*-unix-lsteamclient.so` | `com.bridgeplay.lsteamclient` | loaded by Wine |
+
+None of them is launched by launchd or LaunchServices, so none is its own responsible
+process: macOS charges Bluetooth, Input Monitoring and the other privacy checks to the
+process that started the chain, which is Steam (signed on each Mac with `NotProton Local
+Signing`, `LocalSigning.swift`) or Bridgeplay itself. Signing them with the release identity
+keeps their requirement stable all the same, should one of them ever hold a permission of
+its own. Signing does not change what loads where: a self-signed library, like an ad hoc
+one, has no Team ID, so a process with library validation refuses both and one without it
+takes both. The committed Wine and SDL binaries in `Resources/` keep their own signatures,
+since their sha256 is pinned (`FreeEngineWinecx.swift`). `np-native` and
+`libnp_gamepad.dylib` are not in the app and stay ad hoc.
+
+To check a build:
+
+```sh
+p=out/Bridgeplay.app/Contents/Resources/BridgeplayApp_BridgeplayApp.bundle/Contents/Resources/payload
+for f in $(find "$p" -type f); do file -b "$f" | grep -q ^Mach-O && codesign -d -r- "$f" 2>&1 | grep designated; done
+```
+
+Each line should read `identifier "<id>" and certificate leaf = H"<sha1>"`, the same hash as
+the app's. `scripts/release-local.sh` stops if any of them is not signed by the identity. The
+first release with signed helpers moves them from ad hoc to the certificate once; if a user
+ever granted one of them a permission directly, they grant it once more after that update.
 
 ### Creating the release identity (once)
 

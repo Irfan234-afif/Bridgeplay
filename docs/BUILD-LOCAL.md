@@ -30,7 +30,7 @@ output to `build/logs/<phase>.log`.
 
 | Path | What |
 |---|---|
-| `build/Bridgeplay.app` | ad-hoc signed app, passes `codesign --verify --strict` |
+| `build/Bridgeplay.app` | app signed ad hoc (or with `BRIDGEPLAY_SIGN_IDENTITY` when set), passes `codesign --verify --strict` |
 | `build/Bridgeplay.zip` | `ditto -c -k --keepParent` of the app, as CI packages it |
 | `out/Bridgeplay.app` | the bundle `make app` writes; the script copies it to `build/` |
 

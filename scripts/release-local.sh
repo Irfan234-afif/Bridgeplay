@@ -187,6 +187,17 @@ case "$requirement" in
 esac
 codesign -dvv "$app" 2>&1 | grep -Fqx "Authority=$sign_identity" \
 	|| check "$app is not signed by \"$sign_identity\""
+# The helpers in the payload (Makefile PAYLOAD_SIGN_IDS) carry the same identity.
+payload=$app/Contents/Resources/BridgeplayApp_BridgeplayApp.bundle/Contents/Resources/payload
+machos=$(mktemp)
+find "$payload" -type f -exec sh -c 'file -b "$1" | grep -q "^Mach-O" && printf "%s\n" "$1"' sh {} \; >"$machos"
+[ -s "$machos" ] || check "no Mach-O helpers in $payload"
+while IFS= read -r helper; do
+	codesign -dvv "$helper" 2>&1 | grep -Fqx "Authority=$sign_identity" \
+		|| check "${helper#"$payload"/} in the payload is not signed by \"$sign_identity\""
+done <"$machos"
+echo "==> payload: checked $(wc -l <"$machos" | tr -d ' ') helpers for \"$sign_identity\""
+rm -f "$machos"
 
 # One archive and one appcast per feed. The appcast attached to the latest release is the
 # feed, so each only needs the newest item; its enclosure points at this tag's zip.
