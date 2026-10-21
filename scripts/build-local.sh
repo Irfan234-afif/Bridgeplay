@@ -15,6 +15,7 @@
 #   app/.build                       SwiftPM build and the Sparkle checkout
 #
 # Overridable: DEVELOPER_DIR (default Xcode-beta), JOBS (default hw.ncpu)
+# A beta build: BRIDGEPLAY_BETA=N BRIDGEPLAY_BETA_BUILD=B [BRIDGEPLAY_BETA_PLANNED=X.Y.Z], see docs/RELEASING.md
 
 set -eu
 
@@ -50,6 +51,9 @@ if [ -z "${DEVELOPER_DIR:-}" ] || [ ! -d "$DEVELOPER_DIR" ]; then
 	exit 1
 fi
 export DEVELOPER_DIR
+
+# A malformed beta stamp (BRIDGEPLAY_BETA*, see stamp-beta.sh) fails now, not after the slow phases.
+sh scripts/stamp-beta.sh check
 
 JOBS=${JOBS:-$(sysctl -n hw.ncpu)}
 LOG_DIR=$repo/build/logs

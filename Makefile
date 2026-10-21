@@ -74,7 +74,7 @@ DEPS := $(OBJS:.o=.d)
         overlay-shim-bench iconmaker icon \
         appinfo helpers-install ntdll-resolve bridge runcheck compatcheck \
         compatsvc-check shortcutcheck scriptcheck envcheck buildcheck settingscheck routecheck bridgecheck gamedrivecheck \
-        gamefixescheck launchercheck padcheck launch-shell activatecheck FORCE
+        gamefixescheck launchercheck padcheck launch-shell activatecheck stamp-check versioncheck FORCE
 
 APP_PAYLOAD := app/Sources/BridgeplayApp/Resources/payload
 
@@ -133,6 +133,11 @@ gamedrivecheck:
 gamefixescheck:
 	@if [ ! -f dylib/tests/gamefixescheck.sh ]; then $(call SKIP,gamefixescheck,dylib/tests/gamefixescheck.sh); exit 0; fi; \
 	sh dylib/tests/gamefixescheck.sh dylib/feats/compat_run.sh
+
+# The beta stamp, the version bump and the upstream sync, on throwaway copies of the repo.
+versioncheck:
+	@if [ ! -f dylib/tests/versioncheck.sh ]; then $(call SKIP,versioncheck,dylib/tests/versioncheck.sh); exit 0; fi; \
+	sh dylib/tests/versioncheck.sh
 
 padcheck:
 	@if [ ! -f dylib/tests/padcheck.sh ]; then $(call SKIP,padcheck,dylib/tests/padcheck.sh); exit 0; fi; \
@@ -774,7 +779,11 @@ $(ICON_CAR): $(ICONGEN) $(ICON_MARK)
 	@test -s "$(ICON_DIR)/$(ICON_NAME).icns" || { echo "actool wrote no $(ICON_NAME).icns" >&2; exit 1; }
 	@echo "==> Built $@"
 
-app: app-payload $(ICON_CAR)
+# A malformed beta stamp fails before the slow build starts.
+stamp-check:
+	@sh scripts/stamp-beta.sh check
+
+app: stamp-check app-payload $(ICON_CAR)
 	swift build --package-path app -c release
 	rm -rf "$(APP_BUNDLE)"
 	@mkdir -p "$(APP_BUNDLE)/Contents/MacOS" "$(APP_BUNDLE)/Contents/Resources"
@@ -786,6 +795,7 @@ app: app-payload $(ICON_CAR)
 		"Set :CFBundleVersion $(APP_BUILD)" -c \
 		"Set :NotProtonVersion $(APP_UPSTREAM)" \
 		"$(APP_BUNDLE)/Contents/Info.plist"
+	@sh scripts/stamp-beta.sh apply "$(APP_BUNDLE)/Contents/Info.plist"
 	cp "$$(swift build --package-path app -c release --show-bin-path)/BridgeplayApp" \
 		"$(APP_BUNDLE)/Contents/MacOS/BridgeplayApp"
 	@mkdir -p "$(APP_BUNDLE)/Contents/Frameworks"
@@ -838,7 +848,8 @@ app: app-payload $(ICON_CAR)
 	codesign -f -s "$(APP_SIGN_ID)" "$(APP_BUNDLE)"
 	codesign --verify --strict --deep "$(APP_BUNDLE)"
 	@codesign -d -r- "$(APP_BUNDLE)" 2>&1 | sed -n 's/^#* *designated => /==> Designated requirement: /p'
-	@echo "==> Built $(APP_BUNDLE) ($(APP_VERSION) build $(APP_BUILD), based on NotProton $(APP_UPSTREAM))"
+	@plist="$(APP_BUNDLE)/Contents/Info.plist"; \
+	echo "==> Built $(APP_BUNDLE) ($$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$$plist") build $$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$$plist"), based on NotProton $(APP_UPSTREAM))"
 
 app-zip: app
 	rm -f "$(APP_ZIP)"
@@ -888,7 +899,7 @@ CI_CHECKS := mincheck l10ncheck \
 	sigcheck callscheck webpatch-fixtures peicon-fixtures panel-behavior spawn-env \
 	activatecheck compatcheck compatsvc-check shortcutcheck launch-shell envcheck \
 	buildcheck settingscheck routecheck bridgecheck gamedrivecheck launchercheck \
-	seedcheck gamefixescheck padcheck np-native-tests native-shim-tests \
+	seedcheck gamefixescheck versioncheck padcheck np-native-tests native-shim-tests \
 	app-tests game-host-check dualsense-check steam-rumble-check
 
 # app.yml runs the checks that need the built app in its build job and the rest in a
