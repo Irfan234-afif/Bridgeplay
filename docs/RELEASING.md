@@ -19,7 +19,7 @@ bump differs), skips them;
 
 | Define | Meaning | In the app | In the appcast |
 |---|---|---|---|
-| `BRIDGEPLAY_VERSION` | Bridgeplay semver: patch for fixes and routine upstream NotProton merges, minor for features players notice, major only for breaks (prefix, save or install layout). Bundle changes into one release rather than bumping per merge | `CFBundleShortVersionString`, About, Status | `sparkle:shortVersionString`, tag `v<version>` |
+| `BRIDGEPLAY_VERSION` | Bridgeplay semver, kept slow: patch for every normal release (fixes, features, upstream NotProton merges), so 3.5.12 is fine. Minor only for a milestone chosen on purpose (a new engine or backend, a big redesign). Major only for breaks (prefix, save or install layout). Bundle changes into one release rather than releasing per merge | `CFBundleShortVersionString`, About, Status | `sparkle:shortVersionString`, tag `v<version>` |
 | `BRIDGEPLAY_BUILD` | +1 on every release; Sparkle orders updates by it | `CFBundleVersion` | `sparkle:version` |
 | `NOTPROTON_VERSION` | the upstream release this is based on, exactly as upstream ships it | `NotProtonVersion`, About ("based on NotProton 1.2.0") | release notes |
 
@@ -48,7 +48,7 @@ installation. `VersioningTests` guards both.
    scripts/bump-version.sh patch        # or minor / major
    git commit -m "chore(release): Bridgeplay X.Y.Z" dylib/version.h
    ```
-   `scripts/sync-upstream.sh` already bumps the minor after an upstream merge.
+   `scripts/sync-upstream.sh` already bumps the patch after an upstream merge.
 2. Push to `main` of `raymondchins/Bridgeplay` (the script refuses anything else).
 3. Optionally rehearse: `scripts/release-local.sh --dry-run` writes the zip and appcast to
    `out/release/` from an app already built with `make app`, without publishing or reading

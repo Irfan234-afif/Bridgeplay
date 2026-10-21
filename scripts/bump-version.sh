@@ -3,8 +3,8 @@
 #
 #   scripts/bump-version.sh patch|minor|major [--upstream "NotProton X.Y.Z"]
 #
-# patch for fixes, minor for an upstream NotProton merge or new features, major for a
-# break. BRIDGEPLAY_BUILD goes up by one every time, since Sparkle orders updates by it.
+# Almost always patch (fixes, features, upstream merges); minor and major are rare, see
+# docs/RELEASING.md. BRIDGEPLAY_BUILD goes up by one every time, since Sparkle orders updates by it.
 # --upstream records the NotProton release this build is based on (NOTPROTON_VERSION);
 # a clean upstream merge already brings upstream's value, so it is rarely needed.
 # Edits the file only; commit it yourself. See docs/RELEASING.md.

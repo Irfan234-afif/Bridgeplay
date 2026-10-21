@@ -6,7 +6,7 @@
 
 // Bridgeplay's own version, independent of the NotProton release above, which stays
 // exactly as upstream ships it so merging upstream never conflicts here.
-//   BRIDGEPLAY_VERSION  semver people see: patch for fixes and upstream merges, minor for features
+//   BRIDGEPLAY_VERSION  semver people see, kept slow: patch for normal releases, minor for milestones
 //                       (CFBundleShortVersionString, sparkle:shortVersionString)
 //   BRIDGEPLAY_BUILD    +1 on every release, continuing the old "-ray.N" counter; Sparkle
 //                       orders updates by it (CFBundleVersion, sparkle:version)
