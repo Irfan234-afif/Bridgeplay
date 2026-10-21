@@ -4,36 +4,39 @@
     "name": "007 First Light",
     "api": "D3D12",
     "anticheat": "none known",
-    "status": "bronze",
+    "status": "platinum",
     "backend": "d3dmetal",
     "engine": "winecx-11.15",
-    "notes": "Launch-verified 2026-10-09 on M5 Max/macOS 27: full-screen window (needs ROSETTA_ADVERTISE_AVX=1). Gameplay not verified.",
+    "notes": "",
     "last_tested": "2026-10-09",
-    "fork_commit": null
+    "fork_commit": null,
+    "tested_on": "M5 Max · macOS 27"
   },
   {
     "appid": 1222700,
     "name": "A Way Out",
     "api": "D3D11",
     "anticheat": "none known",
-    "status": "bronze",
+    "status": "platinum",
     "backend": "d3dmetal",
     "engine": "winecx-11.15",
-    "notes": "Launch-verified 2026-10-09 on M5 Max/macOS 27: full-screen window (needs ROSETTA_ADVERTISE_AVX=1). Gameplay not verified.",
+    "notes": "",
     "last_tested": "2026-10-09",
-    "fork_commit": null
+    "fork_commit": null,
+    "tested_on": "M5 Max · macOS 27"
   },
   {
     "appid": 208650,
     "name": "Batman™: Arkham Knight",
     "api": "D3D11",
     "anticheat": "none known",
-    "status": "bronze",
+    "status": "platinum",
     "backend": "d3dmetal",
     "engine": "winecx-11.15",
-    "notes": "Launch-verified 2026-10-09 on M5 Max/macOS 27: full-screen window. Gameplay not verified.",
+    "notes": "",
     "last_tested": "2026-10-09",
-    "fork_commit": null
+    "fork_commit": null,
+    "tested_on": "M5 Max · macOS 27"
   },
   {
     "appid": 1285190,
@@ -64,12 +67,13 @@
     "name": "DEATH STRANDING DIRECTOR'S CUT",
     "api": "D3D12",
     "anticheat": "none known",
-    "status": "bronze",
+    "status": "platinum",
     "backend": "d3dmetal",
     "engine": "winecx-11.15",
-    "notes": "Launch-verified 2026-10-09 on M5 Max/macOS 27: full-screen window (needs ROSETTA_ADVERTISE_AVX=1). Gameplay not verified.",
+    "notes": "",
     "last_tested": "2026-10-09",
-    "fork_commit": null
+    "fork_commit": null,
+    "tested_on": "M5 Max · macOS 27"
   },
   {
     "appid": 548430,
@@ -148,12 +152,13 @@
     "name": "Ghostrunner",
     "api": "D3D11+D3D12",
     "anticheat": "none known",
-    "status": "bronze",
+    "status": "platinum",
     "backend": "d3dmetal",
     "engine": "winecx-11.15",
-    "notes": "Launch-verified 2026-10-09 on M5 Max/macOS 27: full-screen window. Gameplay not verified.",
+    "notes": "",
     "last_tested": "2026-10-09",
-    "fork_commit": null
+    "fork_commit": null,
+    "tested_on": "M5 Max · macOS 27"
   },
   {
     "appid": 546560,
@@ -184,12 +189,13 @@
     "name": "Horizon Zero Dawn™ Complete Edition",
     "api": "D3D12",
     "anticheat": "none known",
-    "status": "bronze",
+    "status": "platinum",
     "backend": "d3dmetal",
     "engine": "winecx-11.15",
-    "notes": "Launch-verified 2026-10-09 on M5 Max/macOS 27: full-screen window. Gameplay not verified.",
+    "notes": "",
     "last_tested": "2026-10-09",
-    "fork_commit": null
+    "fork_commit": null,
+    "tested_on": "M5 Max · macOS 27"
   },
   {
     "appid": 2677660,
@@ -208,12 +214,13 @@
     "name": "It Takes Two",
     "api": "D3D11",
     "anticheat": "none known",
-    "status": "bronze",
+    "status": "platinum",
     "backend": "d3dmetal",
     "engine": "winecx-11.15",
-    "notes": "Launch-verified 2026-10-09 on M5 Max/macOS 27: full-screen window. Gameplay not verified.",
+    "notes": "",
     "last_tested": "2026-10-09",
-    "fork_commit": null
+    "fork_commit": null,
+    "tested_on": "M5 Max · macOS 27"
   },
   {
     "appid": 1966720,
@@ -232,24 +239,26 @@
     "name": "Marvel's Spider-Man 2",
     "api": "D3D12",
     "anticheat": "none known",
-    "status": "borked",
+    "status": "platinum",
     "backend": "wined3d",
     "engine": "winecx-11.15",
-    "notes": "exits: ensure_mta CO_E_NOTINITIALIZED then c0000409 (AVX check passes with ROSETTA_ADVERTISE_AVX=1)",
-    "last_tested": "2026-10-09",
-    "fork_commit": null
+    "notes": "",
+    "last_tested": "2026-10-21",
+    "fork_commit": null,
+    "tested_on": "M5 Max · macOS 27"
   },
   {
     "appid": 3405340,
     "name": "Megabonk",
     "api": "D3D11+D3D12",
     "anticheat": "none known",
-    "status": "bronze",
+    "status": "platinum",
     "backend": "d3dmetal",
     "engine": "winecx-11.15",
-    "notes": "Launch-verified 2026-10-09 on M5 Max/macOS 27: full-screen window. Gameplay not verified.",
+    "notes": "",
     "last_tested": "2026-10-09",
-    "fork_commit": null
+    "fork_commit": null,
+    "tested_on": "M5 Max · macOS 27"
   },
   {
     "appid": 582010,
@@ -268,12 +277,13 @@
     "name": "Mortal Kombat 1",
     "api": "D3D12",
     "anticheat": "none known",
-    "status": "bronze",
+    "status": "platinum",
     "backend": "d3dmetal",
     "engine": "winecx-11.15",
-    "notes": "Launch-verified 2026-10-09 on M5 Max/macOS 27: full-screen window (needs ROSETTA_ADVERTISE_AVX=1). Gameplay not verified.",
+    "notes": "",
     "last_tested": "2026-10-09",
-    "fork_commit": null
+    "fork_commit": null,
+    "tested_on": "M5 Max · macOS 27"
   },
   {
     "appid": 524220,
@@ -328,12 +338,13 @@
     "name": "PowerWash Simulator 2",
     "api": "D3D11",
     "anticheat": "none known",
-    "status": "bronze",
+    "status": "platinum",
     "backend": "d3dmetal",
     "engine": "winecx-11.15",
-    "notes": "Launch-verified 2026-10-09 on M5 Max/macOS 27: full-screen window (needs ROSETTA_ADVERTISE_AVX=1). Gameplay not verified.",
+    "notes": "",
     "last_tested": "2026-10-09",
-    "fork_commit": null
+    "fork_commit": null,
+    "tested_on": "M5 Max · macOS 27"
   },
   {
     "appid": 3241660,
@@ -352,24 +363,26 @@
     "name": "Ravenswatch",
     "api": "unknown",
     "anticheat": "none known",
-    "status": "bronze",
+    "status": "silver",
     "backend": "d3dmetal",
     "engine": "winecx-11.15",
-    "notes": "Launch-verified 2026-10-09 on M5 Max/macOS 27: menu at 120 fps (Retina 3024x1752); ~12% vertical stretch in full screen. Gameplay not verified.",
+    "notes": "120 fps in menus (Retina 3024x1752); about 12% vertical stretch in full screen.",
     "last_tested": "2026-10-09",
-    "fork_commit": null
+    "fork_commit": null,
+    "tested_on": "M5 Max · macOS 27"
   },
   {
     "appid": 3764200,
     "name": "Resident Evil Requiem",
     "api": "D3D12",
     "anticheat": "none known",
-    "status": "bronze",
+    "status": "platinum",
     "backend": "d3dmetal",
     "engine": "winecx-11.15",
-    "notes": "Launch-verified 2026-10-09 on M5 Max/macOS 27: full-screen window. Gameplay not verified.",
+    "notes": "",
     "last_tested": "2026-10-09",
-    "fork_commit": null
+    "fork_commit": null,
+    "tested_on": "M5 Max · macOS 27"
   },
   {
     "appid": 632360,
@@ -412,24 +425,26 @@
     "name": "Sifu",
     "api": "D3D11",
     "anticheat": "none known",
-    "status": "bronze",
+    "status": "platinum",
     "backend": "d3dmetal",
     "engine": "winecx-11.15",
-    "notes": "Launch-verified 2026-10-09 on M5 Max/macOS 27: full-screen window. Gameplay not verified.",
+    "notes": "",
     "last_tested": "2026-10-09",
-    "fork_commit": null
+    "fork_commit": null,
+    "tested_on": "M5 Max · macOS 27"
   },
   {
     "appid": 2001120,
     "name": "Split Fiction",
     "api": "D3D12",
     "anticheat": "none known",
-    "status": "bronze",
+    "status": "platinum",
     "backend": "d3dmetal",
     "engine": "winecx-11.15",
-    "notes": "Launch-verified 2026-10-09 on M5 Max/macOS 27: full-screen window (needs ROSETTA_ADVERTISE_AVX=1). Gameplay not verified.",
+    "notes": "",
     "last_tested": "2026-10-09",
-    "fork_commit": null
+    "fork_commit": null,
+    "tested_on": "M5 Max · macOS 27"
   },
   {
     "appid": 489830,
@@ -448,12 +463,13 @@
     "name": "The Last of Us™ Part I",
     "api": "D3D12",
     "anticheat": "none known",
-    "status": "borked",
+    "status": "platinum",
     "backend": "wined3d",
     "engine": "winecx-11.15",
-    "notes": "exits after D3D12 feature checks (AVX ok with ROSETTA_ADVERTISE_AVX=1)",
-    "last_tested": "2026-10-09",
-    "fork_commit": null
+    "notes": "",
+    "last_tested": "2026-10-21",
+    "fork_commit": null,
+    "tested_on": "M5 Max · macOS 27"
   },
   {
     "appid": 292030,

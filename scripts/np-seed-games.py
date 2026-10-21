@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """(Re)seed compat/games.json: installed Windows-only games (from compat/installed.json) plus a
 curated list of popular Windows-only DX11-era Steam games. Each candidate is verified against the
-Steam store (windows && !mac). Existing entries keep status/notes/last_tested/fork_commit/engine;
+Steam store (windows && !mac). Existing entries keep status/notes/last_tested/fork_commit/engine/tested_on/reports;
 only api/anticheat/name are refreshed.
 """
 import json
@@ -67,6 +67,8 @@ def main():
             "notes": g.get("notes", ""),
             "last_tested": g.get("last_tested"),
             "fork_commit": g.get("fork_commit"),
+            "tested_on": g.get("tested_on"),
+            "reports": g.get("reports"),
         }
         print(f"  {appid} {name}: {api} / {ac}", file=sys.stderr)
     for appid, g in old.items():  # keep hand-added entries that were not re-verified
