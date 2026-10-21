@@ -60,7 +60,8 @@ The checks the workflows run (`make -s <target>`):
 - **C and shell suites:** `sigcheck`, `callscheck`, `webpatch-fixtures`, `peicon-fixtures`,
   `panel-behavior`, `spawn-env`, `activatecheck`, `compatcheck`, `compatsvc-check`,
   `shortcutcheck`, `launch-shell`, `envcheck`, `buildcheck`, `settingscheck`, `routecheck`,
-  `bridgecheck`, `gamedrivecheck`, `launchercheck`, `seedcheck`, `gamefixescheck`
+  `bridgecheck`, `gamedrivecheck`, `launchercheck`, `seedcheck`, `gamefixescheck`,
+  `compat-reported-check`
 - **Hardware-free device checks:** `game-host-check`, `dualsense-check`, `steam-rumble-check`
 
 `make tests-list` prints the test paths. A check whose tool or input is missing prints

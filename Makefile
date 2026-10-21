@@ -74,7 +74,7 @@ DEPS := $(OBJS:.o=.d)
         overlay-shim-bench iconmaker icon \
         appinfo helpers-install ntdll-resolve bridge runcheck compatcheck \
         compatsvc-check shortcutcheck scriptcheck envcheck buildcheck settingscheck routecheck bridgecheck gamedrivecheck \
-        gamefixescheck launchercheck padcheck launch-shell activatecheck FORCE
+        gamefixescheck launchercheck padcheck launch-shell activatecheck compat-reported-check FORCE
 
 APP_PAYLOAD := app/Sources/BridgeplayApp/Resources/payload
 
@@ -141,6 +141,11 @@ padcheck:
 launchercheck:
 	@if [ ! -f dylib/tests/launchercheck.sh ]; then $(call SKIP,launchercheck,dylib/tests/launchercheck.sh); exit 0; fi; \
 	sh dylib/tests/launchercheck.sh dylib/feats/compat_run.sh
+
+# Runs the weekly compat refresh's commit step against local git repos
+compat-reported-check:
+	@if [ ! -f scripts/tests/compat-reported-commit.sh ]; then $(call SKIP,compat-reported-check,scripts/tests/compat-reported-commit.sh); exit 0; fi; \
+	sh scripts/tests/compat-reported-commit.sh
 
 .PHONY: mincheck
 mincheck:
@@ -888,7 +893,7 @@ CI_CHECKS := mincheck l10ncheck \
 	sigcheck callscheck webpatch-fixtures peicon-fixtures panel-behavior spawn-env \
 	activatecheck compatcheck compatsvc-check shortcutcheck launch-shell envcheck \
 	buildcheck settingscheck routecheck bridgecheck gamedrivecheck launchercheck \
-	seedcheck gamefixescheck padcheck np-native-tests native-shim-tests \
+	seedcheck gamefixescheck padcheck compat-reported-check np-native-tests native-shim-tests \
 	app-tests game-host-check dualsense-check steam-rumble-check
 
 # app.yml runs the checks that need the built app in its build job and the rest in a
