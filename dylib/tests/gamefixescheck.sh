@@ -583,9 +583,11 @@ launch waitforexitandrun "$case_dir/game/game.exe"
 is "no conf leaves the quality to the shim" "<unset>" "$(got NOTPROTON_FRAMEGEN_QUALITY)"
 
 # The stub reports NOTPROTON_OVERLAY_SHIM, set beside DYLD_INSERT_LIBRARIES, since SIP strips DYLD_* from /bin/sh.
+# Without SIP (GitHub runners) dyld does load the shim into /bin/sh, so it is a real, empty arm64e dylib.
 echo "== the launcher loads the shim for frame generation unless it is off"
 mkdir -p "$work/launcher/Contents/MacOS" "$work/launcher/home/Library/Application Support/bridgeplay"
-: > "$work/launcher/home/Library/Application Support/bridgeplay/overlay-shim.dylib"
+clang -dynamiclib -arch arm64e -arch arm64 -arch x86_64 -x c /dev/null \
+	-o "$work/launcher/home/Library/Application Support/bridgeplay/overlay-shim.dylib"
 printf '#!/bin/sh\nprintf "%%s" "${NOTPROTON_OVERLAY_SHIM:-none}"\n' > "$work/launcher/wine"
 chmod +x "$work/launcher/wine"
 env -i PATH="$PATH" HOME="$work/launcher/home" WINELOADER="$work/launcher/wine" loader_root="$work/launcher" \
@@ -609,7 +611,7 @@ set --
 out=$(env -i PATH="$PATH" forward="$forward" VKD3D_CONFIG=dxr MVK_CONFIG_LOG_LEVEL=1 \
 	STAGING_SHARED_MEMORY=1 WINE_CPU_TOPOLOGY=4:0,1,2,3 WINE_LARGE_ADDRESS_AWARE=1 \
 	DXVK_HUD=fps NOTPROTON_FRAMEGEN=1 NOTPROTON_FRAMEGEN_QUALITY=quality NOTPROTON_FRAMEGEN_UI=0 \
-	NOTPROTON_FRAMEGEN_FALLBACK=0 NOTPROTON_FRAMEGEN_ENGINE=metalfx NOTPROTON_FRAMEGENX=1 NOTPROTON_UNRELATED=1 sh -c 'set --; eval "$forward"; printf "%s\n" "$@"' | grep -v '^--env$' | sort | tr '\n' ' ')
+	NOTPROTON_FRAMEGEN_FALLBACK=0 NOTPROTON_FRAMEGEN_ENGINE=metalfx NOTPROTON_FRAMEGENX=1 NOTPROTON_UNRELATED=1 sh -c 'set --; eval "$forward"; printf "%s\n" "$@"' | grep -v '^--env$' | LC_ALL=C sort | tr '\n' ' ')
 is "VKD3D_, MVK_, STAGING_ and WINE_ topology variables are forwarded" \
 	"DXVK_HUD=fps MVK_CONFIG_LOG_LEVEL=1 NOTPROTON_FRAMEGEN=1 NOTPROTON_FRAMEGEN_ENGINE=metalfx NOTPROTON_FRAMEGEN_FALLBACK=0 NOTPROTON_FRAMEGEN_QUALITY=quality NOTPROTON_FRAMEGEN_UI=0 STAGING_SHARED_MEMORY=1 VKD3D_CONFIG=dxr WINE_CPU_TOPOLOGY=4:0,1,2,3 WINE_LARGE_ADDRESS_AWARE=1 " "$out"
 

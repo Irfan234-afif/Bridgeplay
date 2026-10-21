@@ -45,7 +45,8 @@ ov="$H/Library/Application Support/bridgeplay/overlay-shim.dylib"
 steamlib=$tmp/libs/steamoverlay.dylib
 build -dynamiclib -DMARKER='"pad"' "$here/marker.c" -o "$pad"
 build -dynamiclib -DMARKER='"overlay"' "$here/marker.c" -o "$ov"
-build -dynamiclib -DMARKER='"steam"' "$here/marker.c" -o "$steamlib"
+# arm64e too: without SIP (GitHub runners) dyld loads it into /usr/bin/arch
+build -arch arm64e -dynamiclib -DMARKER='"steam"' "$here/marker.c" -o "$steamlib"
 build -dynamiclib -DMARKER='"user"' "$here/marker.c" -o "$tmp/libs/user.dylib"
 for f in "$launcher" "$probe" "$tmp/probe-x86" "$pad" "$ov" "$steamlib" "$tmp/libs/user.dylib"; do
 	codesign -s - -f "$f" 2>/dev/null
