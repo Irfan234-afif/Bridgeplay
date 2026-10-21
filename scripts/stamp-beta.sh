@@ -62,7 +62,7 @@ if [ -n "${BRIDGEPLAY_BETA+set}" ]; then
 	version=$planned-beta.$BRIDGEPLAY_BETA
 	build=$beta_build
 	channel=beta
-elif [ -n "${BRIDGEPLAY_BETA_BUILD:-}" ] || [ -n "${BRIDGEPLAY_BETA_PLANNED:-}" ]; then
+elif [ -n "${BRIDGEPLAY_BETA_BUILD+set}" ] || [ -n "${BRIDGEPLAY_BETA_PLANNED+set}" ]; then
 	die "BRIDGEPLAY_BETA_BUILD or BRIDGEPLAY_BETA_PLANNED is set without BRIDGEPLAY_BETA (the beta number N)"
 fi
 

@@ -51,6 +51,7 @@ while [ $# -gt 0 ]; do
 			;;
 		--named)
 			[ $# -ge 2 ] || usage
+			is_semver "$2" || { echo "==> --named wants X.Y.Z, got '$2'" >&2; exit 1; }
 			named=$2
 			shift 2
 			;;
@@ -71,9 +72,6 @@ if [ -n "$upstream" ]; then
 fi
 if [ -n "$highest" ]; then
 	is_posint "$highest" || die "--highest-build wants a positive integer, got '$highest'"
-fi
-if [ -n "$named" ]; then
-	is_semver "$named" || die "--named wants X.Y.Z, got '$named'"
 fi
 
 next=$(semver_next "$part" "$version")

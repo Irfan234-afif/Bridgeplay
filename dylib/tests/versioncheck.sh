@@ -166,6 +166,10 @@ done
 # A missing number fails, whatever else is set.
 expect_refused "no beta number, build given" stamp BRIDGEPLAY_BETA_BUILD=50 check
 expect_refused "no beta number, planned given" stamp BRIDGEPLAY_BETA_PLANNED=0.8.0 check
+# Empty values count as set: a wrapper that exports them empty must not get a stable build.
+expect_refused "empty beta build, no beta number" stamp BRIDGEPLAY_BETA_BUILD= check
+expect_refused "empty planned, no beta number" stamp BRIDGEPLAY_BETA_PLANNED= check
+expect_refused "both empty, no beta number" stamp BRIDGEPLAY_BETA_BUILD= BRIDGEPLAY_BETA_PLANNED= check
 
 # The build number is given, a positive integer and above the committed build.
 expect_refused "no beta build" stamp BRIDGEPLAY_BETA=1 check
@@ -267,6 +271,7 @@ expect_refused "named differs from the patch" bump patch --named 0.8.0
 expect_same "a refused bump leaves version.h alone" "$work/version.h.orig" "$bumpfx/dylib/version.h"
 expect_refused "named differs from the minor" bump minor --named 0.7.3
 expect_refused "named is malformed" bump patch --named 0.7.3-beta.1
+expect_refused "named is empty" bump patch --named "" --highest-build 50
 expect_refused "no part" bump
 expect_refused "unknown part" bump beta
 
