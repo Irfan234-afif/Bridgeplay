@@ -5,8 +5,9 @@ import Foundation
 
 enum ProductVersion {
 
-    // CFBundleShortVersionString: Bridgeplay semver, the same string recorded as the
-    // installed build in Steam.
+    // CFBundleShortVersionString: the label people see, X.Y.Z or, in a beta build,
+    // X.Y.Z-beta.N (stamped at build time, see scripts/stamp-beta.sh). About, Status and
+    // game reports show it; installs and updates are ordered by `build`, never by this.
     static var short: String { AppVersion.display }
 
     // CFBundleVersion: the release counter Sparkle orders updates by.
@@ -14,6 +15,19 @@ enum ProductVersion {
 
     // The NotProton release this build is based on.
     static var upstream: String? { stamped(Bundle.main.object(forInfoDictionaryKey: "NotProtonVersion")) }
+
+    enum Channel: String {
+        case stable, beta
+    }
+
+    // BridgeplayChannel: "beta" in a build stamped by scripts/stamp-beta.sh. A missing,
+    // empty or unreadable value means stable.
+    static var channel: Channel { channel(from: Bundle.main.object(forInfoDictionaryKey: "BridgeplayChannel")) }
+
+    static func channel(from value: Any?) -> Channel {
+        guard let text = value as? String else { return .stable }
+        return Channel(rawValue: text.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()) ?? .stable
+    }
 
     static var display: String { display(short: short, build: build, upstream: upstream) }
 

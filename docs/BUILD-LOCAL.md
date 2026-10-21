@@ -36,7 +36,8 @@ output to `build/logs/<phase>.log`.
 
 At the end the script prints the version (from `dylib/version.h`: `make app` writes
 `BRIDGEPLAY_VERSION` into `CFBundleShortVersionString` and `BRIDGEPLAY_BUILD` into
-`CFBundleVersion`, see [RELEASING.md](RELEASING.md)) and the zip's sha256.
+`CFBundleVersion`, see [RELEASING.md](RELEASING.md)) and the zip's sha256. A beta build prints its
+stamped label instead (see "Betas" in RELEASING.md).
 
 ## Timings (M5 Max, 18 cores, Xcode 27.0 beta 27A5218g)
 
