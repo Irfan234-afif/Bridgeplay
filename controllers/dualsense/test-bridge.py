@@ -12,7 +12,9 @@ packet = struct.Struct("<II16sIIdff64s")
 token = bytes.fromhex("12" * 16)
 s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 s.bind(("127.0.0.1", 0))
-s.settimeout(1)
+# Read once audio-test has exited, when its packets are already on their way: the
+# timeout only has to outlast loopback delivery.
+s.settimeout(0.3)
 env = dict(
     os.environ,
     DSB_PORT=str(s.getsockname()[1]),
