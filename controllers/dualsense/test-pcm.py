@@ -140,8 +140,13 @@ try:
     assert p.returncode == 0, p.returncode
     state = json.loads(dest.read_text())
     assert not state["hidStalled"], state
+    # A scheduler pause past 40 ms resyncs and suspends PCM for 0.5 s (plus the
+    # zero tail and restart). Only the unpaused time owes the 40 reports/s.
+    active = max(seconds - 0.6 * state["pcm"]["pauses"], 0)
     assert (
-        state["pcm"]["reports"] == 0 if hardware else state["pcm"]["reports"] > seconds * 40
+        state["pcm"]["reports"] == 0
+        if hardware
+        else state["pcm"]["reports"] > 0 and state["pcm"]["reports"] > active * 40
     ), state
     # The 64 ms latency bound drops backlog after a scheduling pause. Slow CI
     # VMs pause; real hardware idles and must drop nothing.
