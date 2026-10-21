@@ -1,4 +1,5 @@
 import SwiftUI
+import BridgeplayUI
 
 enum Pane: String, CaseIterable, Identifiable, Hashable {
     case status

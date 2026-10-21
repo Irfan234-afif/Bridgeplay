@@ -1,4 +1,5 @@
 // 'Status' view, see SystemStatus for actual logic
+import BridgeplayUI
 
 import SwiftUI
 
@@ -456,7 +457,7 @@ struct StatusView: View {
         } header: {
             Text("For Every Game")
         } footer: {
-            Text("A game's own Steam Properties › Compatibility settings win over these.")
+            Text("A game's own settings in Steam Properties › Bridgeplay win over these.")
         }
     }
 

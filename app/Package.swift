@@ -22,11 +22,10 @@ let package = Package(
     targets: [
         .executableTarget(
             name: "BridgeplayApp",
-            dependencies: [.product(name: "Sparkle", package: "Sparkle")],
+            dependencies: [.product(name: "Sparkle", package: "Sparkle"), "BridgeplayUI"],
             path: "Sources/BridgeplayApp",
             resources: (hasPayload ? [.copy("Resources/payload")] : []) + [
                 .process("Resources/Localization"),
-                .copy("Resources/Fonts"),
                 .copy("Resources/payload.manifest"),
                 .copy("Resources/valve-packages.manifest"),
                 .copy("Resources/detour2.bin"),
@@ -75,5 +74,29 @@ let package = Package(
             dependencies: ["BridgeplayApp"],
             path: testsPath
         ),
-    ] : [])
+    ] : []) + [
+        .target(
+            name: "BridgeplayUI",
+            path: "Sources/BridgeplayUI",
+            resources: [.copy("Resources/Fonts")],
+            swiftSettings: [.swiftLanguageMode(.v6)]
+        ),
+        .target(
+            name: "BridgeplayInstallerCore",
+            path: "Sources/BridgeplayInstallerCore",
+            swiftSettings: [.swiftLanguageMode(.v6)]
+        ),
+        .executableTarget(
+            name: "BridgeplayInstaller",
+            dependencies: ["BridgeplayUI", "BridgeplayInstallerCore"],
+            path: "Sources/BridgeplayInstaller",
+            resources: [.process("Resources/Localization")],
+            swiftSettings: [.swiftLanguageMode(.v6)]
+        ),
+        .testTarget(
+            name: "BridgeplayInstallerCoreTests",
+            dependencies: ["BridgeplayInstallerCore"],
+            path: "Tests/BridgeplayInstallerCoreTests"
+        ),
+    ]
 )

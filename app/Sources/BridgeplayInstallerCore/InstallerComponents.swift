@@ -1,0 +1,170 @@
+import Foundation
+
+/// Apple's Game Porting Toolkit, the WineCX engine and the default configs: the one-click
+/// installer ZIP on the `installer` release, which Install.command inside it puts in place.
+/// The wizard downloads it only when this Mac lacks them, checks it against the same EdDSA
+/// key as the app, then runs that Install.command without the app step and without Terminal.
+public struct InstallerComponents: Sendable, Equatable {
+    public static let archiveURL = URL(
+        string: "https://github.com/raymondchins/Bridgeplay/releases/download/installer/Bridgeplay-Installer.zip"
+    )!
+    /// "<base64 EdDSA signature> <length>", written by scripts/release-local.sh with Sparkle's sign_update.
+    public static let signatureURL = URL(
+        string: "https://github.com/raymondchins/Bridgeplay/releases/download/installer/Bridgeplay-Installer.zip.sig"
+    )!
+    static let maximumLength: Int64 = 2_147_483_648
+
+    public let length: Int64
+    public let signature: Data
+    let verificationKey: Data
+    var archiveURL = Self.archiveURL
+
+    public init(signatureFile text: String) throws {
+        try self.init(signatureFile: text, verificationKey: Data(base64Encoded: InstallerRelease.encodedSigningKey)!)
+    }
+
+    init(signatureFile text: String, verificationKey: Data) throws {
+        let parts = text.split(whereSeparator: \.isWhitespace)
+        guard parts.count == 2, let signature = Data(base64Encoded: String(parts[0])), signature.count == 64,
+              parts[1].utf8.allSatisfy({ (48...57).contains($0) }), let length = Int64(parts[1]),
+              length > 0, length <= Self.maximumLength, verificationKey.count == 32 else {
+            throw InstallerError.invalidRelease
+        }
+        self.length = length
+        self.signature = signature
+        self.verificationKey = verificationKey
+    }
+
+    /// Needed on a Mac without Game Porting Toolkit in Bridgeplay's (or the older NotProton)
+    /// support folder, or without Steam.
+    public static func needed(home: URL = FileManager.default.homeDirectoryForCurrentUser,
+                              applications: URL = URL(fileURLWithPath: "/Applications")) -> Bool {
+        let support = home.appending(path: "Library/Application Support")
+        let gptk = ["bridgeplay", "notproton"].contains {
+            FileManager.default.fileExists(atPath: support.appending(path: "\($0)/gptk").path)
+        }
+        let steam = FileManager.default.fileExists(atPath: applications.appending(path: "Steam.app").path)
+        return !gptk || !steam
+    }
+
+    /// The signature published beside the archive. For testing an unpublished build, the
+    /// `ComponentsSignature` and `ComponentsArchive` (a file: URL) defaults name another
+    /// signature and archive; the archive must still be signed by Bridgeplay's key.
+    public static func latest(session: URLSession = .shared, defaults: UserDefaults = .standard) async throws -> InstallerComponents {
+        if let local = defaults.string(forKey: "ComponentsSignature") {
+            var components = try InstallerComponents(signatureFile: local)
+            if let path = defaults.string(forKey: "ComponentsArchive"), let url = URL(string: path), url.isFileURL {
+                components.archiveURL = url
+            }
+            return components
+        }
+        var request = URLRequest(url: signatureURL)
+        request.timeoutInterval = 30
+        let data: Data, response: URLResponse
+        do { (data, response) = try await session.data(for: request) }
+        catch { throw InstallerError.networkFailure(error.localizedDescription) }
+        guard let http = response as? HTTPURLResponse, http.statusCode == 200, data.count < 1024,
+              let text = String(data: data, encoding: .utf8) else { throw InstallerError.invalidRelease }
+        return try InstallerComponents(signatureFile: text)
+    }
+
+    /// Download to a file in `directory` and verify it. Throws without leaving the file on failure.
+    public func download(to directory: URL, session: URLSession = .shared,
+                         progress: @escaping @Sendable (InstallerDownloadProgress) -> Void = { _ in }) async throws -> URL {
+        let delegate = ProgressDelegate(total: length, progress: progress)
+        var request = URLRequest(url: archiveURL)
+        request.timeoutInterval = 60
+        let temporary: URL, response: URLResponse
+        do { (temporary, response) = try await session.download(for: request, delegate: delegate) }
+        catch is CancellationError { throw CancellationError() }
+        catch { throw InstallerError.networkFailure(error.localizedDescription) }
+        let archive = directory.appending(path: "Bridgeplay-Installer.zip")
+        do {
+            guard archiveURL.isFileURL || (response as? HTTPURLResponse)?.statusCode == 200 else { throw InstallerError.invalidRelease }
+            try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+            try? FileManager.default.removeItem(at: archive)
+            try FileManager.default.moveItem(at: temporary, to: archive)
+            try verify(archive)
+        } catch {
+            try? FileManager.default.removeItem(at: temporary)
+            try? FileManager.default.removeItem(at: archive)
+            throw error
+        }
+        return archive
+    }
+
+    // CEILING: Ed25519 signs the whole file, so it is mapped and checked at once (~0.5 GB of
+    // address space); a streamed check would need a different signature scheme.
+    func verify(_ archive: URL) throws {
+        let size = (try? archive.resourceValues(forKeys: [.fileSizeKey]).fileSize).map(Int64.init)
+        guard size == length else { throw InstallerError.invalidArchiveLength }
+        let data = try Data(contentsOf: archive, options: .alwaysMapped)
+        try InstallerRelease.verify(data, signature: signature, publicKey: verificationKey)
+    }
+
+    /// Unpack the verified archive and run its Install.command for Steam, GPTK, the engine and
+    /// the configs. `status` gets each "==>" step the script announces.
+    public static func install(archive: URL, work: URL, status: @escaping @Sendable (String) -> Void = { _ in }) throws {
+        let unpacked = work.appending(path: "components")
+        try? FileManager.default.removeItem(at: unpacked)
+        try FileManager.default.createDirectory(at: unpacked, withIntermediateDirectories: true)
+        try run("/usr/bin/ditto", ["-x", "-k", archive.path, unpacked.path])
+        let script = unpacked.appending(path: "Bridgeplay/Install.command")
+        guard FileManager.default.isReadableFile(atPath: script.path) else {
+            throw InstallerError.invalidInstallation("The components download has no Install.command.")
+        }
+        var environment = ProcessInfo.processInfo.environment
+        environment["BRIDGEPLAY_INSTALL_APP"] = "0"
+        environment["BRIDGEPLAY_NONINTERACTIVE"] = "1"
+        try run("/bin/bash", [script.path], environment: environment) { line in
+            if line.hasPrefix("==> ") { status(String(line.dropFirst(4))) }
+        }
+    }
+
+    @discardableResult
+    static func run(_ executable: String, _ arguments: [String], environment: [String: String]? = nil,
+                    line: @escaping @Sendable (String) -> Void = { _ in }) throws -> String {
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: executable)
+        process.arguments = arguments
+        if let environment { process.environment = environment }
+        let pipe = Pipe()
+        process.standardOutput = pipe
+        process.standardError = pipe
+        process.standardInput = FileHandle.nullDevice
+        try process.run()
+        var all = ""
+        var pending = ""
+        while case let chunk = pipe.fileHandleForReading.availableData, !chunk.isEmpty {
+            // Strip the script's colour codes before reading its lines.
+            let text = String(decoding: chunk, as: UTF8.self)
+                .replacingOccurrences(of: #"\u{1B}\[[0-9;]*m"#, with: "", options: .regularExpression)
+            all += text
+            pending += text
+            while let newline = pending.firstIndex(where: { $0 == "\n" || $0 == "\r" }) {
+                line(String(pending[..<newline]).trimmingCharacters(in: .whitespaces))
+                pending.removeSubrange(...newline)
+            }
+        }
+        process.waitUntilExit()
+        guard process.terminationStatus == 0 else {
+            let reason = all.split(separator: "\n").last { $0.contains("Gagal:") || !$0.trimmingCharacters(in: .whitespaces).isEmpty }
+            throw InstallerError.componentsFailure(reason.map { String($0).replacingOccurrences(of: "Gagal: ", with: "") } ?? "exit \(process.terminationStatus)")
+        }
+        return all
+    }
+}
+
+private final class ProgressDelegate: NSObject, URLSessionDownloadDelegate, @unchecked Sendable {
+    let total: Int64
+    let progress: @Sendable (InstallerDownloadProgress) -> Void
+    init(total: Int64, progress: @escaping @Sendable (InstallerDownloadProgress) -> Void) {
+        self.total = total
+        self.progress = progress
+    }
+    func urlSession(_ session: URLSession, downloadTask: URLSessionDownloadTask, didWriteData bytesWritten: Int64,
+                    totalBytesWritten: Int64, totalBytesExpectedToWrite: Int64) {
+        progress(InstallerDownloadProgress(received: totalBytesWritten, total: total))
+    }
+    func urlSession(_ session: URLSession, downloadTask: URLSessionDownloadTask, didFinishDownloadingTo location: URL) {}
+}

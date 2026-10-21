@@ -4,7 +4,9 @@ import Testing
 
 @testable import BridgeplayApp
 
-@Suite("Prefix template cleanup")
+// refreshRunnerStorage takes the real installation lock with try?, so two of these at once
+// skip each other's cleanup.
+@Suite("Prefix template cleanup", .serialized)
 struct TemplateCleanupTests {
     private struct Layout {
         let root: URL

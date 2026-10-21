@@ -4,37 +4,37 @@ import SwiftUI
 // The look of bridgeplay.dev (styles.css :root) for the app's own surfaces: black canvas,
 // near-white type in Geist, hairline borders, small radii, and the violet-blue-pink
 // gradient kept for emphasis only (progress, the last step, one word of a headline).
-enum BP {
-    static let bg = Color(hex: 0x000000)
-    static let raise = Color(hex: 0x0D0D0F)
-    static let raise2 = Color(hex: 0x161618)
-    static let fg = Color(hex: 0xF5F5F7)
-    static let fg2 = Color(hex: 0xA1A1A6)
-    static let fg3 = Color(hex: 0x86868B)
-    static let line = Color.white.opacity(0.08)
-    static let lineStrong = Color.white.opacity(0.18)
-    static let violet = Color(hex: 0x8B7BFF)
-    static let blue = Color(hex: 0x4FB3FF)
-    static let pink = Color(hex: 0xFF7AC6)
-    static let green = Color(hex: 0x30D158)
-    static let orange = Color(hex: 0xFF9F0A)
-    static let red = Color(hex: 0xFF453A)
+public enum BP {
+    public static let bg = Color(hex: 0x000000)
+    public static let raise = Color(hex: 0x0D0D0F)
+    public static let raise2 = Color(hex: 0x161618)
+    public static let fg = Color(hex: 0xF5F5F7)
+    public static let fg2 = Color(hex: 0xA1A1A6)
+    public static let fg3 = Color(hex: 0x86868B)
+    public static let line = Color.white.opacity(0.08)
+    public static let lineStrong = Color.white.opacity(0.18)
+    public static let violet = Color(hex: 0x8B7BFF)
+    public static let blue = Color(hex: 0x4FB3FF)
+    public static let pink = Color(hex: 0xFF7AC6)
+    public static let green = Color(hex: 0x30D158)
+    public static let orange = Color(hex: 0xFF9F0A)
+    public static let red = Color(hex: 0xFF453A)
 
-    static let iridescent = LinearGradient(colors: [violet, blue, pink], startPoint: .leading, endPoint: .trailing)
-    static let iridescentDiagonal = LinearGradient(colors: [violet, blue, pink], startPoint: .topLeading, endPoint: .bottomTrailing)
+    public static let iridescent = LinearGradient(colors: [violet, blue, pink], startPoint: .leading, endPoint: .trailing)
+    public static let iridescentDiagonal = LinearGradient(colors: [violet, blue, pink], startPoint: .topLeading, endPoint: .bottomTrailing)
 
-    static let radius: CGFloat = 12
-    static let controlRadius: CGFloat = 8
+    public static let radius: CGFloat = 12
+    public static let controlRadius: CGFloat = 8
 
     // cubic-bezier(0.16, 1, 0.3, 1), the site's --ease-out.
-    static let easeOut = Animation.timingCurve(0.16, 1, 0.3, 1, duration: 0.5)
+    public static let easeOut = Animation.timingCurve(0.16, 1, 0.3, 1, duration: 0.5)
 
-    static func sans(_ size: CGFloat, _ weight: Font.Weight = .regular) -> Font {
+    public static func sans(_ size: CGFloat, _ weight: Font.Weight = .regular) -> Font {
         registerFonts()
         return .custom("Geist", size: size).weight(weight)
     }
 
-    static func display(_ size: CGFloat) -> Font {
+    public static func display(_ size: CGFloat) -> Font {
         registerFonts()
         return .custom("Unbounded", size: size).weight(.semibold)
     }
@@ -42,17 +42,22 @@ enum BP {
     // Process-scoped, so nothing is installed on the Mac. Missing glyphs (Chinese) fall
     // back to the system font.
     private static let registered: Void = {
+        let resources = Bundle.main.resourceURL.flatMap { resourceURL in
+            Bundle(url: resourceURL.appendingPathComponent(
+                "BridgeplayApp_BridgeplayUI.bundle", isDirectory: true
+            ))
+        } ?? .module
         for name in ["geist", "unbounded"] {
-            guard let url = Bundle.module.url(forResource: name, withExtension: "woff2", subdirectory: "Fonts") else { continue }
+            guard let url = resources.url(forResource: name, withExtension: "woff2", subdirectory: "Fonts") else { continue }
             CTFontManagerRegisterFontsForURL(url as CFURL, .process, nil)
         }
     }()
 
-    static func registerFonts() { _ = registered }
+    public static func registerFonts() { _ = registered }
 }
 
 extension Color {
-    init(hex: UInt32) {
+    public init(hex: UInt32) {
         self.init(.sRGB,
                   red: Double((hex >> 16) & 0xFF) / 255,
                   green: Double((hex >> 8) & 0xFF) / 255,
@@ -62,14 +67,19 @@ extension Color {
 
 // .pill on the site: white with black text, fully round. The secondary kind is a
 // hairline capsule in the foreground colour.
-struct PillButtonStyle: ButtonStyle {
-    enum Kind { case primary, secondary, plain }
-    var kind: Kind = .primary
-    var large = false
+public struct PillButtonStyle: ButtonStyle {
+    public enum Kind { case primary, secondary, plain }
+    public var kind: Kind = .primary
+    public var large = false
+
+    public init(kind: Kind = .primary, large: Bool = false) {
+        self.kind = kind
+        self.large = large
+    }
 
     @Environment(\.isEnabled) private var isEnabled
 
-    func makeBody(configuration: Configuration) -> some View {
+    public func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .font(BP.sans(large ? 14 : 13, .semibold))
             .tracking(-0.15)
@@ -103,22 +113,26 @@ struct PillButtonStyle: ButtonStyle {
 }
 
 extension ButtonStyle where Self == PillButtonStyle {
-    static var pill: PillButtonStyle { PillButtonStyle() }
-    static var pillLarge: PillButtonStyle { PillButtonStyle(large: true) }
-    static var pillSecondary: PillButtonStyle { PillButtonStyle(kind: .secondary) }
-    static var pillSecondaryLarge: PillButtonStyle { PillButtonStyle(kind: .secondary, large: true) }
-    static var pillPlain: PillButtonStyle { PillButtonStyle(kind: .plain, large: true) }
+    public static var pill: PillButtonStyle { PillButtonStyle() }
+    public static var pillLarge: PillButtonStyle { PillButtonStyle(large: true) }
+    public static var pillSecondary: PillButtonStyle { PillButtonStyle(kind: .secondary) }
+    public static var pillSecondaryLarge: PillButtonStyle { PillButtonStyle(kind: .secondary, large: true) }
+    public static var pillPlain: PillButtonStyle { PillButtonStyle(kind: .plain, large: true) }
 }
 
 // The Bridgeplay mark (helpers/icon/bridgeplay-mark.svg) as shapes in a 24-unit box, so the
 // art can draw it in stroke by stroke: the deck and towers, the suspension cable, and the
 // cable's reflection.
-enum BridgePart { case deck, cable, echo }
+public enum BridgePart: Sendable { case deck, cable, echo }
 
-struct BridgeShape: Shape {
-    let part: BridgePart
+public struct BridgeShape: Shape {
+    public let part: BridgePart
 
-    func path(in rect: CGRect) -> Path {
+    public init(part: BridgePart) {
+        self.part = part
+    }
+
+    public func path(in rect: CGRect) -> Path {
         let s = min(rect.width, rect.height) / 24
         func p(_ x: CGFloat, _ y: CGFloat) -> CGPoint {
             CGPoint(x: rect.minX + (2.4 + x * 0.8) * s, y: rect.minY + (2.4 + y * 0.8) * s)
@@ -148,7 +162,7 @@ struct BridgeShape: Shape {
     }
 
     // Stroke widths from the SVG, scaled to a mark drawn `size` points wide.
-    static func width(_ part: BridgePart, size: CGFloat) -> CGFloat {
+    public static func width(_ part: BridgePart, size: CGFloat) -> CGFloat {
         let unit = size / 24 * 0.8
         switch part {
         case .deck: return 1.8 * unit
@@ -159,10 +173,14 @@ struct BridgeShape: Shape {
 }
 
 // The mark drawn flat on its black tile, as in the nav bar and favicon.
-struct BridgeplayMark: View {
-    var size: CGFloat = 22
+public struct BridgeplayMark: View {
+    public var size: CGFloat = 22
 
-    var body: some View {
+    public init(size: CGFloat = 22) {
+        self.size = size
+    }
+
+    public var body: some View {
         ZStack {
             BridgeShape(part: .deck)
                 .stroke(BP.fg, style: StrokeStyle(lineWidth: BridgeShape.width(.deck, size: size), lineCap: .round))

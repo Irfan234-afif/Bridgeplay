@@ -1,5 +1,6 @@
 import AppKit
 import SwiftUI
+import BridgeplayUI
 
 // The Setup Assistant's art rail, in bridgeplay.dev's motifs: an aurora of the brand gradient
 // over a faint grid, the hero line, and one illustration per step (the checker's scan line,

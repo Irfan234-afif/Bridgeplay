@@ -1,4 +1,5 @@
-// Enables Steam Play in the UI/enables the Compatibility tab in game properties
+// Enables Steam Play in the UI, and shows the game properties tab Steam calls Compatibility
+// as Bridgeplay, since on a Mac every setting on it is Bridgeplay's
 #include "webpatch.h"
 #include "nativeplatform.h"
 #include "../util/log.h"
@@ -271,9 +272,9 @@ static int out_expand(np_out_t *o, const char *replace, const np_cap_t *caps) {
     "(" NP_WEB_IS_ZH "?\"" ZH "\":" NP_WEB_IS_IT "?\"" IT "\":\"" EN "\")"
 
 #define NP_COMPAT_HINT NP_WEB_TEXT( \
-    "Enable CrossOver under Properties > Compatibility to install and run the Windows version.", \
-    "请在“属性 > 兼容性”中启用 CrossOver，以安装并运行 Windows 版本。", \
-    "Abilita CrossOver in Propriet\\u00e0 > Compatibilit\\u00e0 per installare e avviare la versione Windows.")
+    "Enable CrossOver under Properties > Bridgeplay to install and run the Windows version.", \
+    "请在“属性 > Bridgeplay”中启用 CrossOver，以安装并运行 Windows 版本。", \
+    "Abilita CrossOver in Propriet\\u00e0 > Bridgeplay per installare e avviare la versione Windows.")
 
 #define NP_IMAGE_FILES_LABEL NP_WEB_TEXT( \
     "Image Files (*.tga,*.png,*.exe)", "图像文件 (*.tga,*.png,*.exe)", "File immagine (*.tga,*.png,*.exe)")
@@ -471,13 +472,17 @@ static int out_expand(np_out_t *o, const char *replace, const np_cap_t *caps) {
     "localStorage.setItem(K,\"1\")" \
     "}catch(e){console.error(\"Bridgeplay: launch options migration failed\",e)}})()"
 
+// The properties tab Steam calls Compatibility. Its route stays /compatibility.
+#define NP_TAB_FIND \
+    "(0," NP_C1 ".CI)()&&" NP_C2 ".push({title:(0," NP_C3 ".we)(\"#AppProperties_CompatibilityPage\")"
+#define NP_TAB_REPLACE "true&&" NP_C2 ".push({title:\"Bridgeplay\""
+
 static const np_gate_t g_gates_forcetool[] = {
     // SteamPlay settings section
     { "function " NP_C1 "(" NP_C2 "){return(0," NP_C3 ".CI)()?",
       "function " NP_C1 "(" NP_C2 "){return true?", 1, 0 },
-    // AppProperties Compatibility tab (app and non-Steam-shortcut variants)
-    { "(0," NP_C1 ".CI)()&&" NP_C2 ".push({title:(0," NP_C3 ".we)(\"#AppProperties_CompatibilityPage\")",
-      "true&&" NP_C2 ".push({title:(0," NP_C3 ".we)(\"#AppProperties_CompatibilityPage\")", 2, 0 },
+    // AppProperties Compatibility tab, shown as Bridgeplay (app and non-Steam-shortcut variants)
+    { NP_TAB_FIND, NP_TAB_REPLACE, 2, 0 },
     // Settings page Compatibility entry, keeping the SteamOS exclusion (!rf())
     { "Compatibility:{visible:" NP_C1 "&&(0," NP_C2 ".CI)()&&!(0," NP_C2 ".rf)()",
       "Compatibility:{visible:" NP_C1 "&&true&&!(0," NP_C2 ".rf)()", 1, 0 },
@@ -516,11 +521,8 @@ static const np_gate_t g_gates_forcetool[] = {
 
 // Support for new compatibility tab UI in the Steam beta
 static const np_gate_t g_gates_selecttool[] = {
-    // AppProperties Compatibility tab
-    { "(0," NP_C1 ".CI)()&&" NP_C2 ".push({title:(0," NP_C3 ".we)"
-      "(\"#AppProperties_CompatibilityPage\")",
-      "true&&" NP_C2 ".push({title:(0," NP_C3 ".we)"
-      "(\"#AppProperties_CompatibilityPage\")", 2, 0 },
+    // AppProperties Compatibility tab, shown as Bridgeplay
+    { NP_TAB_FIND, NP_TAB_REPLACE, 2, 0 },
     // Settings page Compatibility entry.
     { "Compatibility:{visible:" NP_C1 "&&(0," NP_C2 ".CI)(),title:",
       "Compatibility:{visible:" NP_C1 "&&true,title:", 1, 0 },
