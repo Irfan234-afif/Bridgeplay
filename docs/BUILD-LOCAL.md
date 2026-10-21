@@ -49,8 +49,8 @@ At the end the script prints the version (from `dylib/version.h`: `make app` wri
 | bridge | 14m00s | 13s |
 | app-payload | 0s | 0s |
 | app | 42s | 13s |
-| checks (`--checks`) | about 3m20s | 3m20s |
-| total | about 15m, about 18m with checks | 27s, 3m47s with checks |
+| checks (`--checks`, side by side) | about 1m05s | 55s |
+| total | about 15m, about 16m with checks | 27s, 1m22s with checks |
 
 A `fonts` phase (the Proton font build, needs fontforge and the font tools) also runs; it is
 not in the table because it was added after these timings.

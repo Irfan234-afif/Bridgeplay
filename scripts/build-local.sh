@@ -268,9 +268,9 @@ if [ "$run_checks" -eq 1 ]; then
 	: >"$check_log"
 	start=$(date +%s)
 	link_test_sparkle >>"$check_log" 2>&1 || true
-	# make ci-checks is the list app.yml runs; each check runs even after a failure
+	# make ci-checks is the list app.yml runs, JOBS checks at a time; each runs even after a failure
 	echo "==> [check] make ci-checks, log: $check_log"
-	if ! make ci-checks >>"$check_log" 2>&1; then
+	if ! make ci-checks CHECK_JOBS="$JOBS" >>"$check_log" 2>&1; then
 		check_failures=$(sed -n 's/^==> ci-checks failed://p' "$check_log")
 		[ -n "$check_failures" ] || check_failures=" ci-checks"
 	fi

@@ -380,7 +380,7 @@ APP_TESTS := app/Tests
 
 app-tests:
 	@if [ ! -d $(APP_TESTS) ]; then $(call SKIP,app-tests,$(APP_TESTS)); exit 0; fi; \
-	touch app/Package.swift; cd app && swift test --no-parallel
+	touch app/Package.swift; cd app && swift test
 
 PANEL_TESTS := dylib/tests/panel-behavior
 
@@ -889,7 +889,7 @@ native-shim-tests:
 	@if [ ! -f native-shim/tests/run.sh ]; then $(call SKIP,native-shim-tests,native-shim/tests/run.sh); exit 0; fi; \
 	sh native-shim/tests/run.sh
 
-# Every check .github/workflows/app.yml runs, in its order, after `make app`.
+# Every check .github/workflows/app.yml runs, after `make app`.
 # scripts/build-local.sh --checks runs this same target, so a local release build
 # and CI gate on one list. Each check runs even when an earlier one failed.
 # overlay-shim-tests is left out: it needs a Metal GPU and real frame timing.
@@ -910,11 +910,33 @@ ci-checks-built:
 	@$(MAKE) -s ci-checks CI_CHECKS="$(CI_CHECKS_BUILT)"
 ci-checks-source:
 	@$(MAKE) -s ci-checks CI_CHECKS="$(CI_CHECKS_SOURCE)"
+# The checks run side by side, CHECK_JOBS at a time (CHECK_JOBS=1 runs them one by one).
+# Each one's output goes to $(CHECK_LOGS)/<check>.log and is printed whole, in list order,
+# once all have finished. The slowest start first.
+CHECK_JOBS ?= $(shell sysctl -n hw.ncpu 2>/dev/null || echo 4)
+CHECK_LOGS := $(OUT_DIR)/check-logs
+CI_CHECKS_FIRST := app-tests dualsense-check panel-behavior launchercheck gamefixescheck
+CI_CHECKS_ORDERED := $(filter $(CI_CHECKS_FIRST),$(CI_CHECKS)) $(filter-out $(CI_CHECKS_FIRST),$(CI_CHECKS))
+
 ci-checks:
-	@failed=""; \
+	@rm -rf $(CHECK_LOGS) && mkdir -p $(CHECK_LOGS); \
+	echo "==> ci-checks: $(words $(CI_CHECKS)) checks, $(CHECK_JOBS) at a time"; \
+	$(MAKE) -s -j$(CHECK_JOBS) $(addprefix ci-run/,$(CI_CHECKS_ORDERED)); \
+	failed=""; \
 	for t in $(CI_CHECKS); do \
-		echo "==> [check] make -s $$t"; \
-		$(MAKE) -s $$t || failed="$$failed $$t"; \
+		rc=1; secs=?; \
+		if [ -f $(CHECK_LOGS)/$$t.rc ]; then read -r rc secs <$(CHECK_LOGS)/$$t.rc; fi; \
+		echo "==> [check] make -s $$t ($${secs}s)"; \
+		cat $(CHECK_LOGS)/$$t.log 2>/dev/null; \
+		if [ "$$rc" != 0 ]; then echo "==> [check] $$t failed with exit $$rc"; failed="$$failed $$t"; fi; \
 	done; \
 	if [ -n "$$failed" ]; then echo "==> ci-checks failed:$$failed" >&2; exit 1; fi; \
 	echo "==> ci-checks: all $(words $(CI_CHECKS)) checks passed"
+
+# One check for ci-checks: always succeeds, leaving the exit status and seconds in <check>.rc
+ci-run/%:
+	@start=$$(date +%s); rc=0; \
+	$(MAKE) -s $* >$(CHECK_LOGS)/$*.log 2>&1 </dev/null || rc=$$?; \
+	secs=$$(($$(date +%s) - start)); \
+	echo "$$rc $$secs" >$(CHECK_LOGS)/$*.rc; \
+	if [ $$rc -eq 0 ]; then echo "--> $* passed in $${secs}s"; else echo "--> $* FAILED in $${secs}s"; fi
