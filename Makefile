@@ -153,11 +153,13 @@ compat-reported-check:
 
 .PHONY: mincheck
 mincheck:
-	@sh dylib/tests/mincheck.sh "$(APP_BUNDLE)" "$(MINCHECK_VER)" "$(GLASS_SDK)"
+	@if [ ! -d "$(APP_BUNDLE)" ]; then echo "==> mincheck: $(APP_BUNDLE) not present, skipped (make app builds it)"; exit 0; fi; \
+	sh dylib/tests/mincheck.sh "$(APP_BUNDLE)" "$(MINCHECK_VER)" "$(GLASS_SDK)"
 
 .PHONY: l10ncheck
 l10ncheck:
-	@bin=$$(swift build --package-path app -c release --show-bin-path); \
+	@bin=$$(cd app/.build/release 2>/dev/null && pwd -P) || \
+		bin=$$(swift build --package-path app -c release --show-bin-path); \
 	for target in BridgeplayApp BridgeplayInstaller; do \
 		python3 dylib/tests/l10ncheck.py "app/Sources/$$target/Resources/Localization/Localizable.xcstrings" \
 			"$$bin/../../Intermediates.noindex/BridgeplayApp.build/$$(basename "$$bin")" zh-Hans it || exit $$?; \
@@ -934,8 +936,11 @@ ci-checks:
 		cat $(CHECK_LOGS)/$$t.log 2>/dev/null; \
 		if [ "$$rc" != 0 ]; then echo "==> [check] $$t failed with exit $$rc"; failed="$$failed $$t"; fi; \
 	done; \
+	skipped=$$(cd $(CHECK_LOGS) && grep -l '^==> [^ ]*: .*skipped' $(addsuffix .log,$(CI_CHECKS)) 2>/dev/null | sed 's/\.log$$//' | tr '\n' ' '); \
+	[ -z "$$skipped" ] || echo "==> ci-checks: skipped, so not passed: $$skipped"; \
 	if [ -n "$$failed" ]; then echo "==> ci-checks failed:$$failed" >&2; exit 1; fi; \
-	echo "==> ci-checks: all $(words $(CI_CHECKS)) checks passed"
+	if [ -n "$$skipped" ]; then echo "==> ci-checks: none failed, $$(echo $$skipped | wc -w | tr -d ' ') skipped"; \
+	else echo "==> ci-checks: all $(words $(CI_CHECKS)) checks passed"; fi
 
 # One check for ci-checks: always succeeds, leaving the exit status and seconds in <check>.rc
 ci-run/%:
