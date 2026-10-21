@@ -7,7 +7,7 @@
 // Bridgeplay's own version, independent of the NotProton release above, which stays
 // exactly as upstream ships it so merging upstream never conflicts here.
 //   BRIDGEPLAY_VERSION  semver people see: patch for fixes and upstream merges, minor for features
-//                       or new features (CFBundleShortVersionString, sparkle:shortVersionString)
+//                       (CFBundleShortVersionString, sparkle:shortVersionString)
 //   BRIDGEPLAY_BUILD    +1 on every release, continuing the old "-ray.N" counter; Sparkle
 //                       orders updates by it (CFBundleVersion, sparkle:version)
 // Change both with scripts/bump-version.sh, see docs/RELEASING.md.
