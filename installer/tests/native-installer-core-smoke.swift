@@ -147,6 +147,16 @@ struct NativeInstallerCoreSmoke {
         )[.posixPermissions] as? NSNumber
         try require(lockMode?.intValue == 0o644, "persistent lock is readable by other macOS accounts")
 
+        let zeroVersionRoot = root.appending(path: "zero-version-release", directoryHint: .isDirectory)
+        try FileManager.default.createDirectory(at: zeroVersionRoot, withIntermediateDirectories: true)
+        let (zeroVersion, zeroArchive) = try makeSignedArchive(in: zeroVersionRoot, build: "36", version: "0.7.0", key: key)
+        guard case .updateAvailable = try service.state(for: zeroVersion) else {
+            throw SmokeFailure("A higher build with a lower public version must remain eligible.")
+        }
+        try service.install(release: zeroVersion, archive: zeroArchive)
+        try require(try service.state(for: zeroVersion) == .upToDate(build: 36, version: "0.7.0"), "build ordering survives public version reset")
+        print("PASS higher build updates from 3.x to 0.x public version")
+
         let updateDirectory = root.appending(path: "update-flow", directoryHint: .isDirectory)
         try FileManager.default.createDirectory(at: updateDirectory, withIntermediateDirectories: true)
         let updateDestination = updateDirectory.appending(path: "Bridgeplay.app", directoryHint: .isDirectory)

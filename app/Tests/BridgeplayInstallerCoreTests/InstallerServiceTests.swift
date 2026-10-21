@@ -117,6 +117,22 @@ struct InstallerServiceTests {
         #expect(try Data(contentsOf: config) == Data("user override".utf8))
     }
 
+    @Test func updatesByBuildWhenPublicVersionReturnsToZeroSeries() throws {
+        let root = try temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let destination = root.appending(path: "Applications/Bridgeplay.app", directoryHint: .isDirectory)
+        try writeSignedApp(at: destination, version: "3.5.0", build: "43")
+        let key = Curve25519.Signing.PrivateKey()
+        let (offered, archive) = try makeSignedArchive(in: root, build: "44", version: "0.7.0", key: key)
+        let installer = service(at: destination)
+        guard case .updateAvailable = try installer.state(for: offered) else {
+            Issue.record("A higher build must update even when its public version is lower.")
+            return
+        }
+        try installer.install(release: offered, archive: archive)
+        #expect(try installer.state(for: offered) == .upToDate(build: 44, version: "0.7.0"))
+    }
+
     @Test func treatsSameBuildAndVersionAsCurrent() throws {
         let root = try temporaryDirectory()
         defer { try? FileManager.default.removeItem(at: root) }
