@@ -11,6 +11,9 @@ loader_line=$(grep -A1 '^if \[ -x "\$loader_macos/wine" \]; then$' "$SRC" | sed 
 [ -n "$funcs" ] || { echo "FAIL: bundle functions not found"; exit 1; }
 [ -n "$name_lines" ] || { echo "FAIL: bundle name lines not found"; exit 1; }
 [ -n "$launcher_body" ] || { echo "FAIL: launcher script not found"; exit 1; }
+# A busy lock is waited out for 30 s; the lock contention case below needs it to give up.
+funcs=$(printf '%s\n' "$funcs" | sed 's|/usr/bin/lockf -s -t 30 7|/usr/bin/lockf -s -t 1 7|')
+printf '%s\n' "$funcs" | grep -q 'lockf -s -t 1 7' || { echo "FAIL: bundle lock wait not found"; exit 1; }
 eval "$funcs"
 
 fails=0
