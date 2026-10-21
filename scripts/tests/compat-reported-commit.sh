@@ -1,4 +1,5 @@
 #!/bin/sh
+# shellcheck disable=SC2016 # the sh -c programs expand their own arguments
 # Runs scripts/compat-reported-commit.sh against local bare repos standing in for GitHub:
 # main plus a beta that is ahead of it and is the default branch.
 set -eu
