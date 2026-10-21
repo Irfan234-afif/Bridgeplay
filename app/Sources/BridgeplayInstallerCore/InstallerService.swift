@@ -140,14 +140,17 @@ public struct InstallerService: Sendable {
             }
         }
 
+        var retiredBackup: URL?
         if backupExists {
             let previous = try Self.readBundle(at: backup)
             guard previous.identifier == Self.bundleIdentifier else {
                 throw InstallerError.invalidInstallation("A different app is occupying the saved recovery location.")
             }
             try Self.verifyInstalledSignature(at: backup)
-            do { try fileManager.removeItem(at: backup) }
+            let retired = parent.appending(path: ".Bridgeplay.app.previous-\(UUID().uuidString)", directoryHint: .isDirectory)
+            do { try fileManager.moveItem(at: backup, to: retired) }
             catch { throw InstallerError.writeFailure(error.localizedDescription) }
+            retiredBackup = retired
         }
 
         do {
@@ -163,11 +166,37 @@ public struct InstallerService: Sendable {
                     rollbackDetail = " The previous app remains at \(backup.path): \(error.localizedDescription)"
                 }
             }
+            if let retiredBackup, !fileManager.fileExists(atPath: backup.path) {
+                try? fileManager.moveItem(at: retiredBackup, to: backup)
+            }
             throw InstallerError.replacementFailure("\(error.localizedDescription)\(rollbackDetail)")
         }
 
+        // Foreign-owned or read-only copies remain intact for an administrator to remove.
+        if let retiredBackup, Self.canDiscardRetiredBackup(retiredBackup) {
+            try? fileManager.removeItem(at: retiredBackup)
+        }
         // Keep one verified previous app for recovery if the next launch fails.
         return destination
+    }
+
+    private static func canDiscardRetiredBackup(_ url: URL) -> Bool {
+        let fm = FileManager.default
+        guard let attributes = try? fm.attributesOfItem(atPath: url.path),
+              let owner = attributes[.ownerAccountID] as? NSNumber,
+              owner.uint32Value == getuid() else { return false }
+        func writableDirectories(_ directory: URL) -> Bool {
+            guard fm.isWritableFile(atPath: directory.path),
+                  let children = try? fm.contentsOfDirectory(
+                    at: directory, includingPropertiesForKeys: [.isDirectoryKey, .isSymbolicLinkKey]
+                  ) else { return false }
+            for child in children {
+                guard let values = try? child.resourceValues(forKeys: [.isDirectoryKey, .isSymbolicLinkKey]) else { return false }
+                if values.isDirectory == true, values.isSymbolicLink != true, !writableDirectories(child) { return false }
+            }
+            return true
+        }
+        return writableDirectories(url)
     }
 
     /// Resolve symlinked ancestors once, while preserving the final path component for lstat.

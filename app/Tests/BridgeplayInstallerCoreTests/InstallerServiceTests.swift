@@ -323,11 +323,43 @@ struct InstallerServiceTests {
         #expect(try Data(contentsOf: save) == Data("keep this save".utf8))
     }
 
-    @Test func recoversPreviousBundleBeforeUpdatingAndPreservesUserData() throws {
+    @Test func rotatesReadOnlyPreviousBundleWithoutDeletingItsContents() throws {
         let root = try temporaryDirectory()
         defer { try? FileManager.default.removeItem(at: root) }
         let key = Curve25519.Signing.PrivateKey()
         let (release, archive) = try makeSignedArchive(in: root, build: "35", version: "3.5.0", key: key)
+        let parent = root.appending(path: "Applications", directoryHint: .isDirectory)
+        let destination = parent.appending(path: "Bridgeplay.app", directoryHint: .isDirectory)
+        let backup = parent.appending(path: ".Bridgeplay.app.previous", directoryHint: .isDirectory)
+        try writeSignedApp(at: destination, version: "3.4.1", build: "34")
+        try writeSignedApp(at: backup, version: "3.3.0", build: "33")
+        let contents = backup.appending(path: "Contents", directoryHint: .isDirectory)
+        try FileManager.default.setAttributes([.posixPermissions: 0o555], ofItemAtPath: contents.path)
+        defer {
+            for entry in (try? FileManager.default.contentsOfDirectory(at: parent, includingPropertiesForKeys: nil)) ?? [] {
+                if entry.lastPathComponent.hasPrefix(".Bridgeplay.app.previous-") {
+                    try? FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: entry.appending(path: "Contents").path)
+                }
+            }
+        }
+
+        try service(at: destination).install(release: release, archive: archive)
+
+        #expect(try installedBuild(at: destination) == "35")
+        #expect(try installedBuild(at: backup) == "34")
+        let retired = try FileManager.default.contentsOfDirectory(at: parent, includingPropertiesForKeys: nil)
+            .filter { $0.lastPathComponent.hasPrefix(".Bridgeplay.app.previous-") }
+        #expect(retired.count == 1)
+        let preserved = try #require(retired.first)
+        #expect(try installedBuild(at: preserved) == "33")
+        try run("/usr/bin/codesign", ["--verify", "--strict", "--deep", preserved.path])
+    }
+
+    @Test func recoversPreviousBundleBeforeUpdatingAndPreservesUserData() throws {
+        let root = try temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let key = Curve25519.Signing.PrivateKey()
+        let (release, _) = try makeSignedArchive(in: root, build: "35", version: "3.5.0", key: key)
         let parent = root.appending(path: "Applications", directoryHint: .isDirectory)
         try FileManager.default.createDirectory(at: parent, withIntermediateDirectories: true)
         let destination = parent.appending(path: "Bridgeplay.app", directoryHint: .isDirectory)

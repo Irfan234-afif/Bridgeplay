@@ -19,6 +19,9 @@ signing identity. The default size budget is 5 MiB; a larger artifact fails pack
 `BRIDGEPLAY_INSTALLER_MAX_BYTES` can override the budget for a deliberate size review.
 
 CI also packages the DMG as a build artifact and runs `native-installercheck`.
+The maintainer release script attaches the DMG to each app release after generating the
+product appcast, so it never becomes a Sparkle update for the product. Its dry run builds
+an ad hoc DMG without reading signing identities from the keychain.
 The bootstrap can be built separately from the full app/Wine toolchain. Follow
 [BUILD-LOCAL.md](BUILD-LOCAL.md) for the product build, which still requires Xcode.
 Creating an ad hoc DMG does not provide Developer ID signing or notarization. Test a
@@ -36,7 +39,10 @@ The installer stages on the destination volume, coordinates through a persistent
 refuses an active Bridgeplay/updater process, and keeps the prior app in the hidden
 `.Bridgeplay.app.previous` sibling for recovery. An interrupted replacement is recovered
 locally before release discovery, including when the network is unavailable. Unexpected
-backup contents are preserved and reported instead of deleted.
+backup contents are preserved and reported instead of deleted. An older recovery bundle is
+rotated by rename before replacement. Retired copies owned by another account or containing
+read-only directories stay intact as `.Bridgeplay.app.previous-<UUID>` siblings; an
+administrator can remove them in Finder. They do not block subsequent updates.
 
 Prefixes, saves, Steam libraries, support folders and user configuration are not rewritten
 by the bootstrap. Opening the installed app continues its existing Setup Assistant or

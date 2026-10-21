@@ -238,11 +238,20 @@ feed "$out/bridgeplay" Bridgeplay.zip Bridgeplay.app "$slug"
 # installs over /Applications/NotProton.app; later updates match by bundle identifier.
 [ "$legacy" -eq 0 ] || feed "$out/legacy" NotProton.zip NotProton.app "$legacy_slug"
 
+# Add the bootstrap after appcast generation so Sparkle only indexes the product archive.
+if [ "$dry_run" -eq 1 ]; then
+    BRIDGEPLAY_SIGN_IDENTITY=- scripts/package-native-installer.sh
+else
+    scripts/package-native-installer.sh
+fi
+cp out/Bridgeplay-Installer.dmg "$out/bridgeplay/Bridgeplay-Installer.dmg"
+
 title="Bridgeplay $version"
 body=$(printf '%s\n\nBuild %s, based on NotProton %s.\n' "$notes" "$build" "$upstream")
 echo "==> $title (build $build), notes since ${previous:-the beginning}:"
 printf '%s\n' "$notes" | sed 's/^/    /'
 run gh release create "$tag" "$out/bridgeplay/Bridgeplay.zip" "$out/bridgeplay/appcast.xml" \
+    "$out/bridgeplay/Bridgeplay-Installer.dmg" \
 	-R "$slug" --target "$(git rev-parse HEAD)" --title "$title" --notes "$body" --latest
 if [ "$legacy" -eq 1 ]; then
 	# Only a carrier for the feed: the tag goes on that repository's default branch, since

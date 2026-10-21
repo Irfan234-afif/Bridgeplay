@@ -1,969 +1,970 @@
 {
-  "sourceLanguage": "en",
-  "strings": {
-    "Bridgeplay Installer": {
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Installatore Bridgeplay"
+  "sourceLanguage" : "en",
+  "strings" : {
+    "A newer Bridgeplay build is already installed. It has been kept." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A newer Bridgeplay build is already installed. It has been kept."
           }
         },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Program Installer Bridgeplay"
-          }
-        }
-      }
-    },
-    "Bridgeplay is installed. You can eject the installer and move its DMG to Trash in Finder.": {
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Bridgeplay è installato. Puoi espellere il programma di installazione e spostare il DMG nel Cestino dal Finder."
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "È già installata una build più recente di Bridgeplay. È stata mantenuta."
           }
         },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Bridgeplay 已安装。你可以在 Finder 中推出安装器并将 DMG 移到废纸篓。"
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已安装更新的 Bridgeplay 构建版本，现有版本已保留。"
           }
         }
       }
     },
-    "Bridgeplay is ready": {
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Bridgeplay è pronto"
+    "Another application already uses the install location. Move it in Finder before trying again." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Another application already uses the install location. Move it in Finder before trying again."
           }
         },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Bridgeplay 已就绪"
-          }
-        }
-      }
-    },
-    "Bridgeplay is up to date": {
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Bridgeplay è aggiornato"
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Un’altra applicazione occupa già il percorso di installazione. Spostala nel Finder prima di riprovare."
           }
         },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Bridgeplay 已是最新版本"
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "安装位置已有其他应用。请在访达中将其移走后重试。"
           }
         }
       }
     },
-    "Cancel": {
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Annulla"
+    "Another installation is in progress, or the installer lock cannot be accessed. Try again after it finishes." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Another installation is in progress, or the installer lock cannot be accessed. Try again after it finishes."
           }
         },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "取消"
-          }
-        }
-      }
-    },
-    "Check": {
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Verifica"
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "È in corso un’altra installazione o non è possibile accedere al blocco del programma di installazione. Riprova al termine."
           }
         },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "检查"
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "另一个安装正在进行，或无法访问安装锁。请在安装结束后重试。"
           }
         }
       }
     },
-    "Check your installation": {
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Controlla l'installazione"
+    "Bridgeplay Installer" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Installatore Bridgeplay"
           }
         },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "检查安装状态"
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Program Installer Bridgeplay"
           }
         }
       }
     },
-    "Checking the latest release and the application on this Mac.": {
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Controllo l'ultima versione e l'applicazione su questo Mac."
+    "Bridgeplay is installed. You can eject the installer and move its DMG to Trash in Finder." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bridgeplay è installato. Puoi espellere il programma di installazione e spostare il DMG nel Cestino dal Finder."
           }
         },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "正在检查最新版本以及这台 Mac 上的应用程序。"
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bridgeplay 已安装。你可以在 Finder 中推出安装器并将 DMG 移到废纸篓。"
           }
         }
       }
     },
-    "Close Bridgeplay before updating. Steam setup and any required permissions are handled by Bridgeplay after installation.": {
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Chiudi Bridgeplay prima di aggiornare. Dopo l'installazione, Bridgeplay configurerà Steam e richiederà le autorizzazioni necessarie."
+    "Bridgeplay is ready" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bridgeplay è pronto"
           }
         },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "更新前请先退出 Bridgeplay。安装后，Bridgeplay 会配置 Steam 并请求所需权限。"
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bridgeplay 已就绪"
           }
         }
       }
     },
-    "Download": {
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Download"
+    "Bridgeplay is up to date" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bridgeplay è aggiornato"
           }
         },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "下载"
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bridgeplay 已是最新版本"
           }
         }
       }
     },
-    "Downloading": {
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Download in corso"
+    "Cancel" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Annulla"
           }
         },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "正在下载"
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "取消"
           }
         }
       }
     },
-    "Downloading Bridgeplay": {
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Download di Bridgeplay"
+    "Check" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Verifica"
           }
         },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "正在下载 Bridgeplay"
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "检查"
           }
         }
       }
     },
-    "Eject installer and move DMG to Trash": {
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Espelli il programma di installazione e sposta il DMG nel Cestino"
+    "Check your installation" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Controlla l'installazione"
           }
         },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "推出安装器并将 DMG 移到废纸篓"
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "检查安装状态"
           }
         }
       }
     },
-    "Finish": {
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Fine"
+    "Checking the latest release and the application on this Mac." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Controllo l'ultima versione e l'applicazione su questo Mac."
           }
         },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "完成"
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在检查最新版本以及这台 Mac 上的应用程序。"
           }
         }
       }
     },
-    "Game data": {
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Dati di gioco"
+    "Close Bridgeplay before updating. Steam setup and any required permissions are handled by Bridgeplay after installation." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Chiudi Bridgeplay prima di aggiornare. Dopo l'installazione, Bridgeplay configurerà Steam e richiederà le autorizzazioni necessarie."
           }
         },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "游戏数据"
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "更新前请先退出 Bridgeplay。安装后，Bridgeplay 会配置 Steam 并请求所需权限。"
           }
         }
       }
     },
-    "In your Mac's Steam.": {
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Nel tuo Steam sul Mac."
+    "Could not reach the release server. Check your connection and try again." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Could not reach the release server. Check your connection and try again."
           }
         },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "在 Mac 的 Steam 中畅玩。"
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Impossibile raggiungere il server delle versioni. Controlla la connessione e riprova."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "无法连接到版本服务器。请检查网络连接后重试。"
           }
         }
       }
     },
-    "Install": {
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Installa"
+    "Download" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Download"
           }
         },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "安装"
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "下载"
           }
         }
       }
     },
-    "Install Bridgeplay": {
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Installa Bridgeplay"
+    "Downloading" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Download in corso"
           }
         },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "安装 Bridgeplay"
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在下载"
           }
         }
       }
     },
-    "Installation could not continue": {
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Impossibile continuare l'installazione"
+    "Downloading Bridgeplay" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Download di Bridgeplay"
           }
         },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "无法继续安装"
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在下载 Bridgeplay"
           }
         }
       }
     },
-    "Installed": {
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Installato"
+    "Eject installer and move DMG to Trash" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Espelli il programma di installazione e sposta il DMG nel Cestino"
           }
         },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "已安装版本"
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "推出安装器并将 DMG 移到废纸篓"
           }
         }
       }
     },
-    "Installer cleanup could not finish": {
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Impossibile completare la pulizia del programma di installazione"
+    "Finish" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fine"
           }
         },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "无法完成安装器清理"
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "完成"
           }
         }
       }
     },
-    "Installing Bridgeplay": {
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Installazione di Bridgeplay"
+    "Game data" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dati di gioco"
           }
         },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "正在安装 Bridgeplay"
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "游戏数据"
           }
         }
       }
     },
-    "Kept in place": {
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Conservati"
+    "In your Mac's Steam." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nel tuo Steam sul Mac."
           }
         },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "已保留"
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在 Mac 的 Steam 中畅玩。"
           }
         }
       }
     },
-    "Location": {
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Posizione"
+    "Install" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Installa"
           }
         },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "位置"
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "安装"
           }
         }
       }
     },
-    "OK": {
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "OK"
+    "Install Bridgeplay" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Installa Bridgeplay"
           }
         },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "好"
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "安装 Bridgeplay"
           }
         }
       }
     },
-    "Only the application is downloaded here. Its signature is checked before installation.": {
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Qui viene scaricata solo l'applicazione. La firma viene verificata prima dell'installazione."
+    "Installation could not continue" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Impossibile continuare l'installazione"
           }
         },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "此处只会下载应用程序，并在安装前验证其签名。"
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "无法继续安装"
           }
         }
       }
     },
-    "Open Bridgeplay": {
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Apri Bridgeplay"
+    "Installed" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Installato"
           }
         },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "打开 Bridgeplay"
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已安装版本"
           }
         }
       }
     },
-    "Open Bridgeplay to continue setup or check its Status page for component updates. Engine and graphics downloads are handled there.": {
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Apri Bridgeplay per continuare la configurazione o controllare gli aggiornamenti dei componenti nella pagina Stato. Da lì puoi scaricare motore e grafica."
+    "Installer cleanup could not finish" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Impossibile completare la pulizia del programma di installazione"
           }
         },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "打开 Bridgeplay 继续设置，或在“状态”页面检查组件更新。你可以在那里下载引擎和图形组件。"
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "无法完成安装器清理"
           }
         }
       }
     },
-    "Review": {
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Riepilogo"
+    "Installing Bridgeplay" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Installazione di Bridgeplay"
           }
         },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "确认"
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在安装 Bridgeplay"
           }
         }
       }
     },
-    "Review the details below, then try again. The installer does not remove your game data.": {
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Controlla i dettagli qui sotto e riprova. Il programma di installazione non rimuove i dati di gioco."
+    "Kept in place" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Conservati"
           }
         },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "请查看下方详情后重试。安装器不会删除你的游戏数据。"
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已保留"
           }
         }
       }
     },
-    "Something went wrong": {
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Si è verificato un problema"
+    "Location" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Posizione"
           }
         },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "出了点问题"
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "位置"
           }
         }
       }
     },
-    "The application goes in Applications. Your settings, game prefixes and saves are kept.": {
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "L'applicazione viene installata in Applicazioni. Le impostazioni, i prefissi di gioco e i salvataggi vengono mantenuti."
+    "OK" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "OK"
           }
         },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "应用程序将安装到“应用程序”文件夹。你的设置、游戏前缀和存档都会保留。"
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "好"
           }
         }
       }
     },
-    "The download could not be verified. Your installed application has been kept.": {
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Impossibile verificare il download. L'applicazione installata è stata conservata."
+    "Only the application is downloaded here. Its signature is checked before installation." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Qui viene scaricata solo l'applicazione. La firma viene verificata prima dell'installazione."
           }
         },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "无法验证下载文件。已保留当前安装的应用程序。"
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "此处只会下载应用程序，并在安装前验证其签名。"
           }
         }
       }
     },
-    "The source DMG could not be identified. You can eject it and move it to Trash in Finder.": {
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Impossibile identificare il DMG di origine. Puoi espellerlo e spostarlo nel Cestino dal Finder."
+    "Open Bridgeplay" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apri Bridgeplay"
           }
         },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "无法识别来源 DMG。你可以在 Finder 中将其推出并移到废纸篓。"
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "打开 Bridgeplay"
           }
         }
       }
     },
-    "Try Again": {
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Riprova"
+    "Open Bridgeplay to continue setup or check its Status page for component updates. Engine and graphics downloads are handled there." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apri Bridgeplay per continuare la configurazione o controllare gli aggiornamenti dei componenti nella pagina Stato. Da lì puoi scaricare motore e grafica."
           }
         },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "重试"
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "打开 Bridgeplay 继续设置，或在“状态”页面检查组件更新。你可以在那里下载引擎和图形组件。"
           }
         }
       }
     },
-    "Update": {
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Aggiorna"
+    "Quit Bridgeplay and its updater, then try again." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Quit Bridgeplay and its updater, then try again."
           }
         },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "更新"
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Chiudi Bridgeplay e il suo programma di aggiornamento, poi riprova."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "请退出 Bridgeplay 及其更新程序后重试。"
           }
         }
       }
     },
-    "Update Bridgeplay": {
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Aggiorna Bridgeplay"
+    "Review" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Riepilogo"
           }
         },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "更新 Bridgeplay"
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "确认"
           }
         }
       }
     },
-    "Verifying and installing": {
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Verifica e installazione"
+    "Review the details below, then try again. The installer does not remove your game data." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Controlla i dettagli qui sotto e riprova. Il programma di installazione non rimuove i dati di gioco."
           }
         },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "正在验证并安装"
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "请查看下方详情后重试。安装器不会删除你的游戏数据。"
           }
         }
       }
     },
-    "Verifying and replacing the application. Please keep the installer open.": {
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Verifica e sostituzione dell'applicazione. Tieni aperto il programma di installazione."
+    "Something went wrong" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Si è verificato un problema"
           }
         },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "正在验证并替换应用程序。请保持安装器打开。"
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "出了点问题"
           }
         }
       }
     },
-    "Version": {
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Versione"
+    "The application could not be replaced. Check the app and its previous-version backup in Applications before trying again." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The application could not be replaced. Check the app and its previous-version backup in Applications before trying again."
           }
         },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "版本"
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Impossibile sostituire l’applicazione. Controlla l’app e il backup della versione precedente in Applicazioni prima di riprovare."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "无法替换应用。请在“应用程序”中检查应用及其旧版本备份后重试。"
           }
         }
       }
     },
-    "Windows games.": {
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Giochi Windows."
+    "The application goes in Applications. Your settings, game prefixes and saves are kept." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "L'applicazione viene installata in Applicazioni. Le impostazioni, i prefissi di gioco e i salvataggi vengono mantenuti."
           }
         },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "畅玩 Windows 游戏。"
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "应用程序将安装到“应用程序”文件夹。你的设置、游戏前缀和存档都会保留。"
           }
         }
       }
     },
-    "The release information is invalid. Try again later.": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "The release information is invalid. Try again later."
+    "The application location is not safe to update." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The application location is not safe to update."
           }
         },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Le informazioni sulla versione non sono valide. Riprova più tardi."
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Il percorso dell’applicazione non può essere aggiornato in sicurezza."
           }
         },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "版本信息无效。请稍后重试。"
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "无法安全更新此应用位置。"
           }
         }
       }
     },
-    "Could not reach the release server. Check your connection and try again.": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Could not reach the release server. Check your connection and try again."
+    "The download could not be saved. Check available space and folder permissions." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The download could not be saved. Check available space and folder permissions."
           }
         },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Impossibile raggiungere il server delle versioni. Controlla la connessione e riprova."
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Impossibile salvare il download. Controlla lo spazio disponibile e i permessi della cartella."
           }
         },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "无法连接到版本服务器。请检查网络连接后重试。"
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "无法保存下载内容。请检查可用空间和文件夹权限。"
           }
         }
       }
     },
-    "The application location is not safe to update.": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "The application location is not safe to update."
+    "The download could not be verified. Your installed application has been kept." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Impossibile verificare il download. L'applicazione installata è stata conservata."
           }
         },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Il percorso dell’applicazione non può essere aggiornato in sicurezza."
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "无法安全更新此应用位置。"
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "无法验证下载文件。已保留当前安装的应用程序。"
           }
         }
       }
     },
-    "The download is incomplete or has an unexpected size. Try again.": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "The download is incomplete or has an unexpected size. Try again."
+    "The download is incomplete or has an unexpected size. Try again." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The download is incomplete or has an unexpected size. Try again."
           }
         },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Il download è incompleto o ha dimensioni inattese. Riprova."
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Il download è incompleto o ha dimensioni inattese. Riprova."
           }
         },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "下载不完整或大小不符合预期。请重试。"
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "下载不完整或大小不符合预期。请重试。"
           }
         }
       }
     },
-    "The download could not be saved. Check available space and folder permissions.": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "The download could not be saved. Check available space and folder permissions."
+    "The downloaded application did not pass validation. Your installed application has been kept." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The downloaded application did not pass validation. Your installed application has been kept."
           }
         },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Impossibile salvare il download. Controlla lo spazio disponibile e i permessi della cartella."
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "L’applicazione scaricata non ha superato la verifica. L’applicazione installata è stata mantenuta."
           }
         },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "无法保存下载内容。请检查可用空间和文件夹权限。"
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "下载的应用未通过验证。现有应用已保留。"
           }
         }
       }
     },
-    "This release requires a newer macOS version or an Apple silicon Mac.": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "This release requires a newer macOS version or an Apple silicon Mac."
+    "The existing application could not be read. Check the application in Finder before trying again." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The existing application could not be read. Check the application in Finder before trying again."
           }
         },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Questa versione richiede una versione più recente di macOS o un Mac con chip Apple."
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Impossibile leggere l’applicazione esistente. Controllala nel Finder prima di riprovare."
           }
         },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "此版本需要更新的 macOS 或搭载 Apple 芯片的 Mac。"
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "无法读取现有应用。请在访达中检查该应用后重试。"
           }
         }
       }
     },
-    "The existing application could not be read. Check the application in Finder before trying again.": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "The existing application could not be read. Check the application in Finder before trying again."
+    "The release information is invalid. Try again later." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The release information is invalid. Try again later."
           }
         },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Impossibile leggere l’applicazione esistente. Controllala nel Finder prima di riprovare."
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le informazioni sulla versione non sono valide. Riprova più tardi."
           }
         },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "无法读取现有应用。请在访达中检查该应用后重试。"
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "版本信息无效。请稍后重试。"
           }
         }
       }
     },
-    "Another application already uses the install location. Move it in Finder before trying again.": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Another application already uses the install location. Move it in Finder before trying again."
+    "The source DMG could not be identified. You can eject it and move it to Trash in Finder." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Impossibile identificare il DMG di origine. Puoi espellerlo e spostarlo nel Cestino dal Finder."
           }
         },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Un’altra applicazione occupa già il percorso di installazione. Spostala nel Finder prima di riprovare."
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "安装位置已有其他应用。请在访达中将其移走后重试。"
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "无法识别来源 DMG。你可以在 Finder 中将其推出并移到废纸篓。"
           }
         }
       }
     },
-    "A newer Bridgeplay build is already installed. It has been kept.": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "A newer Bridgeplay build is already installed. It has been kept."
+    "This Bridgeplay version is already installed. Check again to continue." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This Bridgeplay version is already installed. Check again to continue."
           }
         },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "È già installata una build più recente di Bridgeplay. È stata mantenuta."
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Questa versione di Bridgeplay è già installata. Controlla di nuovo per continuare."
           }
         },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "已安装更新的 Bridgeplay 构建版本，现有版本已保留。"
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "此 Bridgeplay 版本已安装。请重新检查以继续。"
           }
         }
       }
     },
-    "This Bridgeplay version is already installed. Check again to continue.": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "This Bridgeplay version is already installed. Check again to continue."
+    "This release requires a newer macOS version or an Apple silicon Mac." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This release requires a newer macOS version or an Apple silicon Mac."
           }
         },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Questa versione di Bridgeplay è già installata. Controlla di nuovo per continuare."
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Questa versione richiede una versione più recente di macOS o un Mac con chip Apple."
           }
         },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "此 Bridgeplay 版本已安装。请重新检查以继续。"
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "此版本需要更新的 macOS 或搭载 Apple 芯片的 Mac。"
           }
         }
       }
     },
-    "Quit Bridgeplay and its updater, then try again.": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Quit Bridgeplay and its updater, then try again."
+    "Try Again" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Riprova"
           }
         },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Chiudi Bridgeplay e il suo programma di aggiornamento, poi riprova."
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "请退出 Bridgeplay 及其更新程序后重试。"
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "重试"
           }
         }
       }
     },
-    "Another installation is in progress, or the installer lock cannot be accessed. Try again after it finishes.": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Another installation is in progress, or the installer lock cannot be accessed. Try again after it finishes."
+    "Update" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aggiorna"
           }
         },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "È in corso un’altra installazione o non è possibile accedere al blocco del programma di installazione. Riprova al termine."
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "另一个安装正在进行，或无法访问安装锁。请在安装结束后重试。"
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "更新"
           }
         }
       }
     },
-    "The downloaded application did not pass validation. Your installed application has been kept.": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "The downloaded application did not pass validation. Your installed application has been kept."
+    "Update Bridgeplay" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aggiorna Bridgeplay"
           }
         },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "L’applicazione scaricata non ha superato la verifica. L’applicazione installata è stata mantenuta."
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "下载的应用未通过验证。现有应用已保留。"
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "更新 Bridgeplay"
           }
         }
       }
     },
-    "The application could not be replaced. Check the app and its previous-version backup in Applications before trying again.": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "The application could not be replaced. Check the app and its previous-version backup in Applications before trying again."
+    "Verifying and installing" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Verifica e installazione"
           }
         },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Impossibile sostituire l’applicazione. Controlla l’app e il backup della versione precedente in Applicazioni prima di riprovare."
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在验证并安装"
+          }
+        }
+      }
+    },
+    "Verifying and replacing the application. Please keep the installer open." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Verifica e sostituzione dell'applicazione. Tieni aperto il programma di installazione."
           }
         },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "无法替换应用。请在“应用程序”中检查应用及其旧版本备份后重试。"
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在验证并替换应用程序。请保持安装器打开。"
+          }
+        }
+      }
+    },
+    "Version" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Versione"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "版本"
+          }
+        }
+      }
+    },
+    "Windows games." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Giochi Windows."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "畅玩 Windows 游戏。"
           }
         }
       }
     }
-  }
+  },
+  "version" : "1.0"
 }
