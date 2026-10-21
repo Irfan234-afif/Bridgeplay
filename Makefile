@@ -154,8 +154,10 @@ mincheck:
 .PHONY: l10ncheck
 l10ncheck:
 	@bin=$$(swift build --package-path app -c release --show-bin-path); \
-	python3 dylib/tests/l10ncheck.py app/Sources/BridgeplayApp/Resources/Localization/Localizable.xcstrings \
-		"$$bin/../../Intermediates.noindex/BridgeplayApp.build/$$(basename "$$bin")" zh-Hans it
+	for target in BridgeplayApp BridgeplayInstaller; do \
+		python3 dylib/tests/l10ncheck.py "app/Sources/$$target/Resources/Localization/Localizable.xcstrings" \
+			"$$bin/../../Intermediates.noindex/BridgeplayApp.build/$$(basename "$$bin")" zh-Hans it || exit $$?; \
+	done
 
 # runcheck owns compat_run.sh, whose warnings wait for a change that can move
 # the embedded __text baseline
@@ -803,6 +805,8 @@ app: app-payload $(ICON_CAR)
 		"$(APP_BUNDLE)/Contents/MacOS/BridgeplayApp"
 	cp -R "$$(swift build --package-path app -c release --show-bin-path)/BridgeplayApp_BridgeplayApp.bundle" \
 		"$(APP_BUNDLE)/Contents/Resources/"
+	cp -R "$$(swift build --package-path app -c release --show-bin-path)/BridgeplayApp_BridgeplayUI.bundle" \
+		"$(APP_BUNDLE)/Contents/Resources/"
 	cp -R "$(APP_BUNDLE)/Contents/Resources/BridgeplayApp_BridgeplayApp.bundle/Contents/Resources/"*.lproj \
 		"$(APP_BUNDLE)/Contents/Resources/"
 	cp "$(ICON_DIR)/Assets.car" "$(ICON_DIR)/$(ICON_NAME).icns" \
@@ -894,7 +898,7 @@ CI_CHECKS := mincheck l10ncheck \
 	activatecheck compatcheck compatsvc-check shortcutcheck launch-shell envcheck \
 	buildcheck settingscheck routecheck bridgecheck gamedrivecheck launchercheck \
 	seedcheck gamefixescheck padcheck compat-reported-check np-native-tests native-shim-tests \
-	app-tests game-host-check dualsense-check steam-rumble-check
+	app-tests native-installercheck game-host-check dualsense-check steam-rumble-check
 
 # app.yml runs the checks that need the built app in its build job and the rest in a
 # parallel job; both lists together are CI_CHECKS.
@@ -914,3 +918,11 @@ ci-checks:
 	done; \
 	if [ -n "$$failed" ]; then echo "==> ci-checks failed:$$failed" >&2; exit 1; fi; \
 	echo "==> ci-checks: all $(words $(CI_CHECKS)) checks passed"
+
+.PHONY: native-installer native-installercheck
+native-installer:
+	sh scripts/package-native-installer.sh
+
+native-installercheck:
+	sh scripts/test-native-installer.sh
+	sh scripts/test-installer-cleanup.sh

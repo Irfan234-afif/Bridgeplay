@@ -1,4 +1,5 @@
 import SwiftUI
+import BridgeplayUI
 
 // How to reach a game's Bridgeplay settings in Steam, and what every one of them does. The
 // pictures are drawings of Steam's own screens in Steam's colours (like the ones on
