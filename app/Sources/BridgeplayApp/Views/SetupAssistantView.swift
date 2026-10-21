@@ -1,5 +1,6 @@
 import SwiftUI
 import UniformTypeIdentifiers
+import BridgeplayUI
 
 // First-run Setup Assistant. Built from the Status page's own pieces (a grouped Form of
 // StatusRows with StatusTone dots and StatusActions) so it reads as part of the same app.
@@ -73,7 +74,7 @@ struct SetupAssistantView: View {
                     VStack(alignment: .leading, spacing: 14) {
                         content
                         if let message = model.message {
-                            Card {
+                            SetupCard {
                                 WizardRow(row: StatusRow(title: String(localized: "Something went wrong"), value: message, tone: .bad))
                             }
                         }
@@ -156,19 +157,19 @@ struct SetupAssistantView: View {
     private var macStep: some View {
         StepHeader(step: model.step, title: "Check your Mac",
                    detail: "Bridgeplay runs Windows games from your Steam library. First, a few quick checks.")
-        Card {
+        SetupCard {
             checked(0, StatusRow(title: String(localized: "Apple silicon"),
                       value: model.appleSilicon ? SetupChecks.chipName : String(localized: "Bridgeplay doesn't run on Intel Macs."),
                       tone: model.appleSilicon ? .ok : .bad))
-            Hairline()
+            SetupHairline()
             checked(1, StatusRow(title: String(localized: "macOS \(SetupChecks.minimumMacOS) or later"),
                       value: model.macOSSupported ? SetupChecks.macOSDisplay : String(localized: "\(SetupChecks.macOSDisplay). Update macOS first."),
                       tone: model.macOSSupported ? .ok : .bad))
-            Hairline()
+            SetupHairline()
             checked(2, StatusRow(title: String(localized: "Free space"),
                       value: model.freeBytes.map { String(localized: "\(ByteCountFormatter.string(fromByteCount: $0, countStyle: .file)) available, 3 GB needed") },
                       tone: model.hasSpace ? .ok : .bad))
-            Hairline()
+            SetupHairline()
             checked(3, StatusRow(title: String(localized: "Rosetta 2"),
                       value: model.rosettaInstalled ? String(localized: "Installed.") : String(localized: "Apple's translator for Windows games. Asks for your Mac password."),
                       tone: model.rosettaInstalled ? .ok : .warning,
@@ -182,7 +183,7 @@ struct SetupAssistantView: View {
     private var graphicsStep: some View {
         StepHeader(step: model.step, title: "Add Apple's game graphics",
                    detail: "Apple's Game Porting Toolkit includes D3DMetal, which runs DirectX 11 and 12 games on Metal, with MetalFX upscaling. It's free, but only Apple can hand it out, so you download it once with your Apple Account.")
-        Card {
+        SetupCard {
             if let gptk = model.gptk {
                 WizardRow(row: StatusRow(title: String(localized: "Game Porting Toolkit"),
                           value: String(localized: "Ready from \(gptk.libRoot.path(percentEncoded: false))."),
@@ -193,7 +194,7 @@ struct SetupAssistantView: View {
                           action: StatusAction(label: String(localized: "Open Apple Downloads")) {
                               NSWorkspace.shared.open(URL(string: "https://developer.apple.com/download/all/?q=Game%20Porting%20Toolkit")!)
                           }), number: 1)
-                Hairline()
+                SetupHairline()
                 if let image = model.gptkImages.first {
                     WizardRow(row: StatusRow(title: String(localized: "Use the one in Downloads"),
                               value: image.lastPathComponent,
@@ -226,19 +227,19 @@ struct SetupAssistantView: View {
     private var steamStep: some View {
         StepHeader(step: model.step, title: "Sign in to Steam",
                    detail: "Sign in with your account in Steam. Bridgeplay continues on its own once you're in.")
-        Card {
+        SetupCard {
             checked(0, StatusRow(title: String(localized: "Steam"),
                       value: model.steamInstalled ? SupportPaths.Steam.app.path(percentEncoded: false) : String(localized: "Not installed."),
                       tone: model.steamInstalled ? .ok : .warning,
                       action: model.steamInstalled ? nil : StatusAction(
                         label: String(localized: "Install Steam"), isProminent: true, isEnabled: !model.isWorking
                       ) { Task { await model.installSteam() } }))
-            Hairline()
+            SetupHairline()
             checked(1, StatusRow(title: String(localized: "Steam account"),
                       value: model.signedIn ? String(localized: "Signed in.") : String(localized: "Waiting for you to sign in. Bridgeplay never sees your password."),
                       tone: model.signedIn ? .ok : .info,
                       action: model.signedIn || !model.steamInstalled ? nil : StatusAction(label: String(localized: "Open Steam"), isProminent: true) { model.openSteam() }))
-            Hairline()
+            SetupHairline()
             checked(2, trustRow)
         }
     }
@@ -273,9 +274,9 @@ struct SetupAssistantView: View {
         if model.tasks.contains(where: { $0.state != .done }) {
             approvals
         }
-        Card {
+        SetupCard {
             ForEach(Array(model.tasks.enumerated()), id: \.element.id) { index, task in
-                if index > 0 { Hairline() }
+                if index > 0 { SetupHairline() }
                 WizardRow(row: StatusRow(title: task.title, value: value(of: task), tone: tone(of: task)),
                           pending: task.state == .running)
                     .animation(Self.rowSpring, value: task.state)
@@ -294,7 +295,7 @@ struct SetupAssistantView: View {
         }
         .padding(.horizontal, 2)
         if model.needsAppManagement {
-            Card {
+            SetupCard {
                 WizardRow(row: StatusRow(title: String(localized: "App Management"),
                           value: String(localized: "Turn on Bridgeplay in Privacy & Security › App Management. Setup continues by itself once it's on."),
                           tone: .warning,
@@ -311,12 +312,12 @@ struct SetupAssistantView: View {
     // can change. App Management can ask too.
     @ViewBuilder
     private var approvals: some View {
-        Card {
+        SetupCard {
             if model.trust == .done {
                 WizardRow(row: StatusRow(title: String(localized: "Confirm the Steam update"),
                           value: String(localized: "macOS asks for your Mac password once, so Steam keeps working with Bridgeplay. Type it and choose Always Allow, and it won't ask again."),
                           tone: .info))
-                Hairline()
+                SetupHairline()
             }
             WizardRow(row: StatusRow(title: String(localized: "Allow Bridgeplay in App Management"),
                       value: String(localized: "If macOS shows the switch, turn it on. Setup carries on by itself."),
@@ -329,15 +330,15 @@ struct SetupAssistantView: View {
         StepHeader(step: model.step, title: "You're all set",
                    detail: "Open Steam, install a Windows game and press Play. Status, Prefixes and Prefix Backups in this window change engines, fix a game or undo everything.",
                    emphasized: true)
-        Card {
+        SetupCard {
             checked(0, StatusRow(title: String(localized: "Bridgeplay"), value: String(localized: "Installed into Steam."), tone: .ok))
-            Hairline()
+            SetupHairline()
             checked(1, StatusRow(title: String(localized: "WineCX Engine"), value: String(localized: "Steam's default for Windows games."), tone: .ok))
-            Hairline()
+            SetupHairline()
             checked(2, StatusRow(title: String(localized: "Game Porting Toolkit"),
                       value: model.gptk == nil ? String(localized: "Skipped. Games use DXMT; add it later from Status.") : String(localized: "Linked."),
                       tone: model.gptk == nil ? .neutral : .ok))
-            Hairline()
+            SetupHairline()
             checked(3, StatusRow(title: String(localized: "Controllers"),
                       value: String(localized: "The first time a game uses a controller, macOS asks to let Steam use Input Monitoring. Click Allow. If you missed it, turn on Steam in Input Monitoring."),
                       tone: .info,
@@ -348,12 +349,12 @@ struct SetupAssistantView: View {
             .foregroundStyle(BP.fg)
             .padding(.horizontal, 2)
             .padding(.top, 8)
-        Card {
+        SetupCard {
             WizardRow(row: StatusRow(title: String(localized: "Metal HUD"),
                       value: String(localized: "Shows frame rate and GPU details in a corner while you play."),
                       toggle: Binding(get: { model.metalHUD }, set: { model.setGameDefault(.metalHUD, $0) })),
                       symbol: "gauge.with.dots.needle.33percent")
-            Hairline()
+            SetupHairline()
             WizardRow(row: StatusRow(title: String(localized: "High Resolution"),
                       value: String(localized: "Sharper on Retina displays, but games run slower."),
                       toggle: Binding(get: { model.highResolution }, set: { model.setGameDefault(.highResolution, $0) })),
@@ -504,23 +505,6 @@ private struct StepHeader: View {
                 .fixedSize(horizontal: false, vertical: true)
         }
         .padding(.bottom, 6)
-    }
-}
-
-// .tile on the site: one raised panel, hairline border, small radius.
-private struct Card<Content: View>: View {
-    @ViewBuilder let content: Content
-
-    var body: some View {
-        VStack(spacing: 0) { content }
-            .background(BP.raise, in: RoundedRectangle(cornerRadius: BP.radius, style: .continuous))
-            .overlay(RoundedRectangle(cornerRadius: BP.radius, style: .continuous).strokeBorder(BP.line, lineWidth: 1))
-    }
-}
-
-private struct Hairline: View {
-    var body: some View {
-        Rectangle().fill(BP.line).frame(height: 1).padding(.leading, 54)
     }
 }
 

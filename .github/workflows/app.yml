@@ -146,10 +146,14 @@ jobs:
       - name: Run the checks that need the built app
         run: make ci-checks-built
 
+      - name: Package the native installer
+        run: make native-installer
+
       - name: Package the app bundle
         run: |
           mkdir -p out/artifact
           ditto -c -k --keepParent out/Bridgeplay.app out/artifact/Bridgeplay.zip
+          cp out/Bridgeplay-Installer.dmg out/artifact/
 
       - name: Upload the app bundle
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
