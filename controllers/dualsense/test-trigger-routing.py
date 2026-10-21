@@ -51,12 +51,13 @@ for pcm, grace in ((False, 75), (False, 0), (True, 0)):
                 addr,
             )
 
-        # A fixed count, not a 1.2 s window: slow CI hosts oversleep.
+        # A fixed count, not a 1.2 s window: slow CI hosts oversleep. The genuine release is
+        # the last off sent, so time it from that send, not from after an oversleep.
         for _ in range(110):
             send(curve)
             send(off)
+            stopped = time.time()
             time.sleep(0.01)
-        stopped = time.time()
         d = json.loads(status.read_text())
         t = d["triggers"]
         if not grace:
