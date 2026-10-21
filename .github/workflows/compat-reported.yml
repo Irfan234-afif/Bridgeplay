@@ -1,0 +1,42 @@
+# Weekly refresh of compat/reported.json, the AppleGamingWiki CrossOver ratings that
+# bridgeplay.dev/compatibility shows as "Should work". The site reads the file from main,
+# so a commit here is live without a deploy. Commits only when the game list changed.
+name: compat-reported
+
+on:
+  schedule:
+    - cron: "41 3 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency: compat-reported
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      - name: Fetch AppleGamingWiki ratings
+        run: python3 scripts/compat-reported.py
+
+      - name: Commit if the game list changed
+        run: |
+          set -euo pipefail
+          # "fetched" changes every run; only a different games list is worth a commit.
+          if git show HEAD:compat/reported.json | python3 -c '
+          import json, sys
+          old = json.load(sys.stdin)["games"]
+          new = json.load(open("compat/reported.json"))["games"]
+          sys.exit(0 if old == new else 1)'; then
+            echo "no change in the game list"
+            exit 0
+          fi
+          git add compat/reported.json
+          git -c user.name="github-actions[bot]" \
+              -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
+              commit -q -m "chore(compat): refresh AppleGamingWiki ratings"
+          git push -q origin HEAD:main

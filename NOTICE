@@ -90,7 +90,8 @@ in app/Sources/BridgeplayApp/Model/FreeEngine*.swift) when they are not there.
       the Apple Software" (section 2C). The wine/ libraries are Apple's build of
       Wine (LGPL-2.1-or-later); their source is the Wine source Apple publishes
       for the Game Porting Toolkit, which Raymond Chin will also provide on request
-      under the offer below.
+      under the offer below. How each condition of Apple's license is met:
+      docs/GPTK-LICENSE.md.
 
 The license texts of DXMT and DXVK ship next to these archives in the installer.
 
