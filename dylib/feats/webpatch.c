@@ -477,28 +477,12 @@ static int out_expand(np_out_t *o, const char *replace, const np_cap_t *caps) {
     "(0," NP_C1 ".CI)()&&" NP_C2 ".push({title:(0," NP_C3 ".we)(\"#AppProperties_CompatibilityPage\")"
 #define NP_TAB_REPLACE "true&&" NP_C2 ".push({title:\"Bridgeplay\""
 
-// The Bridgeplay mark next to the tab name. Optional: if Steam moves it, the tab stays.
-#define NP_TAB_ICON_SVG \
-    "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' width='16' height='16'>" \
-    "<rect width='24' height='24' rx='6' fill='#000'/>" \
-    "<g transform='translate(2.4 2.4) scale(.8)' fill='none' stroke='#f5f5f7' stroke-linecap='round' stroke-linejoin='round'>" \
-    "<path d='M2 14h20M6.5 4v10M17.5 4v10' stroke-width='1.8'/>" \
-    "<path d='M2 7c2.5 0 3.5-3 4.5-3S9.5 11 12 11s4.5-7 5.5-7 2 3 4.5 3' stroke-width='1.4'/>" \
-    "<path d='M6.5 16.5v3M17.5 16.5v3M2 21c2.5 0 3.5-1.6 4.5-1.6S9.5 17.3 12 17.3s4.5 2.1 5.5 2.1 2 1.6 4.5 1.6' stroke-width='1.2' opacity='.35'/>" \
-    "</g></svg>"
-#define NP_TAB_ICON_GATE \
-    { ",link:" NP_C1 "." NP_C2 ".AppProperties.Compatibility(" NP_C3 "),content:(0," NP_C4 ".jsx)(", \
-      ",link:" NP_C1 "." NP_C2 ".AppProperties.Compatibility(" NP_C3 "),icon:(0," NP_C4 ".jsx)(\"span\"," \
-      "{style:{display:\"flex\"},dangerouslySetInnerHTML:{__html:\"" NP_TAB_ICON_SVG "\"}})," \
-      "content:(0," NP_C4 ".jsx)(", 2, 1 }
-
 static const np_gate_t g_gates_forcetool[] = {
     // SteamPlay settings section
     { "function " NP_C1 "(" NP_C2 "){return(0," NP_C3 ".CI)()?",
       "function " NP_C1 "(" NP_C2 "){return true?", 1, 0 },
     // AppProperties Compatibility tab, shown as Bridgeplay (app and non-Steam-shortcut variants)
     { NP_TAB_FIND, NP_TAB_REPLACE, 2, 0 },
-    NP_TAB_ICON_GATE,
     // Settings page Compatibility entry, keeping the SteamOS exclusion (!rf())
     { "Compatibility:{visible:" NP_C1 "&&(0," NP_C2 ".CI)()&&!(0," NP_C2 ".rf)()",
       "Compatibility:{visible:" NP_C1 "&&true&&!(0," NP_C2 ".rf)()", 1, 0 },
@@ -539,7 +523,6 @@ static const np_gate_t g_gates_forcetool[] = {
 static const np_gate_t g_gates_selecttool[] = {
     // AppProperties Compatibility tab, shown as Bridgeplay
     { NP_TAB_FIND, NP_TAB_REPLACE, 2, 0 },
-    NP_TAB_ICON_GATE,
     // Settings page Compatibility entry.
     { "Compatibility:{visible:" NP_C1 "&&(0," NP_C2 ".CI)(),title:",
       "Compatibility:{visible:" NP_C1 "&&true,title:", 1, 0 },

@@ -311,10 +311,7 @@ private struct SteamPropertiesDrawing: View {
                     .lineLimit(1)
                     .padding(.bottom, 8)
                 ForEach(Array(tabs.enumerated()), id: \.offset) { index, tab in
-                    HStack(spacing: 4) {
-                        if index == 1 { BridgeplayMark(size: 10) }
-                        Text(tab)
-                    }
+                    Text(tab)
                     .font(Steam.font(10.5, .regular))
                     .foregroundStyle(index == 1 ? Color.white : Steam.dim)
                     .lineLimit(1)
