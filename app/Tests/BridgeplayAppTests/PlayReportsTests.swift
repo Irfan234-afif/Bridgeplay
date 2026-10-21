@@ -89,6 +89,23 @@ struct PlayReportsTests {
         let json = try JSONSerialization.jsonObject(with: JSONEncoder().encode(payload)) as? [String: Any]
         #expect(json?["status"] as? String == "silver")
         #expect(json?["source"] as? String == "auto")
+        #expect(json?["note"] == nil && json?["setup"] == nil, "absent, not null, for older endpoints")
+    }
+
+    @Test("The payload carries the player's note and the Mac's setup")
+    func payloadNoteAndSetup() {
+        var machine = GameReport.Machine(chip: "Apple M4", memoryBytes: 16 * 1_073_741_824,
+                                         macOS: "macOS 27.0", bridgeplay: "3.4.1 (42)")
+        machine.setup = ["lowPower": "off", "displays": "1: built-in 3024x1964 120 Hz"]
+        let make = { (note: String?) in
+            ReportPayload.make(name: "MGSV", appID: "287700", status: .bronze, source: .tap, session: .byHand(),
+                               log: nil, wineLog: nil, machine: machine, install: "0F8FAD5B-D9CB-469F-A165-70867728950E",
+                               note: note)
+        }
+        #expect(make("  no sound in cutscenes \n").note == "no sound in cutscenes")
+        #expect(make("   ").note == nil)
+        #expect(make(String(repeating: "x", count: 3000)).note?.count == 1000)
+        #expect(make(nil).setup?["lowPower"] == "off")
     }
 }
 
@@ -203,7 +220,7 @@ struct PlayReportsFlowTests {
         reports.handle([found("10", minutes: 90), found("20", minutes: 20)])
         #expect(reports.nudges.count == 2)
         reports.answer(.platinum)
-        #expect(reports.consentRequest == .answer(.platinum))
+        #expect(reports.consentRequest == .answer(.platinum, note: nil))
         #expect(reports.nudges.count == 2, "nothing is sent before consent")
         reports.consentRequest = nil
         reports.dismiss()
@@ -218,7 +235,8 @@ struct PlayReportsFlowTests {
         defer { try? FileManager.default.removeItem(at: queue) }
         let (reports, _) = model("201", queue: queue)
         reports.handle([found("10", minutes: 90)])
-        reports.answer(.bronze)
+        reports.answer(.bronze, note: "no sound")
+        #expect(reports.consentRequest == .answer(.bronze, note: "no sound"), "the note waits for consent")
         reports.consent(alsoAutoShare: false)
         #expect(reports.nudges.isEmpty)
         #expect(reports.thanking)

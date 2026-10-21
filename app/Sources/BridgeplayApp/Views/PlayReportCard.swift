@@ -1,11 +1,52 @@
 import SwiftUI
 
-// Asks how the last game session ran. One tap on an answer sends the report.
+// Asks how the last game session ran. Smooth sends at once; Has Issues and Didn't Run first
+// offer an optional note on what went wrong.
 struct PlayReportCard: View {
     let nudge: PlayReports.Nudge
+    @State private var pending: ReportStatus?
+    @State private var note = ""
     private var reports: PlayReports { .shared }
 
     var body: some View {
+        Group {
+            if let pending { noteRow(pending) } else { answerRow }
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 10)
+        .background(.bar)
+        .overlay(alignment: .top) { Divider() }
+        .onChange(of: nudge.id) {
+            pending = nil
+            note = ""
+        }
+    }
+
+    private func noteRow(_ status: ReportStatus) -> some View {
+        HStack(alignment: .center, spacing: 12) {
+            Image(systemName: "text.bubble.fill")
+                .foregroundStyle(BP.blue)
+                .accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: 4) {
+                Text("What went wrong? Optional, and public with the report.").font(BP.sans(13, .semibold))
+                TextField("For example: no sound, crashes when a level loads", text: $note)
+                    .textFieldStyle(.roundedBorder)
+                    .onSubmit { send(status) }
+            }
+            Spacer(minLength: 12)
+            Button("Back") { pending = nil }
+            Button("Send") { send(status) }
+                .buttonStyle(.borderedProminent)
+        }
+    }
+
+    private func send(_ status: ReportStatus) {
+        reports.answer(status, note: note)
+        pending = nil
+        note = ""
+    }
+
+    private var answerRow: some View {
         HStack(alignment: .center, spacing: 12) {
             Image(systemName: "gamecontroller.fill")
                 .foregroundStyle(BP.blue)
@@ -21,8 +62,8 @@ struct PlayReportCard: View {
             Spacer(minLength: 12)
             Button("Smooth") { reports.answer(.platinum) }
                 .buttonStyle(.borderedProminent)
-            Button("Has issues") { reports.answer(.bronze) }
-            Button("Didn't run") { reports.answer(.borked) }
+            Button("Has issues") { pending = .bronze }
+            Button("Didn't run") { pending = .borked }
             // A click is Not Now; the menu also offers never asking about this game.
             Menu {
                 Button("Not Now") { reports.dismiss() }
@@ -40,10 +81,6 @@ struct PlayReportCard: View {
             .help("Not Now")
             .accessibilityLabel("Not Now")
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 10)
-        .background(.bar)
-        .overlay(alignment: .top) { Divider() }
     }
 
     private var question: String {
@@ -83,7 +120,7 @@ struct PlayReportConsent: View {
         VStack(alignment: .leading, spacing: 14) {
             Text("Share how your games run?")
                 .font(BP.sans(17, .semibold))
-            Text("Reports are posted publicly in Bridgeplay's GitHub Discussions and counted on the compatibility list. Each one has the game, how it ran, your Mac's chip and memory, the macOS and Bridgeplay versions, the engine and backend, and the game's logs. Your home folder, user and computer names, Steam account name, Steam ID and email addresses are removed from the logs first. You don't need a GitHub account.")
+            Text("Reports are posted publicly in Bridgeplay's GitHub Discussions and counted on the compatibility list. Each one has the game, how it ran, anything you write about it, your Mac's chip, memory and displays, the macOS and Bridgeplay versions, the engine and backend, and the game's logs. Your home folder, user and computer names, Steam account name, Steam ID and email addresses are removed from the logs first. You don't need a GitHub account.")
                 .foregroundStyle(BP.fg2)
                 .fixedSize(horizontal: false, vertical: true)
             if reports.consentRequest != .autoShare {

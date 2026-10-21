@@ -1,4 +1,4 @@
-import Foundation
+import AppKit
 import SystemConfiguration
 
 // What a compatibility report says about this Mac and the game's last launch, and the
@@ -18,12 +18,27 @@ enum GameReport {
         var memoryBytes: UInt64
         var macOS: String
         var bridgeplay: String
+        var setup: [String: String] = [:]
     }
 
     static var thisMac: Machine {
         Machine(chip: SetupChecks.chipName, memoryBytes: ProcessInfo.processInfo.physicalMemory,
                 macOS: SetupChecks.macOSDisplay,
                 bridgeplay: ProductVersion.build.map { "\(ProductVersion.short) (\($0))" } ?? ProductVersion.short)
+    }
+
+    // Facts about the Mac when the report is made, which is soon after the game ran:
+    // displays: "2: built-in 3456x2234 120 Hz, 2560x1440 60 Hz", lowPower: "on"/"off".
+    @MainActor static func setup() -> [String: String] {
+        let screens = NSScreen.screens.map { screen -> String in
+            let pixels = screen.convertRectToBacking(screen.frame).size
+            let id = screen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? CGDirectDisplayID
+            let builtIn = id.map { CGDisplayIsBuiltin($0) != 0 } ?? false
+            return "\(builtIn ? "built-in " : "")\(Int(pixels.width))x\(Int(pixels.height)) \(screen.maximumFramesPerSecond) Hz"
+        }
+        var setup = ["lowPower": ProcessInfo.processInfo.isLowPowerModeEnabled ? "on" : "off"]
+        if !screens.isEmpty { setup["displays"] = "\(screens.count): " + screens.joined(separator: ", ") }
+        return setup
     }
 
     // "Apple M5 Max" → "M5 Max"; a chip the form doesn't list is "Other".
