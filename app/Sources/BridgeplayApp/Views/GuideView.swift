@@ -4,7 +4,8 @@ import SwiftUI
 // pictures are drawings of Steam's own screens in Steam's colours (like the ones on
 // bridgeplay.dev), not screenshots: the game list is the player's own, read from Steam's
 // library cache, so no game art ships with Bridgeplay. The option names and order follow the
-// panel the dylib adds to Steam's Compatibility page (dylib/feats/webpatch.c); keep them in step.
+// Bridgeplay tab the dylib adds to a game's Steam Properties (dylib/feats/webpatch.c); keep them
+// in step.
 struct GuideView: View {
     @State private var entries: [LibraryEntry] = LibraryEntry.samples
 
@@ -54,18 +55,18 @@ struct GuideView: View {
             GuideStep(number: 1, text: String(localized: "In your Steam library, right-click the game and choose Properties…")) {
                 SteamLibraryDrawing(entries: entries)
             }
-            GuideStep(number: 2, text: String(localized: "Choose Compatibility. Bridgeplay's settings follow Steam Play on that page.")) {
+            GuideStep(number: 2, text: String(localized: "Choose Bridgeplay. Steam Play's engine picker is at the top, Bridgeplay's settings below it.")) {
                 SteamPropertiesDrawing(game: game)
             }
         }
     }
 
-    // MARK: The Compatibility page, block by block
+    // MARK: The Bridgeplay tab, block by block
 
     private var compatibilityPage: some View {
         VStack(alignment: .leading, spacing: 18) {
             VStack(alignment: .leading, spacing: 6) {
-                Text("Every setting on the Compatibility page")
+                Text("Every setting on the Bridgeplay tab")
                     .font(BP.sans(20, .semibold))
                     .tracking(-0.5)
                 Text("Drawn the way Steam shows them. Changes apply the next time the game starts. Not sure? Leave a setting as it is: Bridgeplay picks what works for each game.")
@@ -287,11 +288,11 @@ private struct SteamLibraryDrawing: View {
     }
 }
 
-// The Properties window on Compatibility, as Steam draws it.
+// The Properties window on the Bridgeplay tab, as Steam draws it.
 private struct SteamPropertiesDrawing: View {
     let game: String
 
-    private let tabs: [LocalizedStringKey] = ["General", "Compatibility", "Updates", "Installed Files",
+    private let tabs: [LocalizedStringKey] = ["General", "Bridgeplay", "Updates", "Installed Files",
                                               "Game Versions & Betas", "Controller", "Game Recording",
                                               "Privacy", "Customization"]
 
@@ -310,15 +311,18 @@ private struct SteamPropertiesDrawing: View {
                     .lineLimit(1)
                     .padding(.bottom, 8)
                 ForEach(Array(tabs.enumerated()), id: \.offset) { index, tab in
-                    Text(tab)
-                        .font(Steam.font(10.5, .regular))
-                        .foregroundStyle(index == 1 ? Color.white : Steam.dim)
-                        .lineLimit(1)
-                        .fixedSize()
-                        .padding(.horizontal, 10)
-                        .frame(maxWidth: .infinity, minHeight: 21, alignment: .leading)
-                        .background(index == 1 ? Steam.sidebarSelected : .clear)
-                        .padding(.horizontal, -10)
+                    HStack(spacing: 4) {
+                        if index == 1 { BridgeplayMark(size: 10) }
+                        Text(tab)
+                    }
+                    .font(Steam.font(10.5, .regular))
+                    .foregroundStyle(index == 1 ? Color.white : Steam.dim)
+                    .lineLimit(1)
+                    .fixedSize()
+                    .padding(.horizontal, 10)
+                    .frame(maxWidth: .infinity, minHeight: 21, alignment: .leading)
+                    .background(index == 1 ? Steam.sidebarSelected : .clear)
+                    .padding(.horizontal, -10)
                 }
                 Spacer(minLength: 0)
             }
@@ -328,7 +332,7 @@ private struct SteamPropertiesDrawing: View {
             .background(Steam.sidebar)
 
             VStack(alignment: .leading, spacing: 7) {
-                Text("Compatibility").font(Steam.font(15, .bold)).foregroundStyle(.white)
+                Text(verbatim: "Bridgeplay").font(Steam.font(15, .bold)).foregroundStyle(.white)
                 Text(verbatim: "Steam Play").font(Steam.font(11, .semibold)).foregroundStyle(.white).padding(.top, 2)
                 HStack {
                     Text("Select compatibility tool").font(Steam.font(9.5, .regular)).foregroundStyle(Steam.text)
@@ -372,7 +376,7 @@ private struct SteamPropertiesDrawing: View {
     }
 }
 
-// One block of the Compatibility page at Steam's size, each control followed by what it does.
+// One block of the Bridgeplay tab at Steam's size, each control followed by what it does.
 private struct SteamBlock<Rows: View>: View {
     let title: String
     @ViewBuilder let rows: Rows

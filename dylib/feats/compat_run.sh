@@ -1092,7 +1092,7 @@ refuse_other_build() {
   if [ -n "$had_build" ] && [ "$had_build" != "$np_build" ]; then
     echo "=== prefix was last run by build $had_build and this compatibility tool runs $np_build, rebuild the prefix in Bridgeplay ===" >> "$log" 2>&1 || true
     had_display=$(alert_safe "${had_display:-CrossOver build $had_build}")
-    show_alert "This game needs its prefix rebuilt" "This game's prefix was last run by $had_display, and this compatibility tool runs $(alert_safe "$np_display"). Rebuild the prefix in Bridgeplay to run it here, or pick $had_display again in the game's Compatibility settings. You will not lose game saves by rebuilding the prefix."
+    show_alert "This game needs its prefix rebuilt" "This game's prefix was last run by $had_display, and this compatibility tool runs $(alert_safe "$np_display"). Rebuild the prefix in Bridgeplay to run it here, or pick $had_display again in the game's Steam Properties > Bridgeplay. You will not lose game saves by rebuilding the prefix."
     exit 1
   fi
 }
