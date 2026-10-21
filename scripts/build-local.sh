@@ -200,7 +200,7 @@ zip_out=build/Bridgeplay.zip
 rm -rf "$app_out" "$zip_out"
 ditto out/Bridgeplay.app "$app_out"
 ditto -c -k --keepParent "$app_out" "$zip_out"
-codesign --verify --strict "$app_out"
+codesign --verify --strict --deep "$app_out"
 
 version=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$app_out/Contents/Info.plist")
 sha=$(shasum -a 256 "$zip_out" | cut -d' ' -f1)
@@ -258,7 +258,8 @@ fi
 
 print_timings
 echo "==> Bridgeplay $version"
-echo "    app     $repo/$app_out (ad-hoc signed, codesign --verify --strict ok)"
+echo "    app     $repo/$app_out (codesign --verify --strict ok)"
+echo "    signed  $(codesign -d -r- "$app_out" 2>&1 | sed -n 's/^#* *designated => //p')"
 echo "    zip     $repo/$zip_out"
 echo "    sha256  $sha"
 if [ -n "$check_failures" ]; then

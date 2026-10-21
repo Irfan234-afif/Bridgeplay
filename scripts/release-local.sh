@@ -14,9 +14,10 @@
 #
 # The update is signed with the EdDSA key in this Mac's login keychain, created once with
 # app/.build/artifacts/sparkle/Sparkle/bin/generate_keys; app/Info.plist's SUPublicEDKey
-# must be its public half. The version comes from dylib/version.h (scripts/bump-version.sh)
-# and must not have been released yet. HEAD must already be pushed to the Bridgeplay
-# repository's main.
+# must be its public half. The app is code signed with BRIDGEPLAY_SIGN_IDENTITY (default
+# "Bridgeplay Release", a self-signed identity in the login keychain). The version comes
+# from dylib/version.h (scripts/bump-version.sh) and must not have been released yet.
+# HEAD must already be pushed to the Bridgeplay repository's main.
 
 set -eu
 
@@ -118,6 +119,17 @@ sparkle=app/.build/artifacts/sparkle/Sparkle/bin
 [ -x "$sparkle/generate_appcast" ] || swift build --package-path app >/dev/null
 [ -x "$sparkle/generate_appcast" ] || die "no Sparkle tools at $sparkle"
 
+# The app is signed with a stable self-signed identity, so its designated requirement (and
+# the macOS permissions keyed to it, such as App Management) stays the same across updates.
+# An ad hoc signature is the cdhash, new with every build. See docs/RELEASING.md (Signing).
+sign_identity=${BRIDGEPLAY_SIGN_IDENTITY:-Bridgeplay Release}
+[ "$sign_identity" != "-" ] || check "BRIDGEPLAY_SIGN_IDENTITY is ad hoc (-); a release needs the stable identity"
+if [ "$dry_run" -eq 0 ] && ! security find-identity -p codesigning | grep -Fq "\"$sign_identity\""; then
+	die "no code signing identity \"$sign_identity\" in the keychain; create it once (docs/RELEASING.md, Signing)"
+fi
+BRIDGEPLAY_SIGN_IDENTITY=$sign_identity
+export BRIDGEPLAY_SIGN_IDENTITY
+
 if [ "$dry_run" -eq 1 ]; then
 	out=out/release
 	rm -rf "$out"
@@ -166,7 +178,15 @@ built=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$plist")
 built_build=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$plist")
 [ "$built" = "$version" ] && [ "$built_build" = "$build" ] \
 	|| check "built $built ($built_build), expected $version ($build) from dylib/version.h"
-codesign --verify --strict "$app" || die "$app is not validly signed; Sparkle rejects that"
+codesign --verify --strict --deep "$app" || die "$app is not validly signed; Sparkle rejects that"
+requirement=$(codesign -d -r- "$app" 2>&1 | sed -n 's/^#* *designated => //p')
+echo "==> designated requirement: $requirement"
+case "$requirement" in
+	'identifier "com.bridgeplay.Bridgeplay" and certificate '*' = H"'*'"') ;;
+	*) check "$app is not signed with a certificate (ad hoc?), so macOS would forget its permissions on update" ;;
+esac
+codesign -dvv "$app" 2>&1 | grep -Fqx "Authority=$sign_identity" \
+	|| check "$app is not signed by \"$sign_identity\""
 
 # One archive and one appcast per feed. The appcast attached to the latest release is the
 # feed, so each only needs the newest item; its enclosure points at this tag's zip.

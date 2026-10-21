@@ -51,8 +51,8 @@ installation. `VersioningTests` guards both.
    the keychain.
 4. Release: `scripts/release-local.sh` (notes default to the commit subjects since the
    previous `vX.Y.Z` release; pass a string to override). It builds with
-   `scripts/build-local.sh --checks`, signs the zip with the EdDSA key in the login
-   keychain, writes an appcast with `minimumSystemVersion` 26.0, packages the installer from the
+   `scripts/build-local.sh --checks`, signs the app with the `Bridgeplay Release` identity
+   (see Signing), signs the zip with the EdDSA key in the login keychain, writes an appcast with `minimumSystemVersion` 26.0, packages the installer from the
    same app (`scripts/package-installer.sh`) and publishes `vX.Y.Z` as Latest with all three.
 
 Any other release in the repository (a DXMT build, say) must be created with
@@ -70,11 +70,68 @@ Any other release in the repository (a DXMT build, say) must be created with
 
 ## Signing
 
-Sparkle trusts an update when its EdDSA signature matches `SUPublicEDKey`; the archive is
-checked before extraction (`SUVerifyUpdateBeforeExtraction`). Apple code signing only has
-to be valid, not the same identity: an ad hoc build updates an ad hoc build, and a later
-build signed with "NotProton Local Signing" is accepted as well. Losing the keychain key
-means no installed copy can update again, so keep a backup (`generate_keys -x`).
+Two signatures, for different things:
+
+- **Sparkle (EdDSA)** decides whether an update is trusted: its signature must match
+  `SUPublicEDKey`, and the archive is checked before extraction
+  (`SUVerifyUpdateBeforeExtraction`). Losing that keychain key means no installed copy can
+  update again, so keep a backup (`generate_keys -x`).
+- **Apple code signing** has to be valid (`codesign --verify --strict --deep`), and its
+  designated requirement is what macOS keys permissions to (App Management, which lets
+  Bridgeplay patch Steam.app). An ad hoc signature's requirement is the cdhash, which is new
+  with every build, so macOS treats each update as a different app: the toggle in System
+  Settings still looks on, but no longer applies. Releases are therefore signed with a
+  stable self-signed identity, and the requirement becomes
+  `identifier "com.bridgeplay.Bridgeplay" and certificate leaf = H"<sha1>"`, the same for
+  every build signed with that certificate.
+
+`make app` signs with `APP_SIGN_ID`, which defaults to `$BRIDGEPLAY_SIGN_IDENTITY` and
+then to ad hoc (`-`), so any checkout still builds. Sparkle's helpers (`Autoupdate`,
+`Updater.app`, its XPC services) are signed with the same identity, inside out. There is no
+hardened runtime: library validation needs a Team ID, which a self-signed certificate does
+not have. `scripts/release-local.sh` uses `BRIDGEPLAY_SIGN_IDENTITY` (default
+`Bridgeplay Release`), refuses ad hoc, stops if the identity is not in the keychain, prints
+the designated requirement and stops unless it is the certificate form signed by that
+identity. Changing the identity or its certificate, or marking it trusted (which can turn
+`certificate leaf` into `certificate root`), changes the requirement, and every user has to
+grant App Management once more. The first release signed this way does that once as well,
+coming from ad hoc.
+
+### Creating the release identity (once)
+
+```sh
+scripts/make-release-cert.sh
+```
+
+It creates the self-signed `Bridgeplay Release` code signing identity (RSA 3072, 20 years)
+in the login keychain, asks for a backup password (12 characters or more) and writes
+`~/Desktop/Bridgeplay-Release.p12`. Move the `.p12` and its password into a password
+manager and delete the file from the Desktop; on a new Mac, double-click the `.p12` to
+import it. Without the backup, a new certificate means one more App Management grant for
+every user. Do not change the certificate's Trust settings. The first `make app` with the
+identity asks for access to its key; choose Always Allow.
+
+## Compatibility reports
+
+The app's one-tap reports go to `https://bridgeplay.dev/api/report` (bridgeplay-web,
+`api/report.mjs`), which posts each one as a Discussion in the `compatibility-reports`
+category of this repository. `api/compat.mjs` counts them (only posts by the report bot)
+for the compatibility page, cached for an hour; `compat/games.json` holds the results a
+maintainer checked and wins over them. Both functions use the `BRIDGEPLAY_BOT_TOKEN`
+Vercel env var: a fine-grained token on this repository with Discussions read and write and
+nothing else.
+
+The app asks about a game at most once per Bridgeplay version (an answer, Not Now or an
+automatic report all count), so a release is when players get asked again about the games
+they play. In between, it asks again only if a game crashes after the player answered
+Smooth. Don't Ask About This Game in the card's menu stops the question for that game for
+good; Report This Game… on the Prefixes page always asks. It never asks about (or
+auto-shares) a game that `compat/games.json` already lists as tested on a Mac with the same
+chip (`tested_on`, `reports[].chip` or `reports[].device`, e.g. "M5 Max"); the app reads that
+file from `main` at most once a day and caches it, and asks as usual when it can't. Prefix ›
+Report Your Games… lists every game with a session in its log, minus those, for answering
+in one go; the reports go out one by one, within the endpoint's per-install limit of 50 an
+hour.
 
 ## Moving NotProton users over
 

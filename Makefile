@@ -722,7 +722,10 @@ APP_VERSION  := $(shell sed -n 's/^\#define BRIDGEPLAY_VERSION "\(.*\)"/\1/p' dy
 APP_BUILD    := $(shell sed -n 's/^\#define BRIDGEPLAY_BUILD \([0-9][0-9]*\)$$/\1/p' dylib/version.h)
 APP_UPSTREAM := $(shell sed -n 's/^\#define NOTPROTON_VERSION "\(.*\)"/\1/p' dylib/version.h)
 
-APP_SIGN_ID ?= -
+# The app's code signing identity. Ad hoc (-) by default, so any checkout builds; a release
+# uses a stable self-signed identity (BRIDGEPLAY_SIGN_IDENTITY, see docs/RELEASING.md) so the
+# designated requirement, and the macOS permissions keyed to it, survive updates.
+APP_SIGN_ID ?= $(or $(BRIDGEPLAY_SIGN_IDENTITY),-)
 
 # The icon name must match CFBundleIconFile/CFBundleIconName in app/Info.plist.
 ICON_NAME := Bridgeplay
@@ -793,8 +796,17 @@ app: app-payload $(ICON_CAR)
 		exit 1; \
 	fi
 	@echo "==> Payload complete in the bundle"
+	@# Inside out, so Sparkle's helpers carry the same identity as the app. No hardened
+	@# runtime: library validation needs a Team ID, which a self-signed identity has none of.
+	@sparkle="$(APP_BUNDLE)/Contents/Frameworks/Sparkle.framework/Versions/B"; \
+	codesign -f -s "$(APP_SIGN_ID)" -i org.sparkle-project.Sparkle.Autoupdate "$$sparkle/Autoupdate" || exit 1; \
+	for code in "$$sparkle"/XPCServices/*.xpc "$$sparkle/Updater.app" \
+		"$(APP_BUNDLE)/Contents/Frameworks/Sparkle.framework"; do \
+		codesign -f -s "$(APP_SIGN_ID)" --preserve-metadata=entitlements "$$code" || exit 1; \
+	done
 	codesign -f -s "$(APP_SIGN_ID)" "$(APP_BUNDLE)"
-	codesign --verify --strict "$(APP_BUNDLE)"
+	codesign --verify --strict --deep "$(APP_BUNDLE)"
+	@codesign -d -r- "$(APP_BUNDLE)" 2>&1 | sed -n 's/^#* *designated => /==> Designated requirement: /p'
 	@echo "==> Built $(APP_BUNDLE) ($(APP_VERSION) build $(APP_BUILD), based on NotProton $(APP_UPSTREAM))"
 
 app-zip: app
