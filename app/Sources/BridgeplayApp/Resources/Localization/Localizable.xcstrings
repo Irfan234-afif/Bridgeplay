@@ -1660,6 +1660,22 @@
         }
       }
     },
+    "Automatic reports are sent only when the log makes the result clear. You can turn them off in the Prefix menu." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "I report automatici vengono inviati solo quando il log rende chiaro il risultato. Puoi disattivarli nel menu Prefisso."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "只有在日志能明确说明结果时才会自动发送报告。你可以在“前缀”菜单中关闭此功能。"
+          }
+        }
+      }
+    },
     "Back" : {
       "localizations" : {
         "it" : {
@@ -3666,6 +3682,22 @@
         }
       }
     },
+    "Didn't run" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Non partiva"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "无法运行"
+          }
+        }
+      }
+    },
     "Disable hidraw" : {
       "localizations" : {
         "it" : {
@@ -3694,6 +3726,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "无法运行。其反作弊程序需要 Windows 驱动程序。"
+          }
+        }
+      }
+    },
+    "Don't Ask About This Game" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Non chiedere più per questo gioco"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "不再询问此游戏"
           }
         }
       }
@@ -4338,6 +4386,22 @@
         }
       }
     },
+    "Has issues" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Con problemi"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "有问题"
+          }
+        }
+      }
+    },
     "Hides raw HID devices from the game, so pads only show up through SDL. Try it if a game sees one controller twice or ignores yours." : {
       "localizations" : {
         "it" : {
@@ -4366,6 +4430,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "高分辨率"
+          }
+        }
+      }
+    },
+    "How did each game run? Games you already answered for this version of Bridgeplay, games you asked not to be asked about, and games already verified on a Mac like yours are left out." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Com'è andato ogni gioco? Sono esclusi i giochi a cui hai già risposto per questa versione di Bridgeplay, quelli per cui hai chiesto di non essere più interpellato e quelli già verificati su un Mac come il tuo."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "每个游戏运行得怎么样？已在此 Bridgeplay 版本中回答过的游戏、你要求不再询问的游戏，以及已在与你相同的 Mac 上验证过的游戏不会列出。"
           }
         }
       }
@@ -4862,6 +4942,38 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "让控制器在 Bridgeplay 更新后仍可正常使用。会将此 Mac 的证书添加到你的登录钥匙串。如果 macOS 随后要求输入密码，请选择“始终允许”。"
+          }
+        }
+      }
+    },
+    "Last played %@" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ultima partita %@"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "上次游玩：%@"
+          }
+        }
+      }
+    },
+    "Last played %@, for %@" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ultima partita %1$@, per %2$@"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "上次游玩：%1$@，时长 %2$@"
           }
         }
       }
@@ -5566,6 +5678,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "尚未部署。"
+          }
+        }
+      }
+    },
+    "Nothing left to report." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Non c'è altro da segnalare."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "没有需要报告的游戏了。"
           }
         }
       }
@@ -6818,6 +6946,70 @@
         }
       }
     },
+    "Report This Game…" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Segnala questo gioco…"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "报告此游戏…"
+          }
+        }
+      }
+    },
+    "Report Your Games" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Segnala i tuoi giochi"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "报告你的游戏"
+          }
+        }
+      }
+    },
+    "Report Your Games…" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Segnala i tuoi giochi…"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "报告你的游戏…"
+          }
+        }
+      }
+    },
+    "Reports are posted publicly in Bridgeplay's GitHub Discussions and counted on the compatibility list. Each one has the game, how it ran, your Mac's chip and memory, the macOS and Bridgeplay versions, the engine and backend, and the game's logs. Your home folder, user and computer names, Steam account name, Steam ID and email addresses are removed from the logs first. You don't need a GitHub account." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "I report vengono pubblicati nelle GitHub Discussions di Bridgeplay e contati nell'elenco di compatibilità. Ognuno contiene il gioco, come è andato, chip e memoria del Mac, le versioni di macOS e Bridgeplay, motore e backend, e i log del gioco. Prima dell'invio vengono rimossi dai log la cartella Inizio, i nomi utente e computer, il nome dell'account Steam, lo Steam ID e gli indirizzi email. Non serve un account GitHub."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "报告会公开发布到 Bridgeplay 的 GitHub Discussions，并计入兼容性列表。每份报告包含游戏、运行情况、Mac 的芯片和内存、macOS 和 Bridgeplay 版本、引擎和后端，以及游戏日志。发送前会从日志中移除你的个人文件夹、用户名和电脑名称、Steam 账户名称、Steam ID 和电子邮件地址。不需要 GitHub 账户。"
+          }
+        }
+      }
+    },
     "Reset" : {
       "localizations" : {
         "it" : {
@@ -7314,6 +7506,70 @@
         }
       }
     },
+    "Share" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Condividi"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "分享"
+          }
+        }
+      }
+    },
+    "Share Play Reports Automatically" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Condividi automaticamente i report di gioco"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "自动分享游戏报告"
+          }
+        }
+      }
+    },
+    "Share automatically after each game" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Condividi automaticamente dopo ogni partita"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "每次游戏后自动分享"
+          }
+        }
+      }
+    },
+    "Share how your games run?" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Condividere come girano i tuoi giochi?"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "分享你的游戏运行情况？"
+          }
+        }
+      }
+    },
     "Sharper on Retina displays, but games run slower." : {
       "localizations" : {
         "it" : {
@@ -7550,6 +7806,38 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "已跳过。游戏将使用 DXMT；你可以稍后在“状态”中添加。"
+          }
+        }
+      }
+    },
+    "Smooth" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fluido"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "流畅"
+          }
+        }
+      }
+    },
+    "Smooth for All Remaining" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fluido per tutti i rimanenti"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "其余全部为流畅"
           }
         }
       }
@@ -8321,6 +8609,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "模板 %@"
+          }
+        }
+      }
+    },
+    "Thanks! Your report is on its way." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Grazie! Il tuo report è in arrivo."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "谢谢！你的报告正在发送。"
           }
         }
       }
@@ -9655,6 +9959,38 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "正在处理…"
+          }
+        }
+      }
+    },
+    "You played %@ for %@. How did it run?" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hai giocato a %1$@ per %2$@. Com'è andato?"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "你玩了 %1$@ %2$@。运行得怎么样？"
+          }
+        }
+      }
+    },
+    "You played %@. How did it run?" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hai giocato a %@. Com'è andato?"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "你玩了 %@。运行得怎么样？"
           }
         }
       }

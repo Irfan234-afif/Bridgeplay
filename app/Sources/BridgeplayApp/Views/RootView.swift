@@ -87,9 +87,25 @@ struct RootView: View {
                     PatchBanner(banner: banner)
                 }
             }
+            .safeAreaInset(edge: .bottom, spacing: 0) {
+                if let nudge = PlayReports.shared.nudge {
+                    PlayReportCard(nudge: nudge)
+                } else if PlayReports.shared.thanking {
+                    PlayReportThanks()
+                }
+            }
             .scrollContentBackground(.hidden)
             .background(BP.bg)
             .toolbarBackground(BP.bg, for: .windowToolbar)
+        }
+        // While Report Your Games… is open, it presents the consent sheet itself.
+        .sheet(isPresented: Binding(get: { PlayReports.shared.consentRequest != nil && PlayReports.shared.bulk == nil },
+                                    set: { if !$0 { PlayReports.shared.consentRequest = nil } })) {
+            PlayReportConsent()
+        }
+        .sheet(isPresented: Binding(get: { PlayReports.shared.bulk != nil },
+                                    set: { if !$0 { PlayReports.shared.closeBulk() } })) {
+            BulkReportSheet()
         }
         .font(BP.sans(13))
         .tint(BP.blue)

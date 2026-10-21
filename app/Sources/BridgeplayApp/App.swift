@@ -33,7 +33,9 @@ struct BridgeplayApp: App {
                 // look again whenever the user comes back and every few minutes.
                 .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
                     checkSteamPatch("foreground")
+                    PlayReports.shared.scan()
                 }
+                .task { PlayReports.shared.scan() }
                 .task {
                     while !Task.isCancelled {
                         try? await Task.sleep(for: SteamPatchKeeper.pollInterval)
@@ -156,6 +158,10 @@ struct BridgeplayApp: App {
             }
             .keyboardShortcut("r", modifiers: [.command, .shift])
             .disabled(prefixes.selectedPrefix == nil)
+
+            Button("Report Your Games…") { PlayReports.shared.openBulk() }
+            Toggle("Share Play Reports Automatically", isOn: Binding(
+                get: { PlayReports.shared.autoShare }, set: { PlayReports.shared.setAutoShare($0) }))
 
             Divider()
 

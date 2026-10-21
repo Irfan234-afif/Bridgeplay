@@ -58,6 +58,12 @@ Also running on the same setup: Street Fighter 6, Mortal Kombat 1, The Last of U
 
 <sub>Games with kernel-level anti-cheat do not run.</sub>
 
+### Compatibility list
+
+Every game tested so far, and the Mac it ran on, is at [bridgeplay.dev/compatibility](https://bridgeplay.dev/compatibility). It combines results a maintainer checked ([`compat/`](compat/)), one-tap reports from players, and CrossOver ratings from AppleGamingWiki for games nobody has tried with Bridgeplay yet.
+
+To add yours: after you play, Bridgeplay asks once per game *How did it run?* One tap posts the result, with your Mac and the game's log, to [Compatibility reports](https://github.com/raymondchins/Bridgeplay/discussions/categories/compatibility-reports). No GitHub account needed, and the log is stripped of your user, computer and Steam account details. **Report Your Games…** in the Prefix menu covers everything you've already played. Without the app, use the [Game report form](https://github.com/raymondchins/Bridgeplay/issues/new?template=game-report.yml).
+
 ## Install
 
 1. **Download the installer** from [bridgeplay.dev](https://bridgeplay.dev). About 570 MB, with the engine and graphics already inside.

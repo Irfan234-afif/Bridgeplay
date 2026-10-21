@@ -349,7 +349,9 @@ struct PrefixesView: View {
                             .disabled(!model.hasLog(log, for: prefix))
                     }
                 }
+                Button("Report This Game…") { PlayReports.shared.ask(about: prefix) }
             }
+            Button("Report Your Games…") { PlayReports.shared.openBulk() }
             if !targets.isEmpty {
                 Divider()
                 Button(PrefixPrompt.backUpButton(targets)) {

@@ -5,7 +5,9 @@ is the easiest to review. An imperfect PR is still welcome: say what is unfinish
 help.
 
 1. **Open an issue first** for anything large, and check closed issues and PRs so work is not
-   duplicated. Game reports use the "Game report" template, bugs the "Bug report" one.
+   duplicated. Bugs use the "Bug report" template. To say how a game runs, answer the app's
+   "How did it run?" after you play (or Prefix › Report Your Games… for all of them); without
+   the app, use the "Game report" template.
 2. **Read [docs/DEVELOPING.md](docs/DEVELOPING.md)** for what machine you need, how to build,
    how to try a change in Steam, and the checks. [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
    says where new code goes.
