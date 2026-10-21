@@ -43,7 +43,9 @@ a newer install and leaves it alone. `VersioningTests` guards both.
 
 0. Push the changes first and wait for the `app` workflow to pass on them
    (`gh run watch -R raymondchins/Bridgeplay`, about 10 minutes, free on this public repo).
-   The release then reuses that result instead of running the checks again here.
+   The release then reuses that result instead of running the checks again here. A docs-only run
+   (the gate green, build and checks skipped) does not count; the release falls back to an older run
+   of the same sources or runs the checks here.
 1. Bump and commit:
    ```sh
    scripts/bump-version.sh patch        # or minor / major

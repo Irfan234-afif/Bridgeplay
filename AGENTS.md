@@ -34,8 +34,9 @@ More docs: [docs/WINECX.md](docs/WINECX.md) (engine, patch build recipes and pin
 ## Build and check
 
 A full build needs an Apple Silicon Mac with Xcode 27. Prerequisites, caches and timings
-are in [docs/BUILD-LOCAL.md](docs/BUILD-LOCAL.md). The workflows run only `make scriptcheck`
-and `make runcheck` (shellcheck 0.11.0) on Linux; everything else runs on macOS.
+are in [docs/BUILD-LOCAL.md](docs/BUILD-LOCAL.md). The lint workflow runs only `make scriptcheck`
+and `make runcheck` (shellcheck 0.11.0) on Linux. The `app` workflow decides on Linux whether a change is
+docs-only (`.github/docs-only-paths`) and ends in the `app gate` job; everything else runs on macOS.
 
 ```sh
 scripts/build-local.sh            # full build in CI order; --checks also runs checks and Swift tests
@@ -60,7 +61,7 @@ The checks the workflows run (`make -s <target>`):
 - **C and shell suites:** `sigcheck`, `callscheck`, `webpatch-fixtures`, `peicon-fixtures`,
   `panel-behavior`, `spawn-env`, `activatecheck`, `compatcheck`, `compatsvc-check`,
   `shortcutcheck`, `launch-shell`, `envcheck`, `buildcheck`, `settingscheck`, `routecheck`,
-  `bridgecheck`, `gamedrivecheck`, `launchercheck`, `seedcheck`, `gamefixescheck`
+  `bridgecheck`, `gamedrivecheck`, `launchercheck`, `seedcheck`, `gamefixescheck`, `cicheck`
 - **Hardware-free device checks:** `game-host-check`, `dualsense-check`, `steam-rumble-check`
 
 `make tests-list` prints the test paths. A check whose tool or input is missing prints
