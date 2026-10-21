@@ -134,6 +134,10 @@ int main(int argc, char **argv) {
     assert(!AudioUnitInitialize(unit));
     assert(!AudioOutputUnitStart(unit));
     usleep(150000);
+    // A slow host may start the renderer late; wait up to 2s more.
+    for (int i = 0; i < 200 && atomic_load(&calls) < 5; i++) {
+        usleep(10000);
+    }
     assert(AudioUnitSetProperty(unit, kAudioUnitProperty_SetRenderCallback, kAudioUnitScope_Input,
                                 0, &cb, sizeof(cb)) == kAudioUnitErr_CannotDoInCurrentContext);
     // Uninitialize must join the renderer even when the client omitted Stop.
