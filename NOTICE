@@ -56,6 +56,8 @@ sha256 pins are in docs/WINECX.md and each patch directory's README.
     d3dx11_42-winecx-11.17-i386.dll  (same patch)
     crypt32-winecx-11.17.dll      ngx-signer-patch/winecx-ngx-signer.patch
     wintrust-winecx-11.17.dll     ngx-signer-patch/winecx-ngx-signer.patch
+    kernel32-winecx-11.17.dll     hide-wine-exports-patch/winecx-hide-wine-exports.patch
+    kernelbase-winecx-11.17.dll   hide-wine-exports-patch/winecx-hide-wine-exports.patch
 
   WineCX 11.15 (winecx 5b45f4564c4f87fa9c0f958733a5e9bb3918a058, runtime 4.5.125):
     winemac-winecx-11.15.so       winemac-patch/winecx-d3dmetal-retina.patch

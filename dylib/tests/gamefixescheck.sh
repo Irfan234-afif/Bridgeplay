@@ -116,7 +116,7 @@ launch() {
 			eval "$bridge_line"
 			for v in backend WINEDLLOVERRIDES WINEMSYNC msync_from NOTPROTON_RETINA NOTPROTON_FRAMEGEN \
 				NOTPROTON_FRAMEGEN_QUALITY NOTPROTON_FRAMEGEN_UI NOTPROTON_FRAMEGEN_FALLBACK NOTPROTON_FRAMEGEN_ENGINE CX_GRAPHICS_BACKEND \
-				DXVK_HUD VKD3D_CONFIG WINEDEBUG MTL_HUD_ENABLED D3DM_VENDOR_ID D3DM_DEVICE_ID D3DM_DEVICE_DESCRIPTION NOTPROTON_NGX_SIGNER NOTPROTON_DRIVER_VERSION CX_ACTIVE_GRAPHICS_BACKEND NOTPROTON_VSYNC CX_FWD_COMPAT_GL_CTX gamefix_args; do
+				DXVK_HUD VKD3D_CONFIG WINEDEBUG MTL_HUD_ENABLED D3DM_VENDOR_ID D3DM_DEVICE_ID D3DM_DEVICE_DESCRIPTION NOTPROTON_NGX_SIGNER NOTPROTON_DRIVER_VERSION CX_ACTIVE_GRAPHICS_BACKEND NOTPROTON_VSYNC NOTPROTON_HIDE_WINE_EXPORTS CX_FWD_COMPAT_GL_CTX gamefix_args; do
 				eval "printf \"%s=%s\\n\" \$v \"\${$v-<unset>}\""
 			done
 		' launch "$target" > "$case_dir/out" 2>&1 || echo "launch exited $?" >> "$case_dir/out"
@@ -398,6 +398,9 @@ is "DLSS_FG=1 reports hardware scheduling for DLSS frame generation" "d3dmetal" 
 user_conf 'VSYNC=1'
 launch waitforexitandrun "$case_dir/game/game.exe"
 is "VSYNC=1 asks the overlay shim to keep the layer on display sync" "1" "$(got NOTPROTON_VSYNC)"
+user_conf 'HIDE_WINE_EXPORTS=1'
+launch waitforexitandrun "$case_dir/game/game.exe"
+is "HIDE_WINE_EXPORTS=1 hides ntdll's wine_* exports from GetProcAddress" "1" "$(got NOTPROTON_HIDE_WINE_EXPORTS)"
 user_conf 'NVAPI=1' 'BACKEND=dxmt'
 launch waitforexitandrun "$case_dir/game/game.exe"
 is "but not for dxmt" "d3d10core,d3d11,dxgi=n,b;d3d10,d3d12=b;nvapi64,nvngx=d;$trio" "$(got WINEDLLOVERRIDES)"
