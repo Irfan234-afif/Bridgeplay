@@ -1024,12 +1024,15 @@ first_launch_notice() {
     [ -d "$metal_cache" ] && return 0
   fi
   echo "=== first launch, notice shown ===" >> "$log" 2>&1 || true
-  # Posted by the Bridgeplay app, so it carries Bridgeplay's name and icon; osascript (shown
-  # as Script Editor) only when the app cannot be found.
+  notify_user "Getting this game ready" "The first launch sets the game up and prepares its graphics. It can take a few minutes, and the screen may stay black until it is ready."
+}
+
+# Posted by the Bridgeplay app, so it carries Bridgeplay's name and icon; osascript (shown
+# as Script Editor) only when the app cannot be found. Never holds up the launch.
+notify_user() {
   (
     exec 8>&- 9>&-
-    title="Bridgeplay" subtitle="Getting this game ready"
-    body="The first launch sets the game up and prepares its graphics. It can take a few minutes, and the screen may stay black until it is ready."
+    title="Bridgeplay" subtitle=$(alert_safe "$1") body=$(alert_safe "$2")
     open -n -g -b com.bridgeplay.Bridgeplay --args --notify "$title" "$subtitle" "$body" ||
       osascript -e "display notification \"$body\" with title \"$title\" subtitle \"$subtitle\""
   ) >/dev/null 2>&1 &
@@ -1103,6 +1106,54 @@ claim_prefix() {
   printf '%s\n%s\n' "$np_build" "$np_display" > "$STEAM_COMPAT_DATA_PATH/notproton-build" 2>/dev/null \
     || echo "=== could not record build $np_build in the prefix ===" >> "$log" 2>&1 || true
 }
+# Wine prefixes are only tested on APFS (and HFS+). Every run logs the file system so a
+# report from an exFAT or network library says so; a new prefix there also tells the player.
+volume_type() {
+  device=$(stat -f %Sd "$1" 2>/dev/null) || return 1
+  mount | sed -n "s|^/dev/$device on \(.*\) (\([^,)]*\).*|\2 \1|p" | head -1
+}
+
+note_prefix_volume() {
+  vol=$(volume_type "$STEAM_COMPAT_DATA_PATH") || vol=""
+  fs=${vol%% *}
+  echo "volume: compatdata on ${fs:-unknown} (${vol#* })" >> "$log" 2>&1 || true
+  case "$fs" in apfs|hfs|"") return 0 ;; esac
+  echo "=== compatdata is on $fs, not APFS: Wine prefixes are only tested on APFS, games may hang or fail to start ===" \
+    >> "$log" 2>&1 || true
+  [ "$prefix_was_new" = 1 ] || return 0
+  notify_user "This Steam library is not on APFS" "It is formatted $fs. Games run from it may hang or fail to start. Move the game to a library on an APFS drive for the best results."
+}
+
+# Steam keeps a game's prefix in the library that holds the game, so a game moved to another
+# library starts over with an empty one: saves and launcher sign-ins kept only in the old
+# prefix seem lost. Names the old one when a new prefix is about to be built.
+steam_libraries() {
+  for vdf in "$client_root/steamapps/libraryfolders.vdf" "$client_root/config/libraryfolders.vdf"; do
+    [ -f "$vdf" ] || continue
+    sed -nE 's/^[[:space:]]*"path"[[:space:]]*"(.*)"[[:space:]]*$/\1/p' "$vdf" | sed 's/\\\\/\\/g'
+    return 0
+  done
+}
+
+note_other_prefixes() {
+  [ "$prefix_was_new" = 1 ] && [ "$app_id" != 0 ] || return 0
+  here=$(cd -P -- "$STEAM_COMPAT_DATA_PATH" 2>/dev/null && pwd) || return 0
+  old_prefix=""
+  while IFS= read -r library; do
+    [ -n "$library" ] || continue
+    other="$library/steamapps/compatdata/$app_id"
+    [ -f "$other/pfx/system.reg" ] || continue
+    there=$(cd -P -- "$other" 2>/dev/null && pwd) || continue
+    [ "$there" != "$here" ] || continue
+    echo "=== an older prefix for this game is in another library: $other ===" >> "$log" 2>&1 || true
+    [ -n "$old_prefix" ] || old_prefix=$other
+  done <<EOF_LIBRARIES
+$(steam_libraries)
+EOF_LIBRARIES
+  [ -n "$old_prefix" ] || return 0
+  notify_user "This game starts with a new prefix" "Its earlier prefix is still in $old_prefix. Saves or launcher sign-ins kept only there are not in the new one."
+}
+
 # Steam cloud related
 merge_user_dir() {
   src=$1
@@ -1902,7 +1953,12 @@ if [ -n "$STEAM_COMPAT_DATA_PATH" ]; then
   refuse_other_build
   stage_step="prefix arch check"
   refuse_foreign_prefix
+  prefix_was_new=0
+  [ -f "$WINEPREFIX/system.reg" ] || prefix_was_new=1
   claim_prefix
+  find_client_root "$STEAM_COMPAT_CLIENT_INSTALL_PATH"
+  note_prefix_volume
+  note_other_prefixes
   echo "sync: WINEMSYNC=$WINEMSYNC from $msync_from" >> "$log" 2>&1 || true
   if [ "${wine_unix##*/}" = aarch64-unix ]; then
     echo "fex: FEX_X87REDUCEDPRECISION=$FEX_X87REDUCEDPRECISION from $fex_from" >> "$log" 2>&1 || true
