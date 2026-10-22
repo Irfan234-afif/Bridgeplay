@@ -352,9 +352,9 @@ python3 apply.py <ntdll.dll> <out> <detour bin>   # patched hashes
 | clean x86_64 ntdll | `8b32c9f6f71b4f15fcaccb19b0f2adab9391ae73ad539cae9e136f8ee7d24128` |
 | patched x86_64 ntdll | `4573d521671a48212670e7543aa9ebf0921e383dada69477f677f435df2bef5a` |
 | clean i386 ntdll | `cc8a9035cea0e26c5d333ef220f1becefc27ae44d2cdcdaea3278e8739d26fd9` |
-| patched i386 ntdll | `8ad83740df2da5e79ed435e4bc57e82b4b6a4b984fbec73e1160ca81dfce1b44` |
+| patched i386 ntdll | `628d08854dc42009f63dc489005c2a49a3f1fe4c6a949dc1ac505915004e5b70` |
 | `detour2-winecx-11.17.bin` | `e1bbd185b19de3e23d627ae3a8bf25ed1b767bff5690102c5312a5ed3813e736` |
-| `detour32-winecx-11.17.bin` | `0676104e0bd56c4a1e8c473d9cbcd21fb2ba105fc7dc6cf5a70d37692c129e28` |
+| `detour32-winecx-11.17.bin` | `085df281ffe81c2803f44dd30df885248e5510c8560f0f20a5ae36e8446f7559` |
 | `winemac-winecx-11.17.so` | `aa192f846ad15d56de200fc92752eaf2d455700846ae2cf1ccc7b27b535f1c00` |
 | `winebus-winecx-11.17.so` | `6223c035c824c90708abbc3e733f8d1d6ed6b8b4e9a3e1a5c813493ceba50473` |
 | `winebus-winecx-11.17.sys` | `da108d1c3788fa32807ef08c4d26d8a89812c230317ffa7ba5111e126bda607c` |

@@ -132,7 +132,7 @@ PINNED = {
     'cc8a9035cea0e26c5d333ef220f1becefc27ae44d2cdcdaea3278e8739d26fd9':
         {'hookRVA': 0x4f880, 'stolen': 'f645b4027529', 'caveRVA': 0x808a0, 'caveSize': 1888,
          'resume': 0x4f886, 'wm': 'ebx', 'load_path': -0x5c,
-         'payload': '0676104e0bd56c4a1e8c473d9cbcd21fb2ba105fc7dc6cf5a70d37692c129e28',
+         'payload': '085df281ffe81c2803f44dd30df885248e5510c8560f0f20a5ae36e8446f7559',
          'exports': {'LdrGetDllHandle': 0x7bc12aa0, 'LdrLoadDll': 0x7bc13640,
                      'NtProtectVirtualMemory': 0x7bc0d7a4, 'NtOpenFile': 0x7bc0d5d4,
                      'NtReadFile': 0x7bc0d304, 'NtClose': 0x7bc0d394}},

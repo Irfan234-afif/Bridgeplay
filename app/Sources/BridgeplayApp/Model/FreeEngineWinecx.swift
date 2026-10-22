@@ -205,7 +205,7 @@ enum FreeEngineWinecx {
             ],
             patchedNtdll: [
                 .x86_64Windows: "4573d521671a48212670e7543aa9ebf0921e383dada69477f677f435df2bef5a",
-                .i386Windows: "8ad83740df2da5e79ed435e4bc57e82b4b6a4b984fbec73e1160ca81dfce1b44",
+                .i386Windows: "628d08854dc42009f63dc489005c2a49a3f1fe4c6a949dc1ac505915004e5b70",
             ],
             tools: [
                 CompatTool(name: "bridgeplay-proton-winecx-11.17", flavor: .rosetta, display: "WineCX 11.17 (msync, D3DMetal)"),
@@ -234,7 +234,7 @@ enum FreeEngineWinecx {
             NtdllPatch(
                 arch: .i386Windows,
                 payloadResource: "detour32-winecx-11.17",
-                payloadSHA256: "0676104e0bd56c4a1e8c473d9cbcd21fb2ba105fc7dc6cf5a70d37692c129e28",
+                payloadSHA256: "085df281ffe81c2803f44dd30df885248e5510c8560f0f20a5ae36e8446f7559",
                 caveRVA: 0x808a0,
                 payloadRVA: 0x808a0,
                 hooks: [
