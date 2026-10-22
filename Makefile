@@ -73,7 +73,7 @@ DEPS := $(OBJS:.o=.d)
         tests-list overlay-shim overlay-shim-install overlay-shim-tests \
         overlay-shim-bench iconmaker icon \
         appinfo helpers-install ntdll-resolve bridge runcheck compatcheck \
-        compatsvc-check shortcutcheck scriptcheck envcheck buildcheck settingscheck routecheck bridgecheck gamedrivecheck \
+        compatsvc-check shortcutcheck scriptcheck envcheck buildcheck settingscheck routecheck bridgecheck envpasscheck gamedrivecheck \
         gamefixescheck launchercheck padcheck launch-shell activatecheck stamp-check versioncheck cicheck compat-reported-check FORCE
 
 APP_PAYLOAD := app/Sources/BridgeplayApp/Resources/payload
@@ -129,6 +129,10 @@ routecheck:
 bridgecheck:
 	@if [ ! -f dylib/tests/bridgecheck.sh ]; then $(call SKIP,bridgecheck,dylib/tests/bridgecheck.sh); exit 0; fi; \
 	sh dylib/tests/bridgecheck.sh dylib/feats/compat_run.sh
+
+envpasscheck:
+	@if [ ! -f dylib/tests/envpasscheck.sh ]; then $(call SKIP,envpasscheck,dylib/tests/envpasscheck.sh); exit 0; fi; \
+	sh dylib/tests/envpasscheck.sh dylib/feats/compat_run.sh
 
 gamedrivecheck:
 	@if [ ! -f dylib/tests/gamedrivecheck.sh ]; then $(call SKIP,gamedrivecheck,dylib/tests/gamedrivecheck.sh); exit 0; fi; \
@@ -913,7 +917,7 @@ native-shim-tests:
 CI_CHECKS := mincheck l10ncheck \
 	sigcheck callscheck webpatch-fixtures peicon-fixtures panel-behavior spawn-env \
 	activatecheck compatcheck compatsvc-check shortcutcheck launch-shell envcheck \
-	buildcheck settingscheck routecheck bridgecheck gamedrivecheck launchercheck \
+	buildcheck settingscheck routecheck bridgecheck envpasscheck gamedrivecheck launchercheck \
 	seedcheck gamefixescheck versioncheck cicheck padcheck compat-reported-check np-native-tests native-shim-tests \
 	app-tests native-installercheck game-host-check dualsense-check steam-rumble-check
 
