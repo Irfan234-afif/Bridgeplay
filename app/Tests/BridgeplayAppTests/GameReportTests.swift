@@ -29,6 +29,25 @@ struct GameReportTests {
         #expect(launch.backend == "d3dmetal")
     }
 
+    @Test("A run aborted before launch does not replace the one that ran")
+    func abortedRun() {
+        let runs = """
+            === bridgeplay run Thu Oct 22 09:44:35 WIB 2026 ===
+            runner: build winecx-11.17 (WineCX 11.17 (msync, D3DMetal)) at /a
+            graphics: backend=d3dmetal (auto-detected, the engine has D3DMetal)
+            === launching (waitforexitandrun): /a/wine /g/INSIDE.exe ===
+            === bridgeplay run Thu Oct 22 09:48:47 WIB 2026 ===
+            runner: build winehq-11.15 (WineHQ 11.15 - Rosetta) at /b
+            === prefix was last run by build winecx-11.17 and this compatibility tool runs winehq-11.15 ===
+            === aborted during prefix build check (exit 1) before launch ===
+            """
+        let launch = GameReport.lastLaunch(in: runs)
+        #expect(launch.engine == "WineCX 11.17 (msync, D3DMetal)")
+        #expect(launch.backend == "d3dmetal")
+        let only = GameReport.lastLaunch(in: runs.components(separatedBy: "\n").suffix(4).joined(separator: "\n"))
+        #expect(only.engine == "WineHQ 11.15 - Rosetta")
+    }
+
     @Test("The copied log hides the home folder")
     func redaction() {
         let text = GameReport.redacted(log, home: "/Users/tester")

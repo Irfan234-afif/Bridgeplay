@@ -55,18 +55,38 @@ enum GameReport {
     // The engine and backend of the most recent launch in bridgeplay-run.log:
     //   runner: build winecx-11.17 (WineCX 11.17 (msync, D3DMetal)) at /…
     //   graphics: backend=d3dmetal (carried over from the last launch)
+    // A run aborted before launch (another tool picked to try a fix, refused by the prefix
+    // check) never ran the game, so it does not replace the run before it. A log of nothing
+    // but aborted runs still names what was tried.
     static func lastLaunch(in log: String) -> (engine: String?, backend: String?) {
         var engine: String?, backend: String?
+        var run: (engine: String?, backend: String?) = (nil, nil)
+        var aborted = false
+        var tried: (engine: String?, backend: String?) = (nil, nil)
+        func finishRun() {
+            tried = (run.engine ?? tried.engine, run.backend ?? tried.backend)
+            if !aborted {
+                engine = run.engine ?? engine
+                backend = run.backend ?? backend
+            }
+            run = (nil, nil)
+            aborted = false
+        }
         for line in log.split(separator: "\n") {
-            if line.hasPrefix("runner: build "), let open = line.firstIndex(of: "("),
+            if line.hasPrefix("=== bridgeplay run ") {
+                finishRun()
+            } else if line.hasPrefix("runner: build "), let open = line.firstIndex(of: "("),
                let close = line.range(of: ") at ", options: .backwards) {
-                engine = String(line[line.index(after: open)..<close.lowerBound])
+                run.engine = String(line[line.index(after: open)..<close.lowerBound])
             } else if line.hasPrefix("graphics: backend=") {
                 let value = line.dropFirst("graphics: backend=".count).prefix { !$0.isWhitespace }
-                if backends.contains(String(value)) { backend = String(value) }
+                if backends.contains(String(value)) { run.backend = String(value) }
+            } else if line.hasPrefix("=== aborted ") {
+                aborted = true
             }
         }
-        return (engine, backend)
+        finishRun()
+        return (engine ?? tried.engine, backend ?? tried.backend)
     }
 
     // Reports are public. Besides the home folder, run logs carry the Steam account name
