@@ -243,6 +243,23 @@ struct FreeEngineWinecxTests {
         }
     }
 
+    // d3dx11-patch: 11.17 ships d3dx11_43 and d3dx11_42 exporting D3DX11CreateThreadPump.
+    @Test("The patched d3dx11 DLLs ship with the app and are pinned for 11.17",
+          arguments: FreeEngineWinecx.releases.map(\.build))
+    func d3dx(id: String) throws {
+        let release = try #require(FreeEngineWinecx.release(build: id))
+        let expected: Set<String> = release.build == "winecx-11.17"
+            ? ["lib/wine/x86_64-windows/d3dx11_43.dll", "lib/wine/i386-windows/d3dx11_43.dll",
+               "lib/wine/x86_64-windows/d3dx11_42.dll", "lib/wine/i386-windows/d3dx11_42.dll"] : []
+        #expect(Set(release.d3dx.map(\.path)) == expected)
+        let table = FreeEngineWinecx.expectedFiles(release)
+        for file in release.d3dx {
+            let bundled = try #require(Bundle.module.url(forResource: file.resource, withExtension: file.ext))
+            #expect(Digest.sha256IfPresent(bundled) == file.sha256, "\(file.resource)")
+            #expect(table[file.path] == file.sha256, "\(file.path)")
+        }
+    }
+
     @Test("Each free engine is current, outdated or missing on its own pins")
     func perEngineState() throws {
         let winehqBuild = try #require(SupportedRunners.build(id: FreeEngine.current.build))

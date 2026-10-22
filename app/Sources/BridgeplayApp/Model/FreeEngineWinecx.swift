@@ -68,6 +68,10 @@ struct WinecxRelease: Sendable {
     // pull, not a whole one, which Wine padded with silence and was heard as crackling
     // (winecoreaudio-patch/). Empty where the runtime's own is kept.
     let audio: [WinecxBundledFile]
+    // d3dx11_43 and d3dx11_42 rebuilt to export D3DX11CreateThreadPump, which games such as
+    // Persona 4 Golden import and Wine leaves as a stub (d3dx11-patch/). Empty where the
+    // runtime's own are kept.
+    let d3dx: [WinecxBundledFile]
     // The runner build this release unpacks to, keyed by its pinned loader, and the ntdll
     // detours for it (NtdllPatcher.byBuild).
     let runner: RunnerBuild
@@ -194,6 +198,22 @@ enum FreeEngineWinecx {
                               path: "lib/wine/x86_64-unix/winecoreaudio.so",
                               sha256: "680b267e8cf41af0868de4adf7f6760615a434a4be06b4ab0cfeece2d9240faa"),
         ],
+        // d3dx11_43.dll, d3dx11_42.dll: winecx e0aa380's PE halves, both arches, with
+        // d3dx11-patch/winecx-create-thread-pump.patch.
+        d3dx: [
+            WinecxBundledFile(resource: "d3dx11_43-winecx-11.17", ext: "dll",
+                              path: "lib/wine/x86_64-windows/d3dx11_43.dll",
+                              sha256: "7d23cdfacc922f67dfa2eba98df277ae2ae351ad3646c3191a84966b55dbbfd3"),
+            WinecxBundledFile(resource: "d3dx11_43-winecx-11.17-i386", ext: "dll",
+                              path: "lib/wine/i386-windows/d3dx11_43.dll",
+                              sha256: "dd4dd351f2a5880c9848d5ccf4944a0b5e7622bb7fb196544115b1f9c92d749c"),
+            WinecxBundledFile(resource: "d3dx11_42-winecx-11.17", ext: "dll",
+                              path: "lib/wine/x86_64-windows/d3dx11_42.dll",
+                              sha256: "3d97e1de9000a78e27eb5c90d0ab9b36d54fd350760063da27226d22c90c8e1b"),
+            WinecxBundledFile(resource: "d3dx11_42-winecx-11.17-i386", ext: "dll",
+                              path: "lib/wine/i386-windows/d3dx11_42.dll",
+                              sha256: "85075f8b4f30f1a993238a0d6ab772a3a3df6c031e87ee9401c4367a527cd57c"),
+        ],
         runner: RunnerBuild(
             bundleVersion: "winecx-11.17",
             releaseVersion: "WineCX 11.17",
@@ -283,6 +303,7 @@ enum FreeEngineWinecx {
         network: [],
         nvidia: [],
         audio: [],
+        d3dx: [],
         // The hash-pinned loader is what makes it free, so a CrossOver install can never be
         // taken for it.
         runner: RunnerBuild(
@@ -375,7 +396,7 @@ enum FreeEngineWinecx {
     // checks them, since they are either Wine's own or links into a Game Porting Toolkit.
     static func expectedFiles(_ release: WinecxRelease = current) -> [String: String] {
         var table: [String: String] = [FreeEngine.macDriverPath: release.macDriver]
-        for file in release.gamepad + release.network + release.nvidia + release.audio { table[file.path] = file.sha256 }
+        for file in release.gamepad + release.network + release.nvidia + release.audio + release.d3dx { table[file.path] = file.sha256 }
         for file in release.backends { table["\(backendsPath)/\(file.destination)"] = file.sha256 }
         for path in release.renderer.files.keys {
             table[release.renderer.installPath(of: path)] = release.renderer.installedHash(of: path)
@@ -464,7 +485,7 @@ enum FreeEngineWinecx {
         try fm.createDirectory(at: root.deletingLastPathComponent(), withIntermediateDirectories: true)
         try fm.moveItem(at: wine, to: root)
         try FreeEngine.installMacDriver(root: root, build: release.build, sha256: release.macDriver, step: step)
-        try installBundled(release.gamepad + release.network + release.nvidia + release.audio, root: root)
+        try installBundled(release.gamepad + release.network + release.nvidia + release.audio + release.d3dx, root: root)
 
         let libraries = wine.deletingLastPathComponent()
         for file in release.backends {

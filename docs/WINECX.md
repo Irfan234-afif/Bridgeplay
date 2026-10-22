@@ -98,6 +98,7 @@ lib/wine/x86_64-unix/winemac.so                   Retina fix, replacing the arch
 lib/wine/x86_64-unix/winebus.so                   built with SDL2, replacing the archive's (Controllers)
 lib/wine/x86_64-windows/winebus.sys               11.17 only: map-key fix, replacing the archive's (Controllers)
 lib/wine/x86_64-windows/ws2_32.dll                11.17 only: own host name without loopback, replacing the archive's (Own host name)
+lib/wine/{x86_64,i386}-windows/d3dx11_4{2,3}.dll  11.17 only: D3DX11CreateThreadPump stub, replacing the archive's (D3DX11 thread pump)
 lib/libSDL2-2.0.0.dylib                           SDL 2.32.10, x86_64, for winebus.so (Controllers)
 ```
 
@@ -203,6 +204,27 @@ gcc 16.2, `make dlls/ws2_32/x86_64-windows/ws2_32.dll`), then
 is byte-identical to the runtime's `ws2_32.dll`; only the PE timestamp, checksum and build id
 differ, and the runtime's `.eh_frame` section name is cut to `.eh_fram` (10 bytes of string
 table). 11.15 keeps the runtime's own `ws2_32.dll`, so it still answers loopback first.
+
+## D3DX11 thread pump
+
+Wine's `d3dx11_43` and `d3dx11_42` declare `D3DX11CreateThreadPump` as a spec stub, so a game
+that imports it (Persona 4 Golden) dies at the first call with
+`unimplemented function d3dx11_43.dll.D3DX11CreateThreadPump` (Wine bug 56176). Wine master
+still has the stub (checked 2026-10-22); MR 6654 (closed, not merged) added an `E_NOTIMPL`
+stub, MR 5357 (open) a fuller thread pump.
+
+11.17 ships `d3dx11_43-winecx-11.17{,-i386}.dll` and `d3dx11_42-winecx-11.17{,-i386}.dll` as
+`lib/wine/{x86_64,i386}-windows/d3dx11_4{3,2}.dll`: winecx `e0aa380`'s PE halves with
+`d3dx11-patch/winecx-create-thread-pump.patch`, MR 6654's change, which returns `E_NOTIMPL`.
+`d3dx11_42` forwards to `d3dx11_43` (`-import`), so both are rebuilt and ship together. The
+pins are the release's `d3dx`.
+
+Built in a tree configured as in `winemac-patch/README.md` but with
+`--enable-archs=i386,x86_64` (mingw-w64 gcc 16.2 for both), brew's bison on `PATH` for `make`
+too, `make dlls/d3dx11_4{3,2}/{x86_64,i386}-windows/d3dx11_4{3,2}.dll`, then
+`{x86_64,i686}-w64-mingw32-strip --strip-debug`. Built without the patch, every section of
+all four is byte-identical to the runtime's; only the build id differs and the runtime's
+`.eh_frame` name is cut to `.eh_fram`. 11.15 keeps the runtime's own.
 
 ## D3DMetal: the builtin model
 
@@ -359,6 +381,10 @@ python3 apply.py <ntdll.dll> <out> <detour bin>   # patched hashes
 | `winebus-winecx-11.17.so` | `6223c035c824c90708abbc3e733f8d1d6ed6b8b4e9a3e1a5c813493ceba50473` |
 | `winebus-winecx-11.17.sys` | `da108d1c3788fa32807ef08c4d26d8a89812c230317ffa7ba5111e126bda607c` |
 | `ws2_32-winecx-11.17.dll` | `cb0a5670ce6dbf949ed25cca54e9f1c4930cd4c2ade895836d518d3d9073079c` |
+| `d3dx11_43-winecx-11.17.dll` | `7d23cdfacc922f67dfa2eba98df277ae2ae351ad3646c3191a84966b55dbbfd3` |
+| `d3dx11_43-winecx-11.17-i386.dll` | `dd4dd351f2a5880c9848d5ccf4944a0b5e7622bb7fb196544115b1f9c92d749c` |
+| `d3dx11_42-winecx-11.17.dll` | `3d97e1de9000a78e27eb5c90d0ab9b36d54fd350760063da27226d22c90c8e1b` |
+| `d3dx11_42-winecx-11.17-i386.dll` | `85075f8b4f30f1a993238a0d6ab772a3a3df6c031e87ee9401c4367a527cd57c` |
 
 4.5.125 (`winecx-11.15`):
 

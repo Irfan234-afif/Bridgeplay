@@ -50,6 +50,10 @@ sha256 pins are in docs/WINECX.md and each patch directory's README.
     winecoreaudio-winecx-11.17.so winecoreaudio-patch/winecx-render-buffer.patch
     wined3d-winecx-11.17.dll      wined3d-patch/winecx-driver-version.patch
     ws2_32-winecx-11.17.dll       ws2_32-patch/winecx-own-hostname.patch
+    d3dx11_43-winecx-11.17.dll    d3dx11-patch/winecx-create-thread-pump.patch
+    d3dx11_43-winecx-11.17-i386.dll  (same patch)
+    d3dx11_42-winecx-11.17.dll    (same patch)
+    d3dx11_42-winecx-11.17-i386.dll  (same patch)
     crypt32-winecx-11.17.dll      ngx-signer-patch/winecx-ngx-signer.patch
     wintrust-winecx-11.17.dll     ngx-signer-patch/winecx-ngx-signer.patch
 
