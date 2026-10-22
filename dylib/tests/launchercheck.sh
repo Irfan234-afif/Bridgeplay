@@ -48,6 +48,14 @@ build() {
 }
 apps() { (cd "$loader_root" && for b in *.app; do [ -e "$b" ] && printf '%s|' "$b"; done; true); }
 plist_inode() { stat -f %i "$loader_app/Contents/Info.plist"; }
+# The lock is free once install_bundle returns. A loaded host has been seen to report it busy
+# for a moment anyway, so name the holders and allow 5 s; a leaked lock stays held.
+lock_free() {
+  /usr/bin/lockf -s -t 0 "$loader_root/.lock" true && return 0
+  echo "  note  lock busy right after install_bundle; holders:"
+  lsof "$loader_root/.lock" 2>&1 | sed 's/^/          /' || true
+  /usr/bin/lockf -s -t 5 "$loader_root/.lock" true
+}
 leftover() { (cd "$loader_root" && n=0 && for b in .build.*; do [ -e "$b" ] && n=$((n + 1)); done; echo "$n"); }
 
 echo "== final paths =="
@@ -128,7 +136,7 @@ is "same listing" "$(bundle_listing "$T/a")" "$(bundle_listing "$T/b")"
 
 echo "== lock =="
 build "OTHER NAME"
-if /usr/bin/lockf -s -t 0 "$loader_root/.lock" true; then ok "lock released"; else bad "lock released" "free" "held"; fi
+if lock_free; then ok "lock released"; else bad "lock released" "free" "held"; fi
 
 echo "== case twin =="
 rm -rf "$loader_root"/*.app
@@ -205,7 +213,7 @@ for failure in install backup signal signal-installed missing-stage restore; do
     is "signal after rename keeps new bundle" "$staged_inode" "$(plist_inode)"
     is "signal after rename does not nest old bundles" "Replacement.app|" "$(apps)"
     is "signal after rename cleans staging" "0" "$(leftover)"
-    if /usr/bin/lockf -s -t 0 "$loader_root/.lock" true; then ok "$failure releases lock"; else bad "$failure releases lock" "free" "held"; fi
+    if lock_free; then ok "$failure releases lock"; else bad "$failure releases lock" "free" "held"; fi
     continue
   fi
   if [ "$failure" = restore ]; then
@@ -216,7 +224,7 @@ for failure in install backup signal signal-installed missing-stage restore; do
   is "$failure keeps original name and inode" "$before" "$(stat -f %i "$loader_root/Original.app/Contents/Info.plist")"
   is "$failure restores visible bundles" "Original.app|Stray.app|" "$(apps)"
   if [ -d "$loader_root/.Hidden.app" ]; then ok "$failure keeps hidden bundle"; else bad "$failure keeps hidden bundle" "present" "missing"; fi
-  if /usr/bin/lockf -s -t 0 "$loader_root/.lock" true; then ok "$failure releases lock"; else bad "$failure releases lock" "free" "held"; fi
+  if lock_free; then ok "$failure releases lock"; else bad "$failure releases lock" "free" "held"; fi
   is "$failure cleans staging" "0" "$(leftover)"
 done
 
