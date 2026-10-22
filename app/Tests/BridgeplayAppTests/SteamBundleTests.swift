@@ -48,29 +48,40 @@ struct SteamBundleTests {
 
     // MARK: Stopping Steam
 
-    // A stand-in Steam: running here and in another account, and whether it quits when asked.
+    // A stand-in Steam: running here and in another account, and which request it quits on.
     private final class FakeSteam: @unchecked Sendable {
+        enum Request: Comparable { case exitURL, quit, never }
+
         private let lock = NSLock()
         private var here: Bool
         private var elsewhere: Bool
-        private let quits: Bool
-        private(set) var asked = 0
+        private let quitsOn: Request
+        private(set) var requests: [Request] = []
         private(set) var swept: [String] = []
 
-        init(here: Bool, elsewhere: Bool = false, quits: Bool = true) {
+        init(here: Bool, elsewhere: Bool = false, quitsOn: Request = .exitURL) {
             self.here = here
             self.elsewhere = elsewhere
-            self.quits = quits
+            self.quitsOn = quitsOn
+        }
+
+        private func receive(_ request: Request) {
+            lock.withLock {
+                requests.append(request)
+                if request >= quitsOn { here = false }
+            }
         }
 
         var client: SteamBundle.Client {
             SteamBundle.Client(
                 runningAnywhere: { self.lock.withLock { self.here || self.elsewhere } },
                 runningHere: { self.lock.withLock { self.here } },
-                askToQuit: { self.lock.withLock { self.asked += 1; if self.quits { self.here = false } } },
+                askToQuit: { self.receive(.exitURL) },
+                requestQuit: { self.receive(.quit) },
                 sweep: { pattern in self.lock.withLock { self.swept.append(pattern) } },
                 pause: {},
-                attempts: 3)
+                attempts: 3,
+                escalationAttempts: 2)
         }
     }
 
@@ -83,7 +94,7 @@ struct SteamBundleTests {
     func closedSteamIsLeftAlone() throws {
         let steam = FakeSteam(here: false)
         #expect(try stop(steam) == false)
-        #expect(steam.asked == 0)
+        #expect(steam.requests.isEmpty)
         #expect(steam.swept.isEmpty)
     }
 
@@ -91,17 +102,28 @@ struct SteamBundleTests {
     func steamThatQuitsIsStopped() throws {
         let steam = FakeSteam(here: true)
         #expect(try stop(steam))
-        #expect(steam.asked == 1)
+        #expect(steam.requests == [.exitURL])
         #expect(steam.swept == [#"/tmp/Steam\.app/"#])
     }
 
-    // It used to be killed with SIGKILL after 30 seconds, mid-write or mid-update.
-    @Test("Steam that does not quit is reported, never killed")
+    // Issue #158: Steam on its login or update screen ignored steam://exit.
+    @Test("Steam that ignores steam://exit gets a macOS quit")
+    func steamThatIgnoresTheURLIsAskedByMacOS() throws {
+        let steam = FakeSteam(here: true, quitsOn: .quit)
+        #expect(try stop(steam))
+        #expect(steam.requests == [.exitURL, .quit])
+        #expect(steam.swept == [#"/tmp/Steam\.app/"#])
+    }
+
+    // It used to be killed with SIGKILL after 30 seconds, mid-write or mid-update. There is
+    // no kill in Client to reach for.
+    @Test("Steam that does not quit is reported with what to do, never swept")
     func steamThatStaysIsReported() {
-        let steam = FakeSteam(here: true, quits: false)
+        let steam = FakeSteam(here: true, quitsOn: .never)
         let failure = #expect(throws: StepFailure.self) { try stop(steam) }
         #expect(failure?.detail.contains("did not quit") == true)
-        #expect(steam.asked == 1)
+        #expect(failure?.detail.contains("Activity Monitor") == true)
+        #expect(steam.requests == [.exitURL, .quit])
         #expect(steam.swept.isEmpty)
     }
 
@@ -111,14 +133,22 @@ struct SteamBundleTests {
         let steam = FakeSteam(here: false, elsewhere: true)
         let failure = #expect(throws: SteamBundle.OpenInAnotherAccount.self) { try stop(steam) }
         #expect(failure?.localizedDescription.contains("another account") == true)
-        #expect(steam.asked == 0)
+        #expect(steam.requests.isEmpty)
     }
 
     @Test("Steam open in two accounts is reported once this one has quit")
     func bothAccountsSteamIsReported() {
         let steam = FakeSteam(here: true, elsewhere: true)
         #expect(throws: SteamBundle.OpenInAnotherAccount.self) { try stop(steam) }
-        #expect(steam.asked == 1)
+        #expect(steam.requests == [.exitURL])
+        #expect(steam.swept.isEmpty)
+    }
+
+    @Test("Steam open in another account is reported even after this one needed a macOS quit")
+    func otherAccountAfterEscalation() {
+        let steam = FakeSteam(here: true, elsewhere: true, quitsOn: .quit)
+        #expect(throws: SteamBundle.OpenInAnotherAccount.self) { try stop(steam) }
+        #expect(steam.requests == [.exitURL, .quit])
         #expect(steam.swept.isEmpty)
     }
 
