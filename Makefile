@@ -7,6 +7,17 @@ MINCHECK_VER := 26.0
 GLASS_SDK := 26.0
 AVAIL    := -Werror=unguarded-availability-new
 
+# The Command Line Tools can't build the app (no xcstringstool or actool). When they are the
+# active developer dir, point make's commands at Xcode, as scripts/build-local.sh does.
+ifeq ($(origin DEVELOPER_DIR),undefined)
+ifeq ($(shell xcode-select -p 2>/dev/null),/Library/Developer/CommandLineTools)
+DEVELOPER_DIR := $(firstword $(wildcard /Applications/Xcode-beta.app/Contents/Developer /Applications/Xcode.app/Contents/Developer))
+ifneq ($(DEVELOPER_DIR),)
+export DEVELOPER_DIR
+endif
+endif
+endif
+
 CFLAGS   := -arch $(ARCH) -mmacosx-version-min=$(MIN_VER) $(AVAIL) \
             -std=c17 -O2 -Wall -Wextra -Wno-unused-parameter \
             -fPIC -MMD -MP \
