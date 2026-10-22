@@ -86,9 +86,27 @@ disk. All of these paths are gitignored:
 `register-components.diff` changes, the script prints a warning. To rebuild fresh the way
 CI would, run `rm -rf scratch/wine scratch/wine-build-dual scratch/wine-build-arm64 scratch/.wine-key`.
 
-The Wine build trees record their source tree by absolute path (`srcdir = <repo>/scratch/wine`).
-To reuse them from another checkout, symlink that checkout's `scratch` to this one. Don't
-copy them. Two builds sharing one tree must not run at the same time.
+The bridge phase is skipped when `scratch/.bridge-key` (written after each bridge build)
+matches `scripts/bridge-key.sh`, a hash of `bridge/`, `lsteamclient/` and `steam-shim/`, the
+same sources CI keys its bridge cache on.
+
+### A new worktree
+
+The Wine build trees record their source tree by absolute path (`srcdir = <repo>/scratch/wine`),
+so they can't be copied, and two checkouts building in one shared tree would overwrite each
+other's bridge. Seed the worktree instead, then build:
+
+```sh
+scripts/worktree-seed.sh      # from the main worktree; or pass another checkout
+scripts/build-local.sh
+```
+
+The seed clones (APFS `cp -c`: instant, no extra disk) Dobby, the fonts and their stamp, the
+Proton tarball and, when both checkouts have the same bridge sources, the five bridge outputs.
+The font venv is linked. Measured on the M5 Max: the seed takes 1–2s and the first build 45s,
+instead of about 15m. When the bridge sources differ, the Wine source is cloned instead and the
+bridge is built in the worktree without the 8m30s clone: 3m21s, 4m05s for the whole build.
+`app/.build` is not seeded: SwiftPM records absolute paths, and a cold app build is 35s.
 
 ## Local deviation from CI
 

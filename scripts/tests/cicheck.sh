@@ -372,5 +372,10 @@ yes "scope: runs the scope script into the job output" has '        run: sh scri
 yes "scope: output is docs_only" has '      docs_only: ${{ steps.scope.outputs.docs_only }}' "$scope_job"
 yes "build-local.sh reuses runs through ci-run-passed.sh" grep -q 'ci-run-passed.sh' "$root/scripts/build-local.sh"
 
+# bridge-key.sh: the outputs build-local.sh and worktree-seed.sh reuse are the ones CI's bridge cache saves
+ci_bridge=$(sed -n '/^          key: bridge-/q;/^          path: |$/,$p' "$app" | sed -n 's/^            \(scratch\/.*\)$/\1/p' | sort)
+eq "bridge-key.sh --outputs = app.yml bridge cache" "$ci_bridge" "$(sh "$root/scripts/bridge-key.sh" --outputs | sort)"
+yes "bridge key is a 16-digit hash" sh -c '[ "$(sh "$1/scripts/bridge-key.sh" | tr -d 0-9a-f)" = "" ] && [ "$(sh "$1/scripts/bridge-key.sh" | wc -c)" -eq 17 ]' _ "$root"
+
 echo "cicheck: $passed passed, $failed failed"
 [ "$failed" -eq 0 ]

@@ -13,6 +13,8 @@
 #   scratch/wine-build-arm64         arm64 tree (FEX unix half)
 #   scratch/proton-lsc               Proton tarball for lsteamclient
 #   app/.build                       SwiftPM build and the Sparkle checkout
+# The bridge phase is skipped when scratch/.bridge-key matches the bridge sources.
+# A new worktree: scripts/worktree-seed.sh first, then this.
 #
 # Overridable: DEVELOPER_DIR (default Xcode-beta), JOBS (default hw.ncpu)
 # A beta build: BRIDGEPLAY_BETA=N BRIDGEPLAY_BETA_BUILD=B [BRIDGEPLAY_BETA_PLANNED=X.Y.Z], see docs/RELEASING.md
@@ -172,9 +174,24 @@ if [ -f "$wine_stamp" ] && [ "$(cat "$wine_stamp")" != "$wine_key" ]; then
 	echo "    rm -rf scratch/wine scratch/wine-build-dual scratch/wine-build-arm64 $wine_stamp"
 fi
 
-# The wine-tree scripts call plain make, which joins this make's jobserver.
-phase bridge make -j"$JOBS" bridge
-[ -f "$wine_stamp" ] || echo "$wine_key" >"$wine_stamp"
+# Like CI's bridge cache: outputs built from these exact sources are reused, which is how a
+# worktree seeded by worktree-seed.sh skips the Wine clone and build.
+bridge_key=$(sh scripts/bridge-key.sh)
+bridge_stamp=scratch/.bridge-key
+bridge_built=0
+if [ "$(cat "$bridge_stamp" 2>/dev/null)" = "$bridge_key" ]; then
+	bridge_built=1
+	for f in $(sh scripts/bridge-key.sh --outputs); do [ -f "$f" ] || bridge_built=0; done
+fi
+if [ "$bridge_built" -eq 1 ]; then
+	echo "==> [bridge] skipped: already built from these sources ($bridge_key)"
+else
+	rm -f "$bridge_stamp"
+	# The wine-tree scripts call plain make, which joins this make's jobserver.
+	phase bridge make -j"$JOBS" bridge
+	[ -f "$wine_stamp" ] || echo "$wine_key" >"$wine_stamp"
+	echo "$bridge_key" >"$bridge_stamp"
+fi
 
 # --- fonts -------------------------------------------------------------------------
 
@@ -185,6 +202,8 @@ for tool in fontforge gpatch; do
 		|| { echo "==> $tool is missing, run: brew install fontforge gpatch" >&2; exit 1; }
 done
 if [ ! -x scratch/fontvenv/bin/makeotfexe ] || [ "$(cat scratch/fontvenv/.tools 2>/dev/null)" != "$font_tools" ]; then
+	# A venv shared by worktree-seed.sh belongs to the other checkout: replace the link, not that venv.
+	[ ! -L scratch/fontvenv ] || rm scratch/fontvenv
 	python3 -m venv scratch/fontvenv
 	# shellcheck disable=SC2086 # FONT_TOOLS is a space-separated requirement list
 	scratch/fontvenv/bin/pip install -q $font_tools
