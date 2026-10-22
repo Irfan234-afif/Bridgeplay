@@ -76,7 +76,8 @@ the dylib into `Steam.app` and installs the signatures, fonts and helpers into
 ## Rules
 
 - **Large changes:** open an issue first. Check closed issues and PRs for duplicate work.
-  Changes that belong upstream go to NotProton.
+  Changes that belong upstream go to NotProton. Port an upstream PR only after it is merged
+  there; until then, wait for the maintainer's version.
 - **PR descriptions** are written by the contributor in their own words. Don't generate one.
 - **Comments:** keep them short. Comment where the code is hard to follow, not where it is
   obvious.

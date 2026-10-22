@@ -112,6 +112,12 @@ Building from source: see [docs/DEVELOPING.md](docs/DEVELOPING.md), [docs/ARCHIT
 
 Bridgeplay is a fork of [NotProton](https://github.com/NotProtonNot/NotProton) (GPL-3.0), built on CodeWeavers' [WineCX](https://www.codeweavers.com/crossover) and Apple's [Game Porting Toolkit](https://developer.apple.com/games/game-porting-toolkit/). The DualSense Bluetooth bridge and Steam rumble forwarding come from [sn0wst0rm's NotProton fork](https://github.com/sn0wst0rm/NotProton). It also uses [Dobby](https://github.com/jmpews/Dobby) (Apache-2.0), [Sparkle](https://sparkle-project.org) (MIT), [DXMT](https://github.com/3Shain/dxmt) and [DXVK-macOS](https://github.com/Gcenx/DXVK-macOS).
 
+## Support Wine
+
+Wine on the Mac exists largely because of [CodeWeavers](https://www.codeweavers.com), the biggest contributor to the Wine project. They fund that work by selling [CrossOver](https://www.codeweavers.com/crossover). Bridgeplay's free engine is built from the source code CodeWeavers publishes, so every game it runs also stands on their work.
+
+If you can, buy CrossOver.
+
 ## License
 
 Bridgeplay is licensed under the [GPL-3.0](LICENSE). Third-party licenses, and the source for the patched Wine files the app ships (LGPL-2.1-or-later), are listed in [NOTICE](NOTICE).
