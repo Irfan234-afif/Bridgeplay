@@ -200,6 +200,10 @@ struct InstallerView: View {
                 }
                 .buttonStyle(.pillPlain).keyboardShortcut(.cancelAction)
             }
+            if model.stage == .failed {
+                Button(tr("Show Log")) { model.showLog() }.buttonStyle(.pillPlain)
+                Button(tr("Report on GitHub")) { model.report() }.buttonStyle(.pillPlain)
+            }
             Spacer()
             switch model.stage {
             case .review:

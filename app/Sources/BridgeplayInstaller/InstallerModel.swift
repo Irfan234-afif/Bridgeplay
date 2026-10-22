@@ -80,6 +80,7 @@ final class InstallerModel {
         guard preview == nil else { return }
         stage = .checking
         failure = nil
+        InstallerLog.write("Check on \(InstallerLog.system)")
         do {
             let service = self.service
             try await Task.detached(priority: .userInitiated) { try service.recoverIfNeeded() }.value
@@ -92,6 +93,7 @@ final class InstallerModel {
             try Task.checkCancellation()
             let state = try service.state(for: fetched)
             total = (state.isCurrent ? 0 : fetched.archiveLength) + (components?.length ?? 0)
+            InstallerLog.write("Release \(fetched.shortVersion), installed \(state.installedVersion ?? "none"), components \(components == nil ? "present" : "needed")")
             switch state {
             case .notInstalled: installedVersion = nil; stage = .review
             case .updateAvailable(_, let current, _): installedVersion = current; stage = .review
@@ -110,6 +112,7 @@ final class InstallerModel {
             defer { operation = nil }
             stage = .downloading
             failure = nil
+            InstallerLog.write("Install \(release.shortVersion) to \(destination.path)")
             received = 0
             downloadedBefore = 0
             progress = nil
@@ -145,6 +148,7 @@ final class InstallerModel {
                     componentStatus = nil
                     try await Task.detached(priority: .userInitiated) {
                         try InstallerComponents.install(archive: archive, work: work) { line in
+                            InstallerLog.write("Install.command: \(line)")
                             Task { @MainActor [weak self] in self?.componentStatus = Self.status(line) }
                         }
                     }.value
@@ -152,6 +156,7 @@ final class InstallerModel {
                 }
                 isCurrent = false
                 stage = .done
+                InstallerLog.write("Done")
             } catch is CancellationError {
                 stage = .review
             } catch { fail(error) }
@@ -197,7 +202,17 @@ final class InstallerModel {
     }
 
     private func fail(_ error: Error) {
+        InstallerLog.write("Failed: \(String(reflecting: error))")
         failure = InstallerMessage.describe(error)
         stage = .failed
+    }
+
+    func report() {
+        guard let failure, let url = InstallerReport.issueURL(failure: failure, version: version, installed: installedVersion) else { return }
+        NSWorkspace.shared.open(url)
+    }
+
+    func showLog() {
+        NSWorkspace.shared.activateFileViewerSelecting([InstallerLog.url])
     }
 }

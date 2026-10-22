@@ -671,6 +671,22 @@
         }
       }
     },
+    "Report on GitHub" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Segnala su GitHub"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在 GitHub 上报告"
+          }
+        }
+      }
+    },
     "Review" : {
       "localizations" : {
         "it" : {
@@ -715,6 +731,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "正在设置 Bridgeplay"
+          }
+        }
+      }
+    },
+    "Show Log" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mostra registro"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "显示日志"
           }
         }
       }

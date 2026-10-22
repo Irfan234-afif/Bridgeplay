@@ -29,5 +29,6 @@ body:
       label: Logs
       description: |
         Attach `~/Library/Application Support/bridgeplay/bridgeplay.log`. For a game, also
-        attach its `bridgeplay-run.log` (Prefixes page › the game › Open Log).
+        attach its `bridgeplay-run.log` (Prefixes page › the game › Open Log). For the
+        installer, attach `~/Library/Logs/Bridgeplay/installer.log`.
       render: text
