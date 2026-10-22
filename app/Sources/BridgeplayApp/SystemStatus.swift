@@ -8,7 +8,8 @@ import UniformTypeIdentifiers
 enum AppVersion {
     static let fallback = "0.1.0-dev"
 
-    // The semver people see. It went from 3.5.0 back to 0.7.0, so it doesn't order installs.
+    // The label people see: X.Y.Z, or X.Y.Z-beta.N in a beta build. It went from 3.5.0 back to 0.7.0,
+    // so it never orders installs.
     static var display: String {
         Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? fallback
     }

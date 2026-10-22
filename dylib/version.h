@@ -10,6 +10,9 @@
 //                       (CFBundleShortVersionString, sparkle:shortVersionString)
 //   BRIDGEPLAY_BUILD    +1 on every release, continuing the old "-ray.N" counter; Sparkle
 //                       orders updates by it (CFBundleVersion, sparkle:version)
+// Both are committed as they are for a stable release: a plain X.Y.Z and the next build. A beta
+// build stamps its X.Y.Z-beta.N label, build number and channel in at build time
+// (scripts/stamp-beta.sh); those are never committed.
 // Change both with scripts/bump-version.sh, see docs/RELEASING.md.
 #define BRIDGEPLAY_VERSION "0.7.1"
 #define BRIDGEPLAY_BUILD 45

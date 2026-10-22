@@ -42,6 +42,48 @@ record holds `4.0.<build>` (`AppVersion.deployKey`), not the semver: it sorts pa
 older record (`1.2.0-…`, `3.5.0`), and an older app that another macOS user still runs sees
 a newer install and leaves it alone. `VersioningTests` guards both.
 
+## Betas
+
+The committed `BRIDGEPLAY_VERSION` is always a plain `X.Y.Z`, on `main` and on `beta`, so merging
+`main` into `beta` never conflicts over a version. A beta's label, build number and channel are
+stamped into the app at build time by `scripts/stamp-beta.sh` and never committed;
+`bump-version.sh`, `stamp-beta.sh` and `make app` refuse a beta label in `dylib/version.h`.
+
+```sh
+BRIDGEPLAY_BETA=1 BRIDGEPLAY_BETA_BUILD=46 scripts/build-local.sh        # or make app
+BRIDGEPLAY_BETA=2 BRIDGEPLAY_BETA_BUILD=47 BRIDGEPLAY_BETA_PLANNED=0.8.0 make app
+```
+
+| Variable | Meaning |
+|---|---|
+| `BRIDGEPLAY_BETA` | The beta number N, a positive integer. Setting it at all asks for a beta; anything but a positive integer fails the build, and so does setting the two below without it |
+| `BRIDGEPLAY_BETA_BUILD` | The build number: the highest build ever published, stable or beta, plus one. Required, and above the committed build, so the beta orders above the stable it branched from |
+| `BRIDGEPLAY_BETA_PLANNED` | The release the beta is named after. Defaults to the next patch of the committed version; name a milestone minor (`0.8.0`) to override it. Must be above the committed version |
+
+A beta built from committed `0.7.2` therefore reads `0.7.3-beta.1` by default (`CFBundleShortVersionString`,
+shown in About, Status and game reports), carries the build it was given (`CFBundleVersion`) and
+`BridgeplayChannel` `beta` in `Info.plist`; a normal build keeps the committed version and build and
+the `stable` channel `app/Info.plist` ships with. A missing or unreadable channel means stable.
+Installs and updates are ordered by the build alone, never by the label (`AppVersion.deployKey`),
+which is why every published build, prerelease or not, must take a higher number than all before it.
+
+The stable that ships the beta is bumped as the version policy says, usually a patch, to the number
+the beta was named after, and takes the highest published build into account so it outranks every beta:
+
+```sh
+scripts/bump-version.sh patch --named 0.7.3 --highest-build 47    # minor --named 0.8.0 for a milestone
+```
+
+`--named` fails the bump when it would land anywhere else, and `BRIDGEPLAY_HIGHEST_BUILD` can stand in
+for `--highest-build`. Without it the bump only knows the committed build, so give it the real maximum.
+
+Upstream merges go to `beta`: `scripts/sync-upstream.sh` merges and commits no version bump there
+(`BRIDGEPLAY_BETA_BRANCH` names the branch, default `beta`). On `main`, the exception for a security or
+crash hotfix from upstream, it still bumps the patch.
+
+`release-local.sh` does not publish betas: a stamped build no longer matches `dylib/version.h`, so
+its version check stops it. `make versioncheck` covers the stamp, the bump and the sync.
+
 ## Steps
 
 0. Push the changes first and wait for the `app` workflow to pass on them
@@ -54,7 +96,8 @@ a newer install and leaves it alone. `VersioningTests` guards both.
    scripts/bump-version.sh patch        # or minor / major
    git commit -m "chore(release): Bridgeplay X.Y.Z" dylib/version.h
    ```
-   `scripts/sync-upstream.sh` already bumps the patch after an upstream merge.
+   `scripts/sync-upstream.sh` already bumps the patch after an upstream merge on `main`; on `beta` it
+   commits no bump, see Betas.
 2. Push to `main` of `raymondchins/Bridgeplay` (the script refuses anything else).
 3. Optionally rehearse: `scripts/release-local.sh --dry-run` writes the zip, appcast and
    an ad hoc native installer ZIP to
