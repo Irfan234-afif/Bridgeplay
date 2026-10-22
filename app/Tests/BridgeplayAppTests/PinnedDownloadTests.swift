@@ -115,7 +115,7 @@ struct PinnedDownloadTests {
 
     @Test("A download has an overall deadline, not only an idle one")
     func downloadsHaveADeadline() {
-        #expect(PinnedDownload.session.configuration.timeoutIntervalForResource <= 60 * 60)
+        #expect(PinnedDownload.session.configuration.timeoutIntervalForResource <= 4 * 60 * 60)
     }
 
     private final class Trickle: URLProtocol, @unchecked Sendable {

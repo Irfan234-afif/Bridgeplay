@@ -34,7 +34,9 @@ enum PinnedDownload {
         }
     }
 
-    static let session = session(deadline: 30 * 60)
+    // The engine is about 440 MB: three hours still finishes it at about 42 KB/s. Stalls
+    // fail sooner on the 60 second idle timeout.
+    static let session = session(deadline: 3 * 60 * 60)
 
     static func session(deadline: TimeInterval, protocols: [AnyClass] = []) -> URLSession {
         let config = URLSessionConfiguration.default
