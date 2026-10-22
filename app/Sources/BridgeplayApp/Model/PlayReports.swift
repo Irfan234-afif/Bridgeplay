@@ -35,7 +35,8 @@ struct ReportPayload: Codable, Equatable, Sendable {
                      log: String?, wineLog: String?, machine: GameReport.Machine, install: String,
                      note: String? = nil) -> ReportPayload {
         let launch: (engine: String?, backend: String?) = log.map(GameReport.lastLaunch) ?? (nil, nil)
-        var summary = session.summary(wineLog: wineLog)
+        var summary = session.summary(log: log, wineLog: wineLog)
+        if let newer = machine.newerRelease { summary += ". A newer Bridgeplay was out: \(newer)" }
         if source == .auto { summary += ". Status inferred from the log" }
         return ReportPayload(
             appid: appID, status: status, install: install, source: source, name: name,
@@ -45,7 +46,7 @@ struct ReportPayload: Codable, Equatable, Sendable {
             note: note.map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }.flatMap { $0.isEmpty ? nil : String($0.prefix(1000)) },
             setup: machine.setup.isEmpty ? nil : machine.setup,
             log: log.map { String(GameReport.redacted($0).suffix(logLimit)) },
-            wineLog: wineLog.map { String(GameReport.redacted($0).suffix(wineLogLimit)) })
+            wineLog: wineLog.map { GameReport.wineTail(GameReport.redacted($0), limit: wineLogLimit) })
     }
 }
 
