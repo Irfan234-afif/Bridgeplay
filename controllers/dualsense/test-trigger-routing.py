@@ -62,8 +62,16 @@ for pcm, grace in ((False, 75), (False, 0), (True, 0)):
         t = d["triggers"]
         if not grace:
             assert t["suppressedR2Resets"] == 0, t
-        time.sleep(1.1)
-        t = json.loads(status.read_text())["triggers"]
+        # The broker rewrites status once a second, so a fixed sleep can read a snapshot
+        # taken before the deferred release fired. Wait for one written well after it:
+        # packets older than 0.25 s are dropped, so the release is due by stopped + 0.35.
+        deadline = time.time() + 5
+        while True:
+            d = json.loads(status.read_text())
+            if d["updated"] >= stopped + 0.5 or time.time() > deadline:
+                break
+            time.sleep(0.05)
+        t = d["triggers"]
         assert bytes(t["r2"]) == off, t
         if grace:
             # Resets inside the grace never reach the pad. A host pause longer than
