@@ -38,10 +38,12 @@ for pcm, grace in ((False, 75), (False, 0), (True, 0)):
         addr = ("127.0.0.1", json.loads(p.stdout.readline())["port"])
         sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         seq = 0
+        sent = []
 
         def send(effect):
             global seq
             seq += 1
+            sent.append(time.time())
             report = bytearray(64)
             report[0] = 2
             report[1] = 4
@@ -74,11 +76,16 @@ for pcm, grace in ((False, 75), (False, 0), (True, 0)):
         t = d["triggers"]
         assert bytes(t["r2"]) == off, t
         if grace:
-            # Resets inside the grace never reach the pad. A host pause longer than
-            # the grace may let a few through, so judge the history, not a snapshot.
+            # Resets inside the grace never reach the pad. A pause in this loop longer
+            # than the grace rightly lets an off through (or fires the deferred release)
+            # and the next curve follows, so allow two sends per slow gap. Gaps a third
+            # of the grace count as slow: the broker stamps packets per run-loop pass.
             h = t["sentHistory"]
-            assert t["suppressedR2Resets"] > 50 and bytes(h[0]["r2"]) == curve, t
-            assert len(h) <= 8 and bytes(h[-1]["r2"]) == off, t
+            slow = sum(b - a > grace / 3000 for a, b in zip(sent, sent[1:]))
+            assert t["suppressedR2Resets"] > 50, t
+            assert len(h) <= 2 + 2 * slow + 2, (slow, t)
+            assert len(h) == 40 or bytes(h[0]["r2"]) == curve, t
+            assert bytes(h[-1]["r2"]) == off, t
             assert -0.5 < h[-1]["at"] - stopped < 0.5, t
         send(curve)
         time.sleep(0.06)
