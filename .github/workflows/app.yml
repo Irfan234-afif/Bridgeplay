@@ -2,9 +2,9 @@ name: app
 
 # Starts on every PR and every push to main and beta, so the "app gate" job below always
 # reports: it is the check a branch rule can require. The scope job decides whether the
-# change is docs-only (.github/docs-only-paths); if so the build, checks and tests jobs are
+# change is docs-only (.github/docs-only-paths); if so the build and checks jobs are
 # skipped and the gate passes. scripts/build-local.sh reuses a run for a release only when
-# those three jobs ran and succeeded (scripts/ci-run-passed.sh), so keep their names.
+# those two jobs ran and succeeded (scripts/ci-run-passed.sh), so keep their names.
 on:
   push:
     branches: [main, beta]
@@ -165,7 +165,7 @@ jobs:
       - name: Build the app
         run: make app
 
-      # The checks and tests jobs run the rest of the one check list (make ci-checks).
+      # The checks job runs the rest of the one check list (make ci-checks).
       - name: Run the checks that need the built app
         run: make ci-checks-built
 
@@ -200,30 +200,12 @@ jobs:
       - name: Run the checks
         run: make ci-checks-source
 
-  # The Swift tests build their own debug products, so they run beside the app build
-  # instead of after it, and on a runner of their own: the timing-sensitive controller
-  # checks in the checks job would share three cores with the Swift compiler otherwise.
-  tests:
-    name: swift tests
-    needs: scope
-    if: needs.scope.outputs.docs_only != 'true'
-    runs-on: xcode-27
-    timeout-minutes: 20
-    steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
-
-      - name: Select Xcode
-        run: sudo xcode-select -s /Applications/Xcode_27.0.app
-
-      - name: Run the Swift tests
-        run: make ci-checks-tests
-
   # The one check a branch rule requires. always(): a skipped required check counts as
   # passing, so a gate skipped because build or checks failed or were cancelled would let
   # the change in. scripts/ci-gate.sh says what is green.
   gate:
     name: app gate
-    needs: [scope, build, checks, tests]
+    needs: [scope, build, checks]
     if: always()
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -236,5 +218,4 @@ jobs:
           DOCS_ONLY: ${{ needs.scope.outputs.docs_only }}
           BUILD_RESULT: ${{ needs.build.result }}
           CHECKS_RESULT: ${{ needs.checks.result }}
-          TESTS_RESULT: ${{ needs.tests.result }}
         run: sh scripts/ci-gate.sh

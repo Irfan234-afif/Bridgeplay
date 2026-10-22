@@ -163,8 +163,7 @@ eq "pull request, HEAD is not a merge" "docs_only=false" "$(scope pull_request)"
 
 # --- ci-gate.sh --------------------------------------------------------------------
 
-# The tests job ends like the checks job unless a fifth result is given.
-gate() { SCOPE_RESULT=$1 DOCS_ONLY=$2 BUILD_RESULT=$3 CHECKS_RESULT=$4 TESTS_RESULT=${5:-$4} sh "$root/scripts/ci-gate.sh"; }
+gate() { SCOPE_RESULT=$1 DOCS_ONLY=$2 BUILD_RESULT=$3 CHECKS_RESULT=$4 sh "$root/scripts/ci-gate.sh"; }
 
 yes "gate: docs-only, heavy jobs skipped" gate success true skipped skipped
 yes "gate: code, heavy jobs passed" gate success false success success
@@ -173,12 +172,8 @@ no "gate: code, checks failed" gate success false success failure
 no "gate: code, build cancelled" gate success false cancelled success
 no "gate: code, checks cancelled" gate success false success cancelled
 no "gate: code, heavy jobs skipped" gate success false skipped skipped
-no "gate: code, tests failed" gate success false success success failure
-no "gate: code, tests cancelled" gate success false success success cancelled
-no "gate: code, tests skipped" gate success false success success skipped
-no "gate: docs-only, tests ran" gate success true skipped skipped success
 no "gate: scope failed" gate failure '' skipped skipped
-no "gate: no results at all" env -u SCOPE_RESULT -u DOCS_ONLY -u BUILD_RESULT -u CHECKS_RESULT -u TESTS_RESULT sh "$root/scripts/ci-gate.sh"
+no "gate: no results at all" env -u SCOPE_RESULT -u DOCS_ONLY -u BUILD_RESULT -u CHECKS_RESULT sh "$root/scripts/ci-gate.sh"
 
 # Every combination: green exactly for the two good ones.
 for s in success failure cancelled skipped; do
@@ -223,9 +218,9 @@ chmod +x "$work/bin/gh"
 FAKE_DIR=$work/fake
 export FAKE_DIR
 tab=$(printf '\t')
-jobs_file() { # jobs_file <id> <scope> <build> <checks> <gate> [tests, default <checks>]
-	printf 'change scope%s%s\nfull app build%s%s\nsource checks%s%s\nswift tests%s%s\napp gate%s%s\n' \
-		"$tab" "$2" "$tab" "$3" "$tab" "$4" "$tab" "${6:-$4}" "$tab" "$5" >"$FAKE_DIR/jobs.$1"
+jobs_file() { # jobs_file <id> <scope> <build> <checks> <gate>
+	printf 'change scope%s%s\nfull app build%s%s\nsource checks%s%s\napp gate%s%s\n' \
+		"$tab" "$2" "$tab" "$3" "$tab" "$4" "$tab" "$5" >"$FAKE_DIR/jobs.$1"
 }
 reset_fake() { rm -f "$FAKE_DIR"/runs.* "$FAKE_DIR"/jobs.* "$FAKE_DIR/calls" "$FAKE_DIR/list-fails"; }
 passed_run() { PATH="$work/bin:$PATH" sh "$root/scripts/ci-run-passed.sh" owner/repo abc123; }
@@ -249,10 +244,6 @@ reset_fake
 jobs_file 20 success success failure failure
 printf '20\n' >"$FAKE_DIR/runs.abc123"
 no "run: checks failed" passed_run
-jobs_file 20 success success success success failure
-no "run: tests failed" passed_run
-printf 'change scope\tsuccess\nfull app build\tsuccess\nsource checks\tsuccess\napp gate\tsuccess\n' >"$FAKE_DIR/jobs.20"
-no "run: a run from before the tests job" passed_run
 jobs_file 20 success skipped success success
 no "run: build skipped" passed_run
 jobs_file 20 success cancelled success success
@@ -355,28 +346,24 @@ yes "app.yml: other runs have a group of their own" grep -Fxq '  group: app-${{ 
 
 build=$(job build)
 checks=$(job checks)
-tests=$(job tests)
 gate_job=$(job gate)
 scope_job=$(job scope)
 yes "build job name" has "    name: full app build" "$build"
 yes "checks job name" has "    name: source checks" "$checks"
-yes "tests job name" has "    name: swift tests" "$tests"
 yes "gate job name" has "    name: app gate" "$gate_job"
 eq "ci-run-passed.sh knows the build job" "full app build" "$(sed -n 's/^build_job=\${BRIDGEPLAY_CI_BUILD_JOB:-\(.*\)}$/\1/p' "$root/scripts/ci-run-passed.sh")"
 eq "ci-run-passed.sh knows the checks job" "source checks" "$(sed -n 's/^checks_job=\${BRIDGEPLAY_CI_CHECKS_JOB:-\(.*\)}$/\1/p' "$root/scripts/ci-run-passed.sh")"
-eq "ci-run-passed.sh knows the tests job" "swift tests" "$(sed -n 's/^tests_job=\${BRIDGEPLAY_CI_TESTS_JOB:-\(.*\)}$/\1/p' "$root/scripts/ci-run-passed.sh")"
-for j in build checks tests; do
+for j in build checks; do
 	body=$(job "$j")
 	yes "$j: waits for scope" has "    needs: scope" "$body"
 	yes "$j: skipped for docs-only" has "    if: needs.scope.outputs.docs_only != 'true'" "$body"
 done
-yes "gate: waits for every job" has "    needs: [scope, build, checks, tests]" "$gate_job"
+yes "gate: waits for every job" has "    needs: [scope, build, checks]" "$gate_job"
 yes "gate: runs whatever the others did" has "    if: always()" "$gate_job"
 yes "gate: on a Linux runner" has "    runs-on: ubuntu-latest" "$gate_job"
 yes "gate: runs the verdict script" has "        run: sh scripts/ci-gate.sh" "$gate_job"
 for v in 'SCOPE_RESULT: ${{ needs.scope.result }}' 'DOCS_ONLY: ${{ needs.scope.outputs.docs_only }}' \
-	'BUILD_RESULT: ${{ needs.build.result }}' 'CHECKS_RESULT: ${{ needs.checks.result }}' \
-	'TESTS_RESULT: ${{ needs.tests.result }}'; do
+	'BUILD_RESULT: ${{ needs.build.result }}' 'CHECKS_RESULT: ${{ needs.checks.result }}'; do
 	yes "gate input $v" has "          $v" "$gate_job"
 done
 yes "scope: on a Linux runner" has "    runs-on: ubuntu-latest" "$scope_job"

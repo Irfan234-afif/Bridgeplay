@@ -948,17 +948,14 @@ CI_CHECKS := mincheck l10ncheck \
 	seedcheck gamefixescheck versioncheck cicheck padcheck compat-reported-check np-native-tests native-shim-tests \
 	app-tests native-installercheck game-host-check dualsense-check steam-rumble-check
 
-# app.yml runs the checks that need the built app in its build job, the Swift tests in a
-# job of their own and the rest in a third; the three lists together are CI_CHECKS.
-CI_CHECKS_BUILT := mincheck l10ncheck
-CI_CHECKS_TESTS := app-tests
-CI_CHECKS_SOURCE := $(filter-out $(CI_CHECKS_BUILT) $(CI_CHECKS_TESTS),$(CI_CHECKS))
+# app.yml runs the checks that need the built app in its build job and the rest in a
+# parallel job; both lists together are CI_CHECKS.
+CI_CHECKS_BUILT := mincheck l10ncheck app-tests
+CI_CHECKS_SOURCE := $(filter-out $(CI_CHECKS_BUILT),$(CI_CHECKS))
 
-.PHONY: ci-checks ci-checks-built ci-checks-tests ci-checks-source
+.PHONY: ci-checks ci-checks-built ci-checks-source
 ci-checks-built:
 	@$(MAKE) -s ci-checks CI_CHECKS="$(CI_CHECKS_BUILT)"
-ci-checks-tests:
-	@$(MAKE) -s ci-checks CI_CHECKS="$(CI_CHECKS_TESTS)"
 ci-checks-source:
 	@$(MAKE) -s ci-checks CI_CHECKS="$(CI_CHECKS_SOURCE)"
 # The checks run side by side, CHECK_JOBS at a time (CHECK_JOBS=1 runs them one by one).
