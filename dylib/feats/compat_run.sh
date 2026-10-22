@@ -1343,6 +1343,12 @@ refuse_broken_prefix() {
     show_alert "This Steam library cannot hold the game's prefix" "It is formatted $fs, which has no symbolic links, so Wine cannot set up the game here. Move the game to a library on an APFS drive."
     exit 1
   esac
+  # Wine reports a full disk only as error=112 on each file it could not copy.
+  free_kb=$(df -Pk "$STEAM_COMPAT_DATA_PATH" 2>/dev/null | awk 'NR == 2 { print $4 }')
+  if [ -n "$free_kb" ] && [ "$free_kb" -lt 2097152 ]; then
+    show_alert "The disk is too full for the game's prefix" "Wine needs about 2 GB free to set up the game. Free some space on the drive that holds this Steam library, then rebuild the prefix in Bridgeplay."
+    exit 1
+  fi
   show_alert "The game's prefix could not be set up" "Wine did not finish building it. Rebuild the prefix in Bridgeplay, then launch again. bridgeplay-run.log has the details."
   exit 1
 }

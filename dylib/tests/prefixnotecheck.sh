@@ -92,17 +92,20 @@ is "an unknown file system does not notify" "" "$(cat "$work/notes")"
 
 echo "== a prefix Wine did not finish"
 pfx="$two/steamapps/compatdata/42/pfx"
-check_prefix() { # check_prefix FS: prints the exit status
+check_prefix() { # check_prefix FS [FREE_KB]: prints the exit status
 	: > "$work/log"
 	: > "$work/notes"
 	env log="$work/log" notes="$work/notes" body="$body" fs="$1" WINEPREFIX="$pfx" \
 		STEAM_COMPAT_DATA_PATH="$two/steamapps/compatdata/42" \
-		sh -c 'eval "$body"; volume_type() { [ -z "$fs" ] || echo "$fs /Volumes/Drive"; }
+		free="${2:-99999999}" sh -c 'eval "$body"; volume_type() { [ -z "$fs" ] || echo "$fs /Volumes/Drive"; }
+			df() { printf "Filesystem 1024-blocks Used Available\n/dev/disk3 1 1 %s\n" "$free"; }
 			refuse_broken_prefix' && echo 0 || echo $?
 }
 is "no dosdevices stops the launch" 1 "$(check_prefix apfs)"
 has "it is logged" "Wine did not finish building it" "$work/log"
 has "the player is told to rebuild" "The game's prefix could not be set up|Wine did not finish building it. Rebuild the prefix" "$work/notes"
+is "a full disk stops the launch" 1 "$(check_prefix apfs 1024)"
+has "a full disk is named" "The disk is too full for the game's prefix" "$work/notes"
 is "exFAT stops the launch" 1 "$(check_prefix exfat)"
 has "exFAT names the file system" "This Steam library cannot hold the game's prefix|It is formatted exfat" "$work/notes"
 mkdir -p "$pfx/drive_c/windows/system32" "$pfx/dosdevices"
