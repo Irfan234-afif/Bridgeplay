@@ -9,7 +9,7 @@
 # shellcheck disable=SC2016 # the workflow lines checked below contain literal ${{ }} and $VAR
 set -u
 root=$(cd "$(dirname "$0")/../.." && pwd)
-work=$(mktemp -d)
+work=$(mktemp -d) || exit 1
 trap 'rm -rf "$work"' EXIT
 
 passed=0
