@@ -128,68 +128,47 @@ public struct InstallerRelease: Sendable, Equatable {
         return try parse(appcast: data)
     }
 
-    /// Stream the signed archive to temporary memory, verify it, then write it to disk.
-    /// The destination is created only after the complete archive passes its EdDSA check.
+    /// Download the signed archive to a temporary file, verify it, then move it into place.
+    /// The destination archive exists only after the complete file passes its EdDSA check.
+    /// (Reading the response byte by byte held a fast connection to about 0.5 MB/s.)
     public func download(
         to destination: URL,
         session: URLSession = .shared,
-        progress: @Sendable (InstallerDownloadProgress) -> Void = { _ in }
+        progress: @escaping @Sendable (InstallerDownloadProgress) -> Void = { _ in }
     ) async throws -> URL {
         guard destination.isFileURL else { throw InstallerError.invalidDestination }
         let archiveURL = destination.appending(path: "Bridgeplay.zip")
         var request = URLRequest(url: self.archiveURL)
         request.timeoutInterval = 60
 
-        let bytes: URLSession.AsyncBytes
+        let temporary: URL
         let response: URLResponse
         do {
-            (bytes, response) = try await session.bytes(for: request)
+            (temporary, response) = try await InstallerFileDownload.run(request, total: archiveLength, progress: progress)
         } catch is CancellationError {
             throw CancellationError()
         } catch {
             throw InstallerError.networkFailure(error.localizedDescription)
         }
+        defer { try? FileManager.default.removeItem(at: temporary) }
 
         guard let http = response as? HTTPURLResponse, http.statusCode == 200,
               let finalURL = http.url, Self.isArchiveResponseURL(finalURL) else {
             throw InstallerError.invalidRelease
         }
-        let expected = response.expectedContentLength > 0 ? response.expectedContentLength : nil
-        if let expected, expected > Self.maximumArchiveLength {
-            throw InstallerError.archiveTooLarge
-        }
-
-        var archive = Data()
-        archive.reserveCapacity(Int(min(expected ?? archiveLength, Self.maximumArchiveLength)))
-        var received: Int64 = 0
-        for try await byte in bytes {
-            try Task.checkCancellation()
-            received += 1
-            guard received <= Self.maximumArchiveLength,
-                  received <= archiveLength,
-                  expected.map({ received <= $0 }) ?? true else {
-                throw InstallerError.invalidArchiveLength
-            }
-            archive.append(byte)
-            if received.isMultiple(of: 256 * 1024) {
-                progress(InstallerDownloadProgress(received: received, total: expected ?? archiveLength))
-            }
-        }
-
-        guard received == archiveLength, expected.map({ $0 == received }) ?? true else {
-            throw InstallerError.invalidArchiveLength
-        }
-        try Self.verify(archive, signature: signature, publicKey: verificationKey)
+        if response.expectedContentLength > Self.maximumArchiveLength { throw InstallerError.archiveTooLarge }
+        try verifyArchive(at: temporary)
         try Task.checkCancellation()
 
         do {
             try FileManager.default.createDirectory(at: destination, withIntermediateDirectories: true)
-            try archive.write(to: archiveURL, options: .atomic)
+            try? FileManager.default.removeItem(at: archiveURL)
+            try FileManager.default.moveItem(at: temporary, to: archiveURL)
         } catch {
             try? FileManager.default.removeItem(at: archiveURL)
             throw InstallerError.writeFailure(error.localizedDescription)
         }
-        progress(InstallerDownloadProgress(received: received, total: expected ?? archiveLength))
+        progress(InstallerDownloadProgress(received: archiveLength, total: archiveLength))
         return archiveURL
     }
 

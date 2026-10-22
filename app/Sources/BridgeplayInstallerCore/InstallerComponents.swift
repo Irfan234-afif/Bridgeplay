@@ -71,11 +71,10 @@ public struct InstallerComponents: Sendable, Equatable {
     /// Download to a file in `directory` and verify it. Throws without leaving the file on failure.
     public func download(to directory: URL, session: URLSession = .shared,
                          progress: @escaping @Sendable (InstallerDownloadProgress) -> Void = { _ in }) async throws -> URL {
-        let delegate = ProgressDelegate(total: length, progress: progress)
         var request = URLRequest(url: archiveURL)
         request.timeoutInterval = 60
         let temporary: URL, response: URLResponse
-        do { (temporary, response) = try await session.download(for: request, delegate: delegate) }
+        do { (temporary, response) = try await InstallerFileDownload.run(request, total: length, progress: progress) }
         catch is CancellationError { throw CancellationError() }
         catch { throw InstallerError.networkFailure(error.localizedDescription) }
         let archive = directory.appending(path: "Bridgeplay-Installer.zip")
@@ -155,16 +154,58 @@ public struct InstallerComponents: Sendable, Equatable {
     }
 }
 
-private final class ProgressDelegate: NSObject, URLSessionDownloadDelegate, @unchecked Sendable {
-    let total: Int64
-    let progress: @Sendable (InstallerDownloadProgress) -> Void
-    init(total: Int64, progress: @escaping @Sendable (InstallerDownloadProgress) -> Void) {
+/// Downloads to a file with progress. A task delegate passed to `URLSession.download(for:delegate:)`
+/// gets no progress callbacks, so each download gets its own session with this delegate.
+/// The file is moved out of URLSession's temporary location before the callback returns.
+final class InstallerFileDownload: NSObject, URLSessionDownloadDelegate, @unchecked Sendable {
+    private let total: Int64
+    private let progress: @Sendable (InstallerDownloadProgress) -> Void
+    private let lock = NSLock()
+    private var continuation: CheckedContinuation<(URL, URLResponse), Error>?
+    private var saved: URL?
+
+    private init(total: Int64, progress: @escaping @Sendable (InstallerDownloadProgress) -> Void) {
         self.total = total
         self.progress = progress
     }
+
+    static func run(_ request: URLRequest, total: Int64,
+                    progress: @escaping @Sendable (InstallerDownloadProgress) -> Void) async throws -> (URL, URLResponse) {
+        let delegate = InstallerFileDownload(total: total, progress: progress)
+        let session = URLSession(configuration: .ephemeral, delegate: delegate, delegateQueue: nil)
+        defer { session.finishTasksAndInvalidate() }
+        let task = session.downloadTask(with: request)
+        return try await withTaskCancellationHandler {
+            try await withCheckedThrowingContinuation { continuation in
+                delegate.lock.withLock { delegate.continuation = continuation }
+                task.resume()
+            }
+        } onCancel: { task.cancel() }
+    }
+
     func urlSession(_ session: URLSession, downloadTask: URLSessionDownloadTask, didWriteData bytesWritten: Int64,
                     totalBytesWritten: Int64, totalBytesExpectedToWrite: Int64) {
         progress(InstallerDownloadProgress(received: totalBytesWritten, total: total))
     }
-    func urlSession(_ session: URLSession, downloadTask: URLSessionDownloadTask, didFinishDownloadingTo location: URL) {}
+
+    func urlSession(_ session: URLSession, downloadTask: URLSessionDownloadTask, didFinishDownloadingTo location: URL) {
+        let keep = FileManager.default.temporaryDirectory.appending(path: "bridgeplay-download-\(UUID().uuidString)")
+        try? FileManager.default.moveItem(at: location, to: keep)
+        lock.withLock { saved = keep }
+    }
+
+    func urlSession(_ session: URLSession, task: URLSessionTask, didCompleteWithError error: Error?) {
+        let (continuation, file) = lock.withLock { () -> (CheckedContinuation<(URL, URLResponse), Error>?, URL?) in
+            defer { self.continuation = nil }
+            return (self.continuation, saved)
+        }
+        if let error {
+            if let file { try? FileManager.default.removeItem(at: file) }
+            continuation?.resume(throwing: (error as? URLError)?.code == .cancelled ? CancellationError() : error)
+        } else if let file, let response = task.response {
+            continuation?.resume(returning: (file, response))
+        } else {
+            continuation?.resume(throwing: URLError(.cannotCreateFile))
+        }
+    }
 }
