@@ -123,3 +123,9 @@ struct GameSession: Equatable, Sendable {
 enum ReportStatus: String, Codable, Sendable {
     case platinum, gold, silver, bronze, borked
 }
+
+// The main problem behind a Has Issues answer. Must match ISSUES in bridgeplay-web's
+// api/_lib/github.mjs; performance lets the site tell a slow Mac from a Bridgeplay bug.
+enum ReportIssue: String, Codable, Sendable, CaseIterable {
+    case performance, crash, graphics, sound, controls, launcher
+}

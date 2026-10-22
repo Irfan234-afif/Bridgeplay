@@ -3055,6 +3055,22 @@
         }
       }
     },
+    "Controller, keyboard or mouse" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Controller, tastiera o mouse"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "手柄、键盘或鼠标"
+          }
+        }
+      }
+    },
     "Controllers" : {
       "localizations" : {
         "it" : {
@@ -3275,6 +3291,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "无法写入文件。"
+          }
+        }
+      }
+    },
+    "Crashes or freezes" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Si chiude o si blocca"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "崩溃或卡死"
           }
         }
       }
@@ -4466,6 +4498,22 @@
         }
       }
     },
+    "Graphics glitches" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Difetti grafici"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "画面异常"
+          }
+        }
+      }
+    },
     "Guide" : {
       "localizations" : {
         "it" : {
@@ -5106,6 +5154,22 @@
         }
       }
     },
+    "Launcher, sign-in or anti-cheat" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Launcher, accesso o anti-cheat"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "启动器、登录或反作弊"
+          }
+        }
+      }
+    },
     "Let games read controllers directly (Recommended on Mac. Turn off only for Steam Input remapping)" : {
       "localizations" : {
         "it" : {
@@ -5310,6 +5374,38 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "正在查找游戏容器"
+          }
+        }
+      }
+    },
+    "Low frame rate or stutter" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Frame rate basso o scatti"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "帧率低或卡顿"
+          }
+        }
+      }
+    },
+    "Main problem" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Problema principale"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "主要问题"
           }
         }
       }
@@ -8110,6 +8206,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "出了点问题"
+          }
+        }
+      }
+    },
+    "Sound problems" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Problemi audio"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "声音问题"
           }
         }
       }

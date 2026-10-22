@@ -23,6 +23,8 @@ struct ReportPayload: Codable, Equatable, Sendable {
     // What the player wrote after Has Issues or Didn't Run, and a few facts about the Mac
     // (GameReport.setup). Older endpoints ignore both.
     var note: String?
+    var issue: ReportIssue?
+    var model: String?
     var setup: [String: String]?
     var log: String?
     var wineLog: String?
@@ -33,7 +35,7 @@ struct ReportPayload: Codable, Equatable, Sendable {
 
     static func make(name: String, appID: String, status: ReportStatus, source: Source, session: GameSession,
                      log: String?, wineLog: String?, machine: GameReport.Machine, install: String,
-                     note: String? = nil) -> ReportPayload {
+                     note: String? = nil, issue: ReportIssue? = nil) -> ReportPayload {
         let launch: (engine: String?, backend: String?) = log.map(GameReport.lastLaunch) ?? (nil, nil)
         var summary = session.summary(log: log, wineLog: wineLog)
         if let newer = machine.newerRelease { summary += ". A newer Bridgeplay was out: \(newer)" }
@@ -44,6 +46,8 @@ struct ReportPayload: Codable, Equatable, Sendable {
             macos: machine.macOS, version: machine.bridgeplay, engine: launch.engine, backend: launch.backend,
             session: summary,
             note: note.map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }.flatMap { $0.isEmpty ? nil : String($0.prefix(1000)) },
+            issue: status == .bronze ? issue : nil,
+            model: machine.model,
             setup: machine.setup.isEmpty ? nil : machine.setup,
             log: log.map { String(GameReport.redacted($0).suffix(logLimit)) },
             wineLog: wineLog.map { GameReport.wineTail(GameReport.redacted($0), limit: wineLogLimit) })
@@ -139,7 +143,7 @@ final class PlayReports {
 
     // What the consent sheet is for: one answer, several from Report Your Games…, or
     // turning auto-share on.
-    enum ConsentRequest: Equatable { case answer(ReportStatus, note: String?), bulk([String], ReportStatus), autoShare }
+    enum ConsentRequest: Equatable { case answer(ReportStatus, note: String?, issue: ReportIssue? = nil), bulk([String], ReportStatus), autoShare }
 
     private(set) var nudges: [Nudge] = []
     var consentRequest: ConsentRequest?
@@ -241,15 +245,15 @@ final class PlayReports {
     }
 
     // The player picked an answer on the card; the first one asks for consent.
-    func answer(_ status: ReportStatus, note: String? = nil) {
+    func answer(_ status: ReportStatus, note: String? = nil, issue: ReportIssue? = nil) {
         guard let nudge else { return }
         guard hasConsent else {
-            consentRequest = .answer(status, note: note)
+            consentRequest = .answer(status, note: note, issue: issue)
             return
         }
         advance(past: nudge)
         recordAsked(nudge.prefix.appID, answer: status)
-        send(nudge, status: status, source: .tap, note: note)
+        send(nudge, status: status, source: .tap, note: note, issue: issue)
         thanksGeneration += 1
         let generation = thanksGeneration
         thanking = true
@@ -264,7 +268,7 @@ final class PlayReports {
         let request = consentRequest
         consentRequest = nil
         if alsoAutoShare || request == .autoShare { setAutoShare(true) }
-        if case .answer(let status, let note) = request { answer(status, note: note) }
+        if case .answer(let status, let note, let issue) = request { answer(status, note: note, issue: issue) }
         if case .bulk(let appIDs, let status) = request { answerBulk(appIDs, status) }
     }
 
@@ -406,7 +410,8 @@ final class PlayReports {
         }
     }
 
-    private func send(_ nudge: Nudge, status: ReportStatus, source: ReportPayload.Source, note: String? = nil) {
+    private func send(_ nudge: Nudge, status: ReportStatus, source: ReportPayload.Source, note: String? = nil,
+                      issue: ReportIssue? = nil) {
         let prefix = nudge.prefix, session = nudge.session
         Task {
             let logs = await Task.detached {
@@ -414,7 +419,7 @@ final class PlayReports {
                  try? String(contentsOf: PrefixLog.wine.url(for: prefix), encoding: .utf8))
             }.value
             submitAll([(Found(prefix: prefix, session: session, log: logs.0 ?? "", wineLog: logs.1), status)],
-                      source: source, note: note)
+                      source: source, note: note, issue: issue)
         }
     }
 
@@ -424,16 +429,21 @@ final class PlayReports {
 
     // Redacting a large log takes a moment, so payloads are built off the main thread, and
     // sent one after another so a batch stays within the endpoint's rate limits.
-    private func submitAll(_ items: [(Found, ReportStatus)], source: ReportPayload.Source, note: String? = nil) {
+    private func submitAll(_ items: [(Found, ReportStatus)], source: ReportPayload.Source, note: String? = nil,
+                           issue: ReportIssue? = nil) {
         var machine = GameReport.thisMac
         machine.setup = GameReport.setup()
         let sender = sender(), install = installID
         Task.detached {
             for (item, status) in items {
+                var machine = machine
+                if let reg = try? String(contentsOf: item.prefix.pfx.appending(path: "user.reg"), encoding: .utf8) {
+                    machine.setup["retina"] = GameReport.retina(reg)
+                }
                 let payload = ReportPayload.make(
                     name: item.prefix.title, appID: item.prefix.appID, status: status, source: source, session: item.session,
                     log: item.log.isEmpty ? nil : item.log, wineLog: item.wineLog, machine: machine, install: install,
-                    note: note)
+                    note: note, issue: issue)
                 let outcome = await sender.submit(payload)
                 AppLog.note("play report: \(payload.appid) \(payload.status.rawValue) (\(payload.source.rawValue)): \(outcome)")
             }

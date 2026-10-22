@@ -216,6 +216,28 @@ struct PlayReportsTests {
                                          install: "0F8FAD5B-D9CB-469F-A165-70867728950E")
         #expect(payload.session == "Session 27 min, exit status 0. A newer Bridgeplay was out: 0.7.38 (55)")
     }
+
+    @Test("Retina mode is read from the prefix's Mac Driver key")
+    func retinaFromUserReg() {
+        let on = "WINE REGISTRY Version 2\r\n[Software\\\\Wine\\\\Mac Driver] 1791551861\r\n#time=1dd\r\n\"RetinaMode\"=\"y\"\r\n\r\n[Software\\\\Wine\\\\X] 1\r\n\"RetinaMode\"=\"n\"\r\n"
+        #expect(GameReport.retina(on) == "on")
+        #expect(GameReport.retina(on.replacingOccurrences(of: "=\"y\"", with: "=\"n\"")) == "off")
+        #expect(GameReport.retina("[Software\\\\Wine\\\\X] 1\n\"RetinaMode\"=\"y\"\n") == "off", "another key's RetinaMode doesn't count")
+    }
+
+    @Test("Only a Has Issues payload carries its main problem")
+    func payloadIssue() {
+        let machine = GameReport.Machine(chip: "Apple M1", memoryBytes: 8 * 1_073_741_824,
+                                         macOS: "macOS 27.0", bridgeplay: "0.7.39 (56)")
+        let make = { (status: ReportStatus) in
+            ReportPayload.make(name: "CS2", appID: "730", status: status, source: .tap, session: .byHand(),
+                               log: nil, wineLog: nil, machine: machine, install: "0F8FAD5B-D9CB-469F-A165-70867728950E",
+                               issue: .performance)
+        }
+        #expect(make(.bronze).issue == .performance)
+        #expect(make(.platinum).issue == nil)
+        #expect(make(.borked).issue == nil)
+    }
 }
 
 // Answers https://report.invalid/<status> with that status; /offline fails like no network.

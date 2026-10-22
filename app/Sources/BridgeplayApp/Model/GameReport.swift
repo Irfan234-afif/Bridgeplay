@@ -1,4 +1,5 @@
 import AppKit
+import IOKit.ps
 import SystemConfiguration
 
 // What a compatibility report says about this Mac and the game's last launch, and the
@@ -18,6 +19,7 @@ enum GameReport {
         var memoryBytes: UInt64
         var macOS: String
         var bridgeplay: String
+        var model: String? = nil
         var setup: [String: String] = [:]
         // A newer release the updater found, "0.7.38 (55)".
         var newerRelease: String?
@@ -27,11 +29,21 @@ enum GameReport {
         Machine(chip: SetupChecks.chipName, memoryBytes: ProcessInfo.processInfo.physicalMemory,
                 macOS: SetupChecks.macOSDisplay,
                 bridgeplay: ProductVersion.build.map { "\(ProductVersion.short) (\($0))" } ?? ProductVersion.short,
+                model: sysctl("hw.model"),
                 newerRelease: LatestRelease.newer(than: ProductVersion.build))
     }
 
+    private static func sysctl(_ name: String) -> String? {
+        var size = 0
+        guard sysctlbyname(name, nil, &size, nil, 0) == 0, size > 0 else { return nil }
+        var value = [CChar](repeating: 0, count: size)
+        guard sysctlbyname(name, &value, &size, nil, 0) == 0 else { return nil }
+        return String(cString: value)
+    }
+
     // Facts about the Mac when the report is made, which is soon after the game ran:
-    // displays: "2: built-in 3456x2234 120 Hz, 2560x1440 60 Hz", lowPower: "on"/"off".
+    // displays: "2: built-in 3456x2234 120 Hz, 2560x1440 60 Hz", lowPower: "on"/"off",
+    // thermal: "nominal"…"critical", power: "battery"/"plugged in", gpuCores: "16".
     @MainActor static func setup() -> [String: String] {
         let screens = NSScreen.screens.map { screen -> String in
             let pixels = screen.convertRectToBacking(screen.frame).size
@@ -41,7 +53,37 @@ enum GameReport {
         }
         var setup = ["lowPower": ProcessInfo.processInfo.isLowPowerModeEnabled ? "on" : "off"]
         if !screens.isEmpty { setup["displays"] = "\(screens.count): " + screens.joined(separator: ", ") }
+        setup["thermal"] = switch ProcessInfo.processInfo.thermalState {
+        case .nominal: "nominal"
+        case .fair: "fair"
+        case .serious: "serious"
+        case .critical: "critical"
+        @unknown default: "unknown"
+        }
+        if let info = IOPSCopyPowerSourcesInfo()?.takeRetainedValue(),
+           let type = IOPSGetProvidingPowerSourceType(info)?.takeUnretainedValue() as String? {
+            setup["power"] = type == kIOPSBatteryPowerValue ? "battery" : "plugged in"
+        }
+        let gpu = IOServiceGetMatchingService(kIOMainPortDefault, IOServiceMatching("AGXAccelerator"))
+        if gpu != 0 {
+            defer { IOObjectRelease(gpu) }
+            if let cores = IORegistryEntryCreateCFProperty(gpu, "gpu-core-count" as CFString, kCFAllocatorDefault, 0)?
+                .takeRetainedValue() as? Int {
+                setup["gpuCores"] = String(cores)
+            }
+        }
         return setup
+    }
+
+    // Whether the game's prefix runs in Retina mode, so a game can render at the display's full
+    // pixel size (displays) instead of half: the biggest resolution factor behind a low frame rate.
+    static func retina(_ userReg: String) -> String {
+        var inDriver = false
+        for line in userReg.split(whereSeparator: \.isNewline) {
+            if line.hasPrefix("[") { inDriver = line.hasPrefix(#"[Software\\Wine\\Mac Driver]"#) }
+            else if inDriver, line.hasPrefix(#""RetinaMode"="#) { return line.lowercased().contains(#"="y""#) ? "on" : "off" }
+        }
+        return "off"
     }
 
     // "Apple M5 Max" → "M5 Max"; a chip the form doesn't list is "Other".
