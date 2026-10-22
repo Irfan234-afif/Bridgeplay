@@ -272,6 +272,21 @@ expect_same "a refused bump leaves version.h alone" "$work/version.h.orig" "$bum
 expect_refused "named differs from the minor" bump minor --named 0.7.3
 expect_refused "named is malformed" bump patch --named 0.7.3-beta.1
 expect_refused "named is empty" bump patch --named "" --highest-build 50
+# set picks any version above the committed one; the build still goes up by one.
+expect_ok "set a finer patch" bump set 0.7.31
+bumped 0.7.31 45
+expect_ok "set with the highest build" bump set 0.7.31 --highest-build 50
+bumped 0.7.31 51
+expect_ok "set a named release" bump set 0.7.31 --named 0.7.31
+bumped 0.7.31 45
+expect_refused "set to the committed version" bump set 0.7.2
+expect_refused "set below the committed version" bump set 0.6.9
+expect_same "a refused set leaves version.h alone" "$work/version.h.orig" "$bumpfx/dylib/version.h"
+expect_refused "set without a version" bump set
+for v in 0.7 0.7.31-beta.1 v0.7.31 0.7.3.1; do
+	expect_refused "set '$v'" bump set "$v"
+done
+expect_refused "set named elsewhere" bump set 0.7.31 --named 0.7.3
 expect_refused "no part" bump
 expect_refused "unknown part" bump beta
 

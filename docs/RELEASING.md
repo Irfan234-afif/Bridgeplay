@@ -93,9 +93,12 @@ its version check stops it. `make versioncheck` covers the stamp, the bump and t
    of the same sources or runs the checks here.
 1. Bump and commit:
    ```sh
-   scripts/bump-version.sh patch        # or minor / major
+   scripts/bump-version.sh patch        # or minor / major, or set X.Y.Z
    git commit -m "chore(release): Bridgeplay X.Y.Z" dylib/version.h
    ```
+   `set X.Y.Z` takes any version above the committed one, such as `0.7.31` after `0.7.3` for a
+   small follow-up. The numbers compare as integers, so `0.7.31` sorts above `0.7.4`: after it,
+   go on with `0.7.32` (or `patch`) or a minor. Updates still order by the build, which goes up by one.
    `scripts/sync-upstream.sh` already bumps the patch after an upstream merge on `main`; on `beta` it
    commits no bump, see Betas.
 2. Push to `main` of `raymondchins/Bridgeplay` (the script refuses anything else).
