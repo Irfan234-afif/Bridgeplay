@@ -687,7 +687,8 @@ struct PrefixToolsTests {
         // Replaced, both the file the arch is read from and what an installer left beside it.
         #expect(text("drive_c/windows/system32/ntdll.dll") == "fresh")
         #expect(text("drive_c/windows/vcruntime.dll") == nil)
-        #expect(text("drive_c/Program Files/redist/thing.dll") == nil)
+        // Program Files can hold saves, so what the template lacks comes over.
+        #expect(text("drive_c/Program Files/redist/thing.dll") == "installed")
 
         // Inside the prefix, so the folder Steam syncs is the folder the game reads. The home
         // folder the template used to point at keeps what is in it and is no longer reached.
@@ -1022,9 +1023,9 @@ struct PrefixToolsTests {
         #expect(try Data(contentsOf: driveC.appending(path: "Games/Quake/quake.exe")) == Data("exe".utf8))
         #expect(try Data(contentsOf: driveC.appending(path: "notes.txt")) == Data("notes".utf8))
 
-        // A name the template does make is the template's, arch and all.
+        // windows is the template's, arch and all.
         #expect(!fm.fileExists(
-            atPath: driveC.appending(path: "Program Files/redist/thing.dll").path(percentEncoded: false)))
+            atPath: driveC.appending(path: "windows/vcruntime.dll").path(percentEncoded: false)))
     }
 
     // Emptying the prefix first meant a wineboot that failed left the game with nothing at
@@ -1081,6 +1082,67 @@ struct PrefixToolsTests {
         #expect(!fm.fileExists(
             atPath: prefix.root.appending(path: "pfx.rebuild").path(percentEncoded: false)))
         #expect(PrefixStore.backups(of: prefix).isEmpty)
+    }
+
+    // Ubisoft Connect keeps saves under Program Files (x86), and the discard path deleted them.
+    @Test("A discard rebuild carries Program Files and ProgramData, fresh files win")
+    func discardRebuildCarriesProgramFiles() throws {
+        let fm = FileManager.default
+        let dir = fm.temporaryDirectory.appending(path: "np-progfiles-\(UUID().uuidString)")
+        defer { try? fm.removeItem(at: dir) }
+        let home = dir.appending(path: "home/Documents")
+        try fm.createDirectory(at: home, withIntermediateDirectories: true)
+
+        let prefix = try usedPrefix(in: dir, home: home)
+        let drive = prefix.pfx.appending(path: "drive_c")
+        for (path, body) in [
+            ("Program Files (x86)/Ubisoft/savegames/1.save", "ubi"),
+            ("ProgramData/Foo/x.dat", "foo"),
+            ("ProgramData/Shared/both.ini", "old"),
+        ] {
+            let file = drive.appending(path: path)
+            try fm.createDirectory(
+                at: file.deletingLastPathComponent(), withIntermediateDirectories: true)
+            try Data(body.utf8).write(to: file)
+        }
+        let runner = try fakeRunner(in: dir, home: home, extra: """
+            mkdir -p "$WINEPREFIX/drive_c/ProgramData/Shared"; \
+            printf fresh > "$WINEPREFIX/drive_c/ProgramData/Shared/both.ini"
+            """)
+
+        #expect(try PrefixTools.recreate(prefix, runner: runner, keepBackup: false) == nil)
+
+        func text(_ path: String) -> String? {
+            try? String(contentsOf: prefix.pfx.appending(path: "drive_c/\(path)"), encoding: .utf8)
+        }
+        #expect(text("Program Files (x86)/Ubisoft/savegames/1.save") == "ubi")
+        #expect(text("ProgramData/Foo/x.dat") == "foo")
+        #expect(text("ProgramData/Shared/both.ini") == "fresh")
+        #expect(text("windows/system32/ntdll.dll") == "fresh")
+        #expect(PrefixStore.backups(of: prefix).isEmpty)
+    }
+
+    @Test("A discard rebuild keeps the old prefix when Program Files cannot be carried")
+    func discardRebuildKeepsBackupOnMiss() throws {
+        let fm = FileManager.default
+        let dir = fm.temporaryDirectory.appending(path: "np-progfiles-miss-\(UUID().uuidString)")
+        defer { try? fm.removeItem(at: dir) }
+        let home = dir.appending(path: "home/Documents")
+        try fm.createDirectory(at: home, withIntermediateDirectories: true)
+
+        let prefix = try usedPrefix(in: dir, home: home)
+        let save = prefix.pfx.appending(path: "drive_c/Program Files/redist/thing.dll")
+        try fm.setAttributes([.posixPermissions: 0], ofItemAtPath: save.path(percentEncoded: false))
+        defer {
+            try? fm.setAttributes(
+                [.posixPermissions: 0o644], ofItemAtPath: save.path(percentEncoded: false))
+        }
+
+        let kept = try #require(try PrefixTools.recreate(
+            prefix, runner: try fakeRunner(in: dir, home: home), keepBackup: false))
+        #expect(PrefixStore.backups(of: prefix).count == 1)
+        #expect(fm.fileExists(atPath: kept.appending(path: "drive_c/Program Files/redist/thing.dll")
+            .path(percentEncoded: false)))
     }
 
     // Steam lays a prefix down in stages, so one caught early holds no profile. That is nothing

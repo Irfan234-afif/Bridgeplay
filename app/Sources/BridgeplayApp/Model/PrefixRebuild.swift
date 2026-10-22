@@ -95,6 +95,12 @@ extension PrefixTools {
                 detail: String(localized: "\(first) could not be copied out of the prefix. The prefix has been left as it was and nothing has been lost. Check free space and permissions, then try again.")
             )
         }
+        // A miss here keeps the old prefix as the backup instead of blocking the rebuild.
+        carry.installedFolders()
+        let discard = !keepBackup && carry.lost.isEmpty
+        if !carry.lost.isEmpty {
+            AppLog.note("rebuild \(prefix.appID) kept backup, did not carry: \(carry.lost.joined(separator: ", "))")
+        }
 
         let rerun = InstallScriptMarkers.clear(
             userReg: fresh.appending(path: "user.reg"),
@@ -117,7 +123,7 @@ extension PrefixTools {
         }
         if let record { try writeBuildRecord(record, for: prefix) }
         guard parked else { return nil }
-        guard keepBackup else {
+        guard !discard else {
             try? fm.removeItem(at: previous)
             return nil
         }
@@ -246,6 +252,32 @@ private final class Carry {
                 try fm.copyItem(at: stray, to: destination.appending(path: name))
             }
         }
+    }
+
+    // Saves and launchers also live here. Fresh files win; only what the template lacks comes over.
+    func installedFolders() {
+        for name in ["Program Files", "Program Files (x86)", "ProgramData"] {
+            let source = old.appending(path: "drive_c/\(name)")
+            let values = try? source.resourceValues(forKeys: [.isSymbolicLinkKey])
+            guard values?.isSymbolicLink != true else { continue }
+            fill(fresh.appending(path: "drive_c/\(name)"), from: source)
+        }
+    }
+
+    private func fill(_ landing: URL, from source: URL) {
+        for entry in realEntries(in: source) {
+            let target = landing.appending(path: entry.lastPathComponent)
+            if isBrokenLink(target) { try? fm.removeItem(at: target) }
+            var isDirectory: ObjCBool = false
+            if !fm.fileExists(atPath: target.path(percentEncoded: false), isDirectory: &isDirectory) {
+                attempt(entry) { try fm.copyItem(at: entry, to: target) }
+            } else if escapes(target) || isDirectory.boolValue != directoryExists(entry) {
+                park(entry, beside: target)
+            } else if isDirectory.boolValue {
+                fill(target, from: entry)
+            }
+        }
+        carryLinks(from: source, to: landing)
     }
 
     private func attempt(_ source: URL, _ work: () throws -> Void) {
