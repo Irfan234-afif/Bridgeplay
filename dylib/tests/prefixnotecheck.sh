@@ -98,7 +98,7 @@ check_prefix() { # check_prefix FS: prints the exit status
 	env log="$work/log" notes="$work/notes" body="$body" fs="$1" WINEPREFIX="$pfx" \
 		STEAM_COMPAT_DATA_PATH="$two/steamapps/compatdata/42" \
 		sh -c 'eval "$body"; volume_type() { [ -z "$fs" ] || echo "$fs /Volumes/Drive"; }
-			refuse_broken_prefix; echo $?'
+			refuse_broken_prefix' && echo 0 || echo $?
 }
 is "no dosdevices stops the launch" 1 "$(check_prefix apfs)"
 has "it is logged" "Wine did not finish building it" "$work/log"

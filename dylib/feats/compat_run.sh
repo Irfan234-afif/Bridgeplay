@@ -1332,19 +1332,19 @@ note_prefix_volume() {
 
 # Without C:\windows\system32 Wine stops at "could not load kernel32.dll" and the game quits
 # with no window. exFAT and FAT have no symbolic links, so dosdevices/c: cannot exist there.
+# Ends the launch when the prefix is broken.
 refuse_broken_prefix() {
   [ ! -f "$WINEPREFIX/dosdevices/c:/windows/system32/kernel32.dll" ] || return 0
   vol=$(volume_type "$STEAM_COMPAT_DATA_PATH") || vol=""
   fs=${vol%% *}
   echo "=== the prefix has no C:\\windows\\system32\\kernel32.dll, Wine did not finish building it ===" \
     >> "$log" 2>&1 || true
-  case "$fs" in
-    exfat|msdos|ntfs)
-      show_alert "This Steam library cannot hold the game's prefix" "It is formatted $fs, which has no symbolic links, so Wine cannot set up the game here. Move the game to a library on an APFS drive." ;;
-    *)
-      show_alert "The game's prefix could not be set up" "Wine did not finish building it. Rebuild the prefix in Bridgeplay, then launch again. bridgeplay-run.log has the details." ;;
+  case "$fs" in exfat|msdos|ntfs)
+    show_alert "This Steam library cannot hold the game's prefix" "It is formatted $fs, which has no symbolic links, so Wine cannot set up the game here. Move the game to a library on an APFS drive."
+    exit 1
   esac
-  return 1
+  show_alert "The game's prefix could not be set up" "Wine did not finish building it. Rebuild the prefix in Bridgeplay, then launch again. bridgeplay-run.log has the details."
+  exit 1
 }
 
 # Steam keeps a game's prefix in the library that holds the game, so a game moved to another
@@ -2210,7 +2210,7 @@ if [ -n "$STEAM_COMPAT_DATA_PATH" ]; then
   stage_step="game drive"
   map_game_drive
   stage_step="prefix check"
-  refuse_broken_prefix || exit 1
+  refuse_broken_prefix
 fi
 
 stage_step="graphics backend"
