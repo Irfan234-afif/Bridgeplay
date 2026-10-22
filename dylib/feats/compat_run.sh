@@ -446,7 +446,7 @@ gamefix_reason() {
     ARGS)
       # Space-separated arguments, each of A-Za-z0-9_+./:=,- only, so none can glob or quote.
       case "$2" in *[!A-Za-z0-9_+./:=,\ -]*) echo "an argument with characters outside A-Za-z0-9_+./:=,-" ;; esac ;;
-    MTL_HUD_ENABLED|WINEDEBUG|WINE_LARGE_ADDRESS_AWARE|WINE_CPU_TOPOLOGY) ;;
+    MTL_HUD_ENABLED|WINEDEBUG|WINE_LARGE_ADDRESS_AWARE|WINE_CPU_TOPOLOGY|CX_FWD_COMPAT_GL_CTX) ;;
     ROSETTA_ADVERTISE_AVX)
       case "$2" in 0|1) ;; *) echo "not 0 or 1" ;; esac ;;
     DXMT_?*|DXVK_?*|MVK_?*|VKD3D_?*|D3DM_?*|STAGING_?*) ;;
@@ -2799,7 +2799,7 @@ else
   echo "=== client staged no overlay renderer, overlay disabled ===" >> "$log" 2>&1 || true
 fi
 set -- --args "$shim_exe" "$@"
-for name in $(env | LC_ALL=C sed -nE 's/^(CX_APPLEGPTK_LIBD3DSHARED_PATH|SDL_GAMECONTROLLERCONFIG(_FILE)?|SDL_JOYSTICK_MFI|WINE_LARGE_ADDRESS_AWARE|WINE_CPU_TOPOLOGY|Steam[A-Za-z0-9]*|(CX_GRAPHICS|D3DM_|DXMT_|DXVK_|FEX_|MVK_|VKD3D_|STAGING_|MTL_|ROSETTA_)[A-Z0-9_]*|NOTPROTON_FRAMEGEN(_[A-Z]+)?|NOTPROTON_NGX_SIGNER|NOTPROTON_NVAPI_DRIVER|NOTPROTON_DRIVER_VERSION|NOTPROTON_STDOUT_NULL|NOTPROTON_VSYNC|CX_ACTIVE_GRAPHICS_BACKEND)=.*/\1/p'); do
+for name in $(env | LC_ALL=C sed -nE 's/^(CX_APPLEGPTK_LIBD3DSHARED_PATH|SDL_GAMECONTROLLERCONFIG(_FILE)?|SDL_JOYSTICK_MFI|WINE_LARGE_ADDRESS_AWARE|WINE_CPU_TOPOLOGY|CX_FWD_COMPAT_GL_CTX|Steam[A-Za-z0-9]*|(CX_GRAPHICS|D3DM_|DXMT_|DXVK_|FEX_|MVK_|VKD3D_|STAGING_|MTL_|ROSETTA_)[A-Z0-9_]*|NOTPROTON_FRAMEGEN(_[A-Z]+)?|NOTPROTON_NGX_SIGNER|NOTPROTON_NVAPI_DRIVER|NOTPROTON_DRIVER_VERSION|NOTPROTON_STDOUT_NULL|NOTPROTON_VSYNC|CX_ACTIVE_GRAPHICS_BACKEND)=.*/\1/p'); do
   eval "value=\$$name"
   # shellcheck disable=SC2154 # eval assigns value on the line above
   set -- --env "$name=$value" "$@"

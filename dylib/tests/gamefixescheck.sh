@@ -116,7 +116,7 @@ launch() {
 			eval "$bridge_line"
 			for v in backend WINEDLLOVERRIDES WINEMSYNC msync_from NOTPROTON_RETINA NOTPROTON_FRAMEGEN \
 				NOTPROTON_FRAMEGEN_QUALITY NOTPROTON_FRAMEGEN_UI NOTPROTON_FRAMEGEN_FALLBACK NOTPROTON_FRAMEGEN_ENGINE CX_GRAPHICS_BACKEND \
-				DXVK_HUD VKD3D_CONFIG WINEDEBUG MTL_HUD_ENABLED D3DM_VENDOR_ID D3DM_DEVICE_ID D3DM_DEVICE_DESCRIPTION NOTPROTON_NGX_SIGNER NOTPROTON_DRIVER_VERSION CX_ACTIVE_GRAPHICS_BACKEND NOTPROTON_VSYNC gamefix_args; do
+				DXVK_HUD VKD3D_CONFIG WINEDEBUG MTL_HUD_ENABLED D3DM_VENDOR_ID D3DM_DEVICE_ID D3DM_DEVICE_DESCRIPTION NOTPROTON_NGX_SIGNER NOTPROTON_DRIVER_VERSION CX_ACTIVE_GRAPHICS_BACKEND NOTPROTON_VSYNC CX_FWD_COMPAT_GL_CTX gamefix_args; do
 				eval "printf \"%s=%s\\n\" \$v \"\${$v-<unset>}\""
 			done
 		' launch "$target" > "$case_dir/out" 2>&1 || echo "launch exited $?" >> "$case_dir/out"
@@ -176,12 +176,13 @@ default_conf '# shipped fix' '' '  DXVK_HUD=fps  ' "VKD3D_CONFIG=dxr$(printf '\r
 	"DXMT_A=\$(touch $case_dir/pwned)" 'DXMT_B=`touch pwned`' 'DXMT_C="quoted"' "DXMT_D='single'" \
 	'BACKEND=vulkan' 'MSYNC=2' 'RETINA=yes' 'DLLOVERRIDES=dxgi=native' 'DLLOVERRIDES=;=n' \
 	'DXMT_=1' 'MTL_HUD_ENABLED=1' 'FRAMEGEN=4' 'FRAMEGEN_QUALITY=ultra' 'FRAMEGEN_UI=2' \
-	'FRAMEGEN_FALLBACK=yes' 'FRAMEGEN_ENGINE=fsr' 'FRAMEGEN_OTHER=1'
+	'FRAMEGEN_FALLBACK=yes' 'FRAMEGEN_ENGINE=fsr' 'FRAMEGEN_OTHER=1' 'CX_FWD_COMPAT_GL_CTX=1'
 launch waitforexitandrun "$case_dir/game/game.exe"
 is "a padded value is trimmed" "fps" "$(got DXVK_HUD)"
 is "a CRLF line ends cleanly" "dxr" "$(got VKD3D_CONFIG)"
 is "WINEDEBUG is allowed" "-all" "$(got WINEDEBUG)"
 is "MTL_HUD_ENABLED is allowed" "1" "$(got MTL_HUD_ENABLED)"
+is "CX_FWD_COMPAT_GL_CTX is allowed" "1" "$(got CX_FWD_COMPAT_GL_CTX)"
 is "PATH is not on the allow-list" "0" "$(grep -c '^PATH=/evil' "$case_dir/out" || true)"
 has "PATH is logged as rejected" "line 6 rejected PATH: not on the allow-list" "$case_dir/log"
 has "DYLD_INSERT_LIBRARIES is rejected" "rejected DYLD_INSERT_LIBRARIES: not on the allow-list" "$case_dir/log"
@@ -609,11 +610,11 @@ done
 echo "== the launcher receives the allow-listed variables"
 set --
 out=$(env -i PATH="$PATH" forward="$forward" VKD3D_CONFIG=dxr MVK_CONFIG_LOG_LEVEL=1 \
-	STAGING_SHARED_MEMORY=1 WINE_CPU_TOPOLOGY=4:0,1,2,3 WINE_LARGE_ADDRESS_AWARE=1 \
+	STAGING_SHARED_MEMORY=1 WINE_CPU_TOPOLOGY=4:0,1,2,3 WINE_LARGE_ADDRESS_AWARE=1 CX_FWD_COMPAT_GL_CTX=1 \
 	DXVK_HUD=fps NOTPROTON_FRAMEGEN=1 NOTPROTON_FRAMEGEN_QUALITY=quality NOTPROTON_FRAMEGEN_UI=0 \
 	NOTPROTON_FRAMEGEN_FALLBACK=0 NOTPROTON_FRAMEGEN_ENGINE=metalfx NOTPROTON_FRAMEGENX=1 NOTPROTON_UNRELATED=1 sh -c 'set --; eval "$forward"; printf "%s\n" "$@"' | grep -v '^--env$' | LC_ALL=C sort | tr '\n' ' ')
-is "VKD3D_, MVK_, STAGING_ and WINE_ topology variables are forwarded" \
-	"DXVK_HUD=fps MVK_CONFIG_LOG_LEVEL=1 NOTPROTON_FRAMEGEN=1 NOTPROTON_FRAMEGEN_ENGINE=metalfx NOTPROTON_FRAMEGEN_FALLBACK=0 NOTPROTON_FRAMEGEN_QUALITY=quality NOTPROTON_FRAMEGEN_UI=0 STAGING_SHARED_MEMORY=1 VKD3D_CONFIG=dxr WINE_CPU_TOPOLOGY=4:0,1,2,3 WINE_LARGE_ADDRESS_AWARE=1 " "$out"
+is "VKD3D_, MVK_, STAGING_, WINE_ topology and CX_FWD_COMPAT_GL_CTX variables are forwarded" \
+	"CX_FWD_COMPAT_GL_CTX=1 DXVK_HUD=fps MVK_CONFIG_LOG_LEVEL=1 NOTPROTON_FRAMEGEN=1 NOTPROTON_FRAMEGEN_ENGINE=metalfx NOTPROTON_FRAMEGEN_FALLBACK=0 NOTPROTON_FRAMEGEN_QUALITY=quality NOTPROTON_FRAMEGEN_UI=0 STAGING_SHARED_MEMORY=1 VKD3D_CONFIG=dxr WINE_CPU_TOPOLOGY=4:0,1,2,3 WINE_LARGE_ADDRESS_AWARE=1 " "$out"
 
 echo "== the wineserver directory self-heal"
 heal=$(sed -n '/^heal_wine_tmp() {$/,/^}$/p' "$SRC")

@@ -28,7 +28,7 @@ logged, when:
 | `ARGS` | space-separated arguments of `A-Za-z0-9_+./:=,-` | Added to the game's command line after the launch options' own arguments. Ignored for installers and other helpers |
 | `DLLOVERRIDES` | Wine syntax, e.g. `dinput8=n,b;xinput1_3=n` | Added to `WINEDLLOVERRIDES` after the backend's entries and before the launch options' |
 | `MSYNC` | `0`, `1` | `1` turns msync on when the engine supports it; `0` turns it off |
-| `RETINA` | `0`, `1` | Same as `BRIDGEPLAY_RETINA` (High Resolution) |
+| `RETINA` | `0`, `1` | Same as `BRIDGEPLAY_RETINA` (High Resolution). DPI-unaware games on the OpenGL/wined3d path (D3D9, OpenGL) can draw into the top-left quarter with RETINA=1; set RETINA=0 in their gamefix, as gamefixes/49520.conf does. |
 | `FRAMEGEN` | `0`, `1`, `2`, `3`, `adaptive` | Same as `BRIDGEPLAY_FRAMEGEN`: experimental frame generation in overlay-shim, adds up to half a frame of latency. `2` and `3` multiply the frame rate, `adaptive` fills up to the display refresh, `1` is the same as `2`, `0` is off (the default) |
 | `FRAMEGEN_QUALITY` | `performance`, `balanced`, `quality` | Same as `BRIDGEPLAY_FRAMEGEN_QUALITY`. `balanced` when unset |
 | `FRAMEGEN_UI` | `0`, `1` | Same as `BRIDGEPLAY_FRAMEGEN_UI`, Protect UI: keeps static HUD and menus sharp. On when unset |
@@ -40,6 +40,7 @@ logged, when:
 | `VSYNC` | `0`, `1` | `1` makes the game's Metal layer wait for the display even when the game turns vsync off, like forcing vsync in the NVIDIA control panel. For games that lock vsync off with frame generation on (Resident Evil Requiem) and tear above the refresh rate |
 | `DXMT_*`, `DXVK_*`, `MVK_*`, `VKD3D_*`, `D3DM_*`, `STAGING_*` | any | Exported as is |
 | `MTL_HUD_ENABLED`, `WINEDEBUG`, `WINE_LARGE_ADDRESS_AWARE`, `WINE_CPU_TOPOLOGY` | any | Exported as is |
+| `CX_FWD_COMPAT_GL_CTX` | any | Exported as is: WineCX's switch for forward-compatible OpenGL contexts, for testing OpenGL (`wined3d`) games |
 
 Wine uses the last entry for a DLL in `WINEDLLOVERRIDES`. The order is: backend, then
 `DLLOVERRIDES`, then the launch options, then the Steam client DLLs, which always come last.
