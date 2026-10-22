@@ -14,12 +14,13 @@ on:
 permissions:
   contents: read
 
-# A newer push to the same PR replaces the run. Every push to main or beta (and every manual
-# run) has a group of its own, so none is cancelled, and none is dropped from the queue
-# the way a pending run is when a third arrives in a shared group.
+# A newer push to the same branch or PR replaces the run, so a feature commit and the
+# release bump pushed right after it don't hold the macOS runners twice. A release still
+# finds a passing run: build-local.sh accepts one on the bump commit (only version.h
+# differs). Every manual run has a group of its own and is never cancelled.
 concurrency:
-  group: app-${{ github.event_name == 'pull_request' && github.ref || github.run_id }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+  group: app-${{ github.event_name == 'workflow_dispatch' && github.run_id || github.ref }}
+  cancel-in-progress: true
 
 env:
   DOBBY_COMMIT: "5dfc8546954ce3b3198132ab13fddb89ee92cdd7"

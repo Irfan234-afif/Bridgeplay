@@ -341,8 +341,8 @@ eq "lint.yml: push branches" "    branches: [main, beta]" "$(grep -E '^    branc
 yes "app.yml: runs on every pull request" grep -Fxq '  pull_request:' "$app"
 no "app.yml: pull requests not limited to a branch" awk '/^  pull_request:/ { p = 1; next } p && /^    branches/ { f = 1 } p && /^  [a-z_]+:/ { p = 0 } END { exit !f }' "$app"
 yes "lint.yml: runs on every pull request" grep -Fxq '  pull_request:' "$lint"
-yes "app.yml: only PR runs are cancelled" grep -Fxq '  cancel-in-progress: ${{ github.event_name == '"'pull_request'"' }}' "$app"
-yes "app.yml: other runs have a group of their own" grep -Fxq '  group: app-${{ github.event_name == '"'pull_request'"' && github.ref || github.run_id }}' "$app"
+yes "app.yml: a newer run replaces an older one" grep -Fxq '  cancel-in-progress: true' "$app"
+yes "app.yml: one group per branch or PR, manual runs alone" grep -Fxq '  group: app-${{ github.event_name == '"'workflow_dispatch'"' && github.run_id || github.ref }}' "$app"
 
 build=$(job build)
 checks=$(job checks)
