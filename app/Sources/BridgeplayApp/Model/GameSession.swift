@@ -65,10 +65,11 @@ struct GameSession: Equatable, Sendable {
         return nil
     }
 
-    // Worth asking about: ended in the last three days, and not opened and closed at once.
+    // Worth asking about: ended in the last three days. A game that quits cleanly within a
+    // minute often showed an error dialog first (SteamAPI_Init failed), so it is asked too.
     func worthAsking(now: Date = Date(), wineLog: String?) -> Bool {
         guard now.timeIntervalSince(ended) < 3 * 86400 else { return false }
-        return (seconds ?? 60) >= 60 || crashed(wineLog: wineLog)
+        return (seconds ?? 60) >= 60 || exitStatus == 0 || crashed(wineLog: wineLog)
     }
 
     static func byHand(now: Date = Date()) -> GameSession {

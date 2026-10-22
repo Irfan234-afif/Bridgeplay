@@ -65,7 +65,9 @@ struct PlayReportsTests {
         #expect(session(45, status: 143, steam: true).inferredStatus(wineLog: nil) == .silver)
         #expect(session(45, status: 5).inferredStatus(wineLog: nil) == nil)
         #expect(session(10, status: 0).inferredStatus(wineLog: nil) == nil)
-        #expect(!session(0.5, status: 0).worthAsking(wineLog: nil))
+        #expect(session(0.5, status: 0).worthAsking(wineLog: nil))
+        #expect(session(0.1, status: 0).inferredStatus(wineLog: nil) == nil)
+        #expect(!session(0.5, status: 143, steam: true).worthAsking(wineLog: nil))
         #expect(session(0.5, status: 5).worthAsking(wineLog: nil))
         #expect(!session(60, status: 0).worthAsking(now: Date().addingTimeInterval(4 * 86400), wineLog: nil))
     }
@@ -261,6 +263,20 @@ struct PlayReportsFlowTests {
         updated.handle([found("10", minutes: 60), found("20", minutes: 60)])
         #expect(Set(updated.nudges.map(\.prefix.appID)) == ["10", "20"])
         #expect(updated.nudge?.prefix.appID == "10", "one card at a time, newest session first")
+    }
+
+    @Test("A game that quits cleanly within seconds is asked about once per version")
+    func quickCleanExit() throws {
+        let queue = try scratchDirectory("reports")
+        defer { try? FileManager.default.removeItem(at: queue) }
+        let (reports, _) = model("201", queue: queue)
+        let quick = found("30", minutes: 0.1, ago: 60)
+        #expect(quick.session.worthAsking(wineLog: nil))
+        reports.handle([quick])
+        #expect(reports.nudge?.prefix.appID == "30")
+        reports.dismiss()
+        reports.handle([found("30", minutes: 0.1)])
+        #expect(reports.nudges.isEmpty, "asked again in the same version")
     }
 
     @Test("A crash after a Smooth answer asks again in the same version")
