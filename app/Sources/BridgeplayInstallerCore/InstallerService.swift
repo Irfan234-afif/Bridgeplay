@@ -10,6 +10,13 @@ public enum InstallationState: Sendable, Equatable {
         if case .upToDate = self { return true }
         return false
     }
+
+    public var installedVersion: String? {
+        switch self {
+        case .notInstalled: nil
+        case .updateAvailable(_, let version, _), .upToDate(_, let version): version
+        }
+    }
 }
 
 /// Detects and safely replaces the Bridgeplay app bundle. Game setup stays in the app.
@@ -300,16 +307,28 @@ public struct InstallerService: Sendable {
     }
 
     private static func requireAppIsClosed() throws {
-        for name in ["BridgeplayApp", "Autoupdate"] {
-            let process = Process()
-            process.executableURL = URL(fileURLWithPath: "/usr/bin/pgrep")
-            process.arguments = ["-x", name]
-            process.standardOutput = FileHandle.nullDevice
-            process.standardError = FileHandle.nullDevice
-            do { try process.run() }
-            catch { throw InstallerError.appIsRunning }
-            process.waitUntilExit()
-            if process.terminationStatus == 0 { throw InstallerError.appIsRunning }
+        let count = proc_listallpids(nil, 0)
+        guard count > 0 else { throw InstallerError.appIsRunning }
+        var pids = [pid_t](repeating: 0, count: Int(count) + 64)
+        let filled = proc_listallpids(&pids, Int32(pids.count * MemoryLayout<pid_t>.size))
+        guard filled > 0 else { throw InstallerError.appIsRunning }
+        var path = [CChar](repeating: 0, count: Int(MAXPATHLEN) * 4)
+        for pid in pids.prefix(Int(filled)) where pid > 0 {
+            guard proc_pidpath(pid, &path, UInt32(path.count)) > 0 else { continue }
+            let executable = String(cString: path)
+            if blocksInstall(executable) {
+                InstallerLog.write("Blocked by running process \(pid): \(executable)")
+                throw InstallerError.appIsRunning
+            }
+        }
+    }
+
+    // Sparkle names every app's updater Autoupdate, so only Bridgeplay's own copy counts.
+    static func blocksInstall(_ executable: String) -> Bool {
+        switch (executable as NSString).lastPathComponent {
+        case "BridgeplayApp": true
+        case "Autoupdate": executable.contains("/\(applicationName)/") || executable.contains("/\(bundleIdentifier)/")
+        default: false
         }
     }
 

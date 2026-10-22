@@ -506,4 +506,16 @@ struct InstallerServiceTests {
         #expect(try Data(contentsOf: destination.appending(path: "Contents/Info.plist")) == oldInfo)
         #expect(!FileManager.default.fileExists(atPath: parent.appending(path: ".Bridgeplay.app.previous").path))
     }
+
+    @Test func onlyBridgeplaysOwnUpdaterBlocksInstall() {
+        #expect(InstallerService.blocksInstall("/Applications/Bridgeplay.app/Contents/MacOS/BridgeplayApp"))
+        #expect(InstallerService.blocksInstall("/Applications/Bridgeplay.app/Contents/Frameworks/Sparkle.framework/Versions/B/Autoupdate"))
+        #expect(InstallerService.blocksInstall("/Users/a/Library/Caches/com.bridgeplay.Bridgeplay/org.sparkle-project.Sparkle/Launcher/X/Autoupdate"))
+        #expect(!InstallerService.blocksInstall("/Applications/OpenUsage.app/Contents/Frameworks/Sparkle.framework/Versions/B/Autoupdate"))
+        #expect(!InstallerService.blocksInstall("/Applications/Bridgeplay.app/Contents/MacOS/Helper"))
+    }
+
+    @Test func logRedactsHomeDirectory() {
+        #expect(InstallerLog.redact(NSHomeDirectory() + "/Downloads/x") == "~/Downloads/x")
+    }
 }
