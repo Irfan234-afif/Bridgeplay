@@ -38,6 +38,7 @@ logged, when:
 | `DLSS_FG` | `0`, `1` | With `NVAPI=1` on `d3dmetal`, `1` sets `CX_ACTIVE_GRAPHICS_BACKEND=d3dmetal` so WineCX reports hardware GPU scheduling, which DLSS frame generation requires. Off by default: [frankea/Whisky#231](https://github.com/frankea/Whisky/pull/231) saw MetalFX frame interpolation on an M5 with D3DMetal 4.0b2 hang WindowServer |
 | `STDOUT_NULL` | `0`, `1` | `1` starts the game without a stdout handle, as Steam on Windows does. Source 2 treats any stdout as a console build (`Plat_IsConsoleApplication`) and then skips NGX, so Deadlock offers no DLSS |
 | `VSYNC` | `0`, `1` | `1` makes the game's Metal layer wait for the display even when the game turns vsync off, like forcing vsync in the NVIDIA control panel. For games that lock vsync off with frame generation on (Resident Evil Requiem) and tear above the refresh rate |
+| `HIDE_WINE_EXPORTS` | `0`, `1` | `1` makes `GetProcAddress` fail for ntdll's `wine_*` exports on the WineCX 11.17 engine (`hide-wine-exports-patch/`), like Wine Staging's `HideWineExports`. For games that turn features off under Wine: The Witcher 3 5.0 skips NVIDIA Streamline, so no DLSS |
 | `DXMT_*`, `DXVK_*`, `MVK_*`, `VKD3D_*`, `D3DM_*`, `STAGING_*` | any | Exported as is |
 | `MTL_HUD_ENABLED`, `WINEDEBUG`, `WINE_LARGE_ADDRESS_AWARE`, `WINE_CPU_TOPOLOGY` | any | Exported as is |
 | `CX_FWD_COMPAT_GL_CTX` | any | Exported as is: WineCX's switch for forward-compatible OpenGL contexts, for testing OpenGL (`wined3d`) games |

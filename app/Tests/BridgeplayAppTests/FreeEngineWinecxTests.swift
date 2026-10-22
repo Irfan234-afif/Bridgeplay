@@ -228,6 +228,23 @@ struct FreeEngineWinecxTests {
         }
     }
 
+    // hide-wine-exports-patch: 11.17 ships kernel32 and kernelbase that can hide ntdll's
+    // wine_* exports; 11.15 keeps the runtime's.
+    @Test("The hide-Wine-exports kernel32 and kernelbase ship with the app and are pinned for 11.17",
+          arguments: FreeEngineWinecx.releases.map(\.build))
+    func hideWineExports(id: String) throws {
+        let release = try #require(FreeEngineWinecx.release(build: id))
+        let expected: Set<String> = release.build == "winecx-11.17"
+            ? ["lib/wine/x86_64-windows/kernel32.dll", "lib/wine/x86_64-windows/kernelbase.dll"] : []
+        #expect(Set(release.loader.map(\.path)) == expected)
+        let table = FreeEngineWinecx.expectedFiles(release)
+        for file in release.loader {
+            let bundled = try #require(Bundle.module.url(forResource: file.resource, withExtension: file.ext))
+            #expect(Digest.sha256IfPresent(bundled) == file.sha256, "\(file.resource)")
+            #expect(table[file.path] == file.sha256, "\(file.path)")
+        }
+    }
+
     // winecoreaudio-patch: 11.17 ships a winecoreaudio.so with half-period output pulls.
     @Test("The patched winecoreaudio ships with the app and is pinned for 11.17",
           arguments: FreeEngineWinecx.releases.map(\.build))

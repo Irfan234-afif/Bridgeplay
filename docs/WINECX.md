@@ -98,6 +98,7 @@ lib/wine/x86_64-unix/winemac.so                   Retina fix, replacing the arch
 lib/wine/x86_64-unix/winebus.so                   built with SDL2, replacing the archive's (Controllers)
 lib/wine/x86_64-windows/winebus.sys               11.17 only: map-key fix, replacing the archive's (Controllers)
 lib/wine/x86_64-windows/ws2_32.dll                11.17 only: own host name without loopback, replacing the archive's (Own host name)
+lib/wine/x86_64-windows/kernel{32,base}.dll       11.17 only: GetProcAddress can hide ntdll's wine_* exports, replacing the archive's (Hidden Wine exports)
 lib/wine/{x86_64,i386}-windows/d3dx11_4{2,3}.dll  11.17 only: D3DX11CreateThreadPump stub, replacing the archive's (D3DX11 thread pump)
 lib/libSDL2-2.0.0.dylib                           SDL 2.32.10, x86_64, for winebus.so (Controllers)
 ```
@@ -204,6 +205,22 @@ gcc 16.2, `make dlls/ws2_32/x86_64-windows/ws2_32.dll`), then
 is byte-identical to the runtime's `ws2_32.dll`; only the PE timestamp, checksum and build id
 differ, and the runtime's `.eh_frame` section name is cut to `.eh_fram` (10 bytes of string
 table). 11.15 keeps the runtime's own `ws2_32.dll`, so it still answers loopback first.
+
+## Hidden Wine exports
+
+Some games turn features off once `GetProcAddress(ntdll, "wine_get_version")` answers. The
+Witcher 3 5.0 then never calls `slInit`: Streamline logs only `SL not initialized or no plugins
+found` and the game offers FSR and XeSS but no DLSS. Wine Staging's `HideWineExports` covers
+this; WineCX has no equivalent.
+
+11.17 ships `kernel32-winecx-11.17.dll` and `kernelbase-winecx-11.17.dll` as
+`lib/wine/x86_64-windows/kernel32.dll` and `kernelbase.dll`: winecx `e0aa380`'s PE halves with
+`hide-wine-exports-patch/winecx-hide-wine-exports.patch`. With `NOTPROTON_HIDE_WINE_EXPORTS`
+set (gamefix key `HIDE_WINE_EXPORTS=1`), both `GetProcAddress` copies fail a lookup by name of
+an ntdll export starting with `wine_`. `__wine_*` stays, since every builtin's
+`__wine_init_unix_call` needs it. Without the variable they behave as the runtime's.
+Built and pinned as in `hide-wine-exports-patch/README.md`; the pins are the release's
+`loader`. 11.15 keeps the runtime's own.
 
 ## D3DX11 thread pump
 
@@ -381,6 +398,8 @@ python3 apply.py <ntdll.dll> <out> <detour bin>   # patched hashes
 | `winebus-winecx-11.17.so` | `6223c035c824c90708abbc3e733f8d1d6ed6b8b4e9a3e1a5c813493ceba50473` |
 | `winebus-winecx-11.17.sys` | `da108d1c3788fa32807ef08c4d26d8a89812c230317ffa7ba5111e126bda607c` |
 | `ws2_32-winecx-11.17.dll` | `cb0a5670ce6dbf949ed25cca54e9f1c4930cd4c2ade895836d518d3d9073079c` |
+| `kernel32-winecx-11.17.dll` | `9cffe153abd3f91f7157f936377baac47c5aef9fa807e263a0f9e051c6010af3` |
+| `kernelbase-winecx-11.17.dll` | `4d55600b204724046567688ca96132e49e53af1baac7a362f3e2bf285f669a8a` |
 | `d3dx11_43-winecx-11.17.dll` | `7d23cdfacc922f67dfa2eba98df277ae2ae351ad3646c3191a84966b55dbbfd3` |
 | `d3dx11_43-winecx-11.17-i386.dll` | `dd4dd351f2a5880c9848d5ccf4944a0b5e7622bb7fb196544115b1f9c92d749c` |
 | `d3dx11_42-winecx-11.17.dll` | `3d97e1de9000a78e27eb5c90d0ab9b36d54fd350760063da27226d22c90c8e1b` |

@@ -53,6 +53,8 @@ let package = Package(
                 .copy("Resources/winebus-winecx-11.17.so"),
                 .copy("Resources/winebus-winecx-11.17.sys"),
                 .copy("Resources/ws2_32-winecx-11.17.dll"),
+                .copy("Resources/kernel32-winecx-11.17.dll"),
+                .copy("Resources/kernelbase-winecx-11.17.dll"),
                 .copy("Resources/crypt32-winecx-11.17.dll"),
                 .copy("Resources/wintrust-winecx-11.17.dll"),
                 .copy("Resources/nvapi64-shim.dll"),
