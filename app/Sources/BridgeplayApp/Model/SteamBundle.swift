@@ -99,6 +99,15 @@ enum SteamBundle {
                 steam.terminate()
             }
         }
+        // Steam on its login screen takes steam://exit, logs its shutdown, then hangs in
+        // exit() (#158). Once it has logged that and its helpers are gone, it has nothing
+        // left to write.
+        var stuckExiting: @Sendable (Date) -> Bool = { asked in
+            SteamBundle.loggedShutdown(since: asked) && !Shell.processIsRunning(named: "Steam Helper")
+        }
+        var kill: @Sendable () -> Void = {
+            _ = try? Shell.run("/usr/bin/pkill", ["-KILL", "-x", "-U", String(getuid()), "steam_osx"])
+        }
         var sweep: @Sendable (String) -> Void = { _ = try? Shell.run("/usr/bin/pkill", ["-f", $0]) }
         var pause: @Sendable () -> Void = { Thread.sleep(forTimeInterval: 0.5) }
         var attempts = 40
@@ -106,9 +115,10 @@ enum SteamBundle {
     }
 
     // Asks this account's Steam to quit with steam://exit, which Steam can ignore on its
-    // login or update screen, then with a macOS quit. Steam is never killed: it may be
-    // writing its config or an update. Steam ignores SIGTERM, so none is sent. A Steam
-    // another account runs is out of reach and reported as such.
+    // login or update screen, then with a macOS quit. Steam is killed only when it is stuck
+    // after its own shutdown; otherwise it may be writing its config or an update. Steam
+    // ignores SIGTERM, so none is sent. A Steam another account runs is out of reach and
+    // reported as such.
     static func stopClient(
         app: URL = SupportPaths.Steam.app,
         helpers: [URL] = [SupportPaths.Steam.innerApp],
@@ -126,11 +136,17 @@ enum SteamBundle {
             }
             return !client.runningHere()
         }
+        let asked = Date()
         client.askToQuit()
         var quit = quits(within: client.attempts)
         if !quit {
             AppLog.note("stop: Steam ignored steam://exit, asking macOS to quit it")
             client.requestQuit()
+            quit = quits(within: client.escalationAttempts)
+        }
+        if !quit, client.stuckExiting(asked) {
+            AppLog.note("stop: Steam logged its shutdown but did not exit, killing it")
+            client.kill()
             quit = quits(within: client.escalationAttempts)
         }
 
@@ -146,6 +162,34 @@ enum SteamBundle {
             client.sweep(pattern)
         }
         return true
+    }
+
+    static func loggedShutdown(
+        since date: Date,
+        log: URL = SupportPaths.Steam.userData.appending(path: "logs/bootstrap_log.txt")
+    ) -> Bool {
+        guard let handle = try? FileHandle(forReadingFrom: log) else { return false }
+        defer { try? handle.close() }
+        let end = (try? handle.seekToEnd()) ?? 0
+        try? handle.seek(toOffset: end > 16_384 ? end - 16_384 : 0)
+        let tail = String(decoding: (try? handle.readToEnd()) ?? Data(), as: UTF8.self)
+        return loggedShutdown(in: tail, since: date)
+    }
+
+    // bootstrap_log.txt lines read "[2026-10-22 20:37:09] Shutdown", in local time.
+    static func loggedShutdown(in log: String, since date: Date, timeZone: TimeZone = .current) -> Bool {
+        let format = DateFormatter()
+        format.locale = Locale(identifier: "en_US_POSIX")
+        format.timeZone = timeZone
+        format.dateFormat = "yyyy-MM-dd HH:mm:ss"
+        for line in log.split(whereSeparator: \.isNewline).reversed() {
+            let text = line.trimmingCharacters(in: .whitespaces)
+            guard text.hasPrefix("["), text.hasSuffix("] Shutdown"),
+                  let at = format.date(from: String(text.dropFirst().prefix(19))) else { continue }
+            // The log keeps whole seconds.
+            return at >= date.addingTimeInterval(-1)
+        }
+        return false
     }
 
     // Its own type, so a caller that only touches this account's files can carry on.

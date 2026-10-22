@@ -48,21 +48,24 @@ struct SteamBundleTests {
 
     // MARK: Stopping Steam
 
-    // A stand-in Steam: running here and in another account, and which request it quits on.
+    // A stand-in Steam: running here and in another account, which request it quits on,
+    // and whether it is stuck after logging its shutdown.
     private final class FakeSteam: @unchecked Sendable {
-        enum Request: Comparable { case exitURL, quit, never }
+        enum Request: Comparable { case exitURL, quit, kill, never }
 
         private let lock = NSLock()
         private var here: Bool
         private var elsewhere: Bool
         private let quitsOn: Request
+        private let stuck: Bool
         private(set) var requests: [Request] = []
         private(set) var swept: [String] = []
 
-        init(here: Bool, elsewhere: Bool = false, quitsOn: Request = .exitURL) {
+        init(here: Bool, elsewhere: Bool = false, quitsOn: Request = .exitURL, stuck: Bool = false) {
             self.here = here
             self.elsewhere = elsewhere
             self.quitsOn = quitsOn
+            self.stuck = stuck
         }
 
         private func receive(_ request: Request) {
@@ -78,6 +81,8 @@ struct SteamBundleTests {
                 runningHere: { self.lock.withLock { self.here } },
                 askToQuit: { self.receive(.exitURL) },
                 requestQuit: { self.receive(.quit) },
+                stuckExiting: { _ in self.stuck },
+                kill: { self.receive(.kill) },
                 sweep: { pattern in self.lock.withLock { self.swept.append(pattern) } },
                 pause: {},
                 attempts: 3,
@@ -125,6 +130,50 @@ struct SteamBundleTests {
         #expect(failure?.detail.contains("Activity Monitor") == true)
         #expect(steam.requests == [.exitURL, .quit])
         #expect(steam.swept.isEmpty)
+    }
+
+    @Test("Steam stuck after logging its shutdown is killed, then swept")
+    func stuckSteamIsKilled() throws {
+        let steam = FakeSteam(here: true, quitsOn: .kill, stuck: true)
+        #expect(try stop(steam))
+        #expect(steam.requests == [.exitURL, .quit, .kill])
+        #expect(steam.swept == [#"/tmp/Steam\.app/"#])
+    }
+
+    @Test("Steam that has not logged its shutdown is never killed")
+    func runningSteamIsNotKilled() {
+        let steam = FakeSteam(here: true, quitsOn: .never, stuck: false)
+        #expect(throws: StepFailure.self) { try stop(steam) }
+        #expect(!steam.requests.contains(.kill))
+    }
+
+    private static let utc = TimeZone(identifier: "UTC")!
+    private static func at(_ text: String) -> Date {
+        let format = DateFormatter()
+        format.locale = Locale(identifier: "en_US_POSIX")
+        format.timeZone = utc
+        format.dateFormat = "yyyy-MM-dd HH:mm:ss"
+        return format.date(from: text)!
+    }
+
+    @Test("A shutdown logged after the request counts; an earlier one or none does not")
+    func shutdownInTheLog() {
+        let log = """
+            [2026-10-22 20:24:56] Nothing to do
+            [2026-10-22 20:37:09] Shutdown
+            """
+        let asked = Self.at("2026-10-22 20:37:05")
+        #expect(SteamBundle.loggedShutdown(in: log, since: asked, timeZone: Self.utc))
+        #expect(SteamBundle.loggedShutdown(in: log + "\r\n", since: asked, timeZone: Self.utc))
+        #expect(!SteamBundle.loggedShutdown(in: log, since: Self.at("2026-10-22 20:40:00"), timeZone: Self.utc))
+        #expect(!SteamBundle.loggedShutdown(in: "[2026-10-22 20:37:09] Startup", since: asked, timeZone: Self.utc))
+        // Only the latest shutdown counts: an old one above a newer start is not this quit.
+        let restarted = """
+            [2026-10-22 20:30:00] Shutdown
+            [2026-10-22 20:31:00] Startup
+            """
+        #expect(!SteamBundle.loggedShutdown(in: restarted, since: asked, timeZone: Self.utc))
+        #expect(!SteamBundle.loggedShutdown(since: asked, log: URL(filePath: "/nonexistent/bootstrap_log.txt")))
     }
 
     // steam://exit only reaches this account's Steam; another account's keeps the bundle open.
