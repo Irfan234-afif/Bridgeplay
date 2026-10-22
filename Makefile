@@ -47,6 +47,7 @@ SRCS := \
 	dylib/feats/compat.c \
 	dylib/feats/webui.c \
 	dylib/feats/compatsvc.c \
+	dylib/feats/prefixstate.c \
 	dylib/feats/usershortcuts.c \
 	dylib/feats/webpatch.c \
 	dylib/feats/nativeplatform.c \
@@ -73,7 +74,7 @@ DEPS := $(OBJS:.o=.d)
         tests-list overlay-shim overlay-shim-install overlay-shim-tests \
         overlay-shim-bench iconmaker icon \
         appinfo helpers-install ntdll-resolve bridge runcheck compatcheck \
-        compatsvc-check shortcutcheck scriptcheck envcheck buildcheck settingscheck routecheck bridgecheck envpasscheck prefixnotecheck gamedrivecheck \
+        compatsvc-check prefixstate-check shortcutcheck scriptcheck envcheck buildcheck settingscheck routecheck bridgecheck envpasscheck prefixnotecheck gamedrivecheck \
         gamefixescheck launchercheck padcheck launch-shell activatecheck stamp-check versioncheck cicheck compat-reported-check FORCE
 
 APP_PAYLOAD := app/Sources/BridgeplayApp/Resources/payload
@@ -200,6 +201,14 @@ compatcheck: $(RUN_SCRIPT_H)
 	$(TEST_CC) -I$(GENERATED_DIR) \
 	  -o $(COMPATCHECK) dylib/tests/compatcheck.c && \
 	$(COMPATCHECK)
+
+PREFIXSTATE_CHECK := $(OUT_DIR)/prefixstate-check
+
+prefixstate-check:
+	@if [ ! -f dylib/tests/prefixstate-check.c ]; then $(call SKIP,prefixstate-check,dylib/tests/prefixstate-check.c); exit 0; fi; \
+	mkdir -p $(OUT_DIR) && \
+	$(TEST_CC) -o $(PREFIXSTATE_CHECK) dylib/tests/prefixstate-check.c && \
+	$(PREFIXSTATE_CHECK)
 
 COMPATSVC_CHECK := $(OUT_DIR)/compatsvc-check
 
@@ -416,6 +425,7 @@ panel-behavior:
 	node $(PANEL_TESTS)/effective.js $(OUT_DIR)/panel-emit && \
 	node $(PANEL_TESTS)/localization.js $(OUT_DIR)/panel-emit && \
 	node $(PANEL_TESTS)/fex.js $(OUT_DIR)/panel-emit && \
+	node $(PANEL_TESTS)/prefix-row.js $(OUT_DIR)/panel-emit && \
 	echo "==> panel behavior: renders as expected, no stale arguments"
 
 CX_ROOT ?= /Applications/CrossOver Preview.app
@@ -672,7 +682,7 @@ fonts-install:
 	@rsync -a --delete $(FONT_FILES) build/fonts/ "$(SUPPORT_DIR)/fonts/"
 	@echo "==> Installed: $(SUPPORT_DIR)/fonts"
 
-deploy: $(TARGET) dylib-install sigdb-install fonts-install helpers-install
+deploy: $(TARGET) dylib-install sigdb-install fonts-install helpers-install prefix-command-install
 	@if [ ! -d "$(STEAM_APP)" ]; then \
 		echo "==> deploy: $(STEAM_APP) not found"; exit 1; fi
 	$(call install_atomically,$(TARGET),$(DEPLOY_DST))
@@ -782,6 +792,15 @@ ICON_CAR  := $(ICON_DIR)/Assets.car
 # Licence texts copied into Contents/Resources: GPL-3.0, NOTICE and every
 # third-party licence the bundle needs (LICENSE.dobby, LICENSE.sparkle, ...).
 APP_LICENSES := LICENSE $(sort $(wildcard LICENSE.*)) NOTICE
+.PHONY: prefix-command-install
+# Records an app bundle that is already built. Building it here would make every deploy
+# build the whole app.
+prefix-command-install:
+	@if [ ! -x "$(APP_BUNDLE)/Contents/MacOS/BridgeplayApp" ]; then \
+		echo "==> no $(APP_BUNDLE) yet, run make app for rebuilds from Steam"; exit 0; fi; \
+	mkdir -p "$(SUPPORT_DIR)" && \
+	printf '%s' "$(CURDIR)/$(APP_BUNDLE)/Contents/MacOS/BridgeplayApp" > "$(SUPPORT_DIR)/app-executable.new" && \
+	mv -f "$(SUPPORT_DIR)/app-executable.new" "$(SUPPORT_DIR)/app-executable"
 
 icon: $(ICON_CAR)
 
@@ -920,7 +939,7 @@ native-shim-tests:
 # overlay-shim-tests is left out: it needs a Metal GPU and real frame timing.
 CI_CHECKS := mincheck l10ncheck \
 	sigcheck callscheck webpatch-fixtures peicon-fixtures panel-behavior spawn-env \
-	activatecheck compatcheck compatsvc-check shortcutcheck launch-shell envcheck \
+	activatecheck compatcheck compatsvc-check prefixstate-check shortcutcheck launch-shell envcheck \
 	buildcheck settingscheck routecheck bridgecheck envpasscheck prefixnotecheck gamedrivecheck launchercheck \
 	seedcheck gamefixescheck versioncheck cicheck padcheck compat-reported-check np-native-tests native-shim-tests \
 	app-tests native-installercheck game-host-check dualsense-check steam-rumble-check

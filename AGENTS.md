@@ -59,7 +59,7 @@ The checks the workflows run (`make -s <target>`):
 - **Lint:** `scriptcheck`, `runcheck`
 - **App:** `mincheck`, `l10ncheck`, `app-tests` (the Swift tests)
 - **C and shell suites:** `sigcheck`, `callscheck`, `webpatch-fixtures`, `peicon-fixtures`,
-  `panel-behavior`, `spawn-env`, `activatecheck`, `compatcheck`, `compatsvc-check`,
+  `panel-behavior`, `spawn-env`, `activatecheck`, `compatcheck`, `compatsvc-check`, `prefixstate-check`,
   `shortcutcheck`, `launch-shell`, `envcheck`, `buildcheck`, `settingscheck`, `routecheck`,
   `bridgecheck`, `envpasscheck`, `prefixnotecheck`, `gamedrivecheck`, `launchercheck`, `seedcheck`, `gamefixescheck`, `versioncheck`, `cicheck`,
   `compat-reported-check`

@@ -2239,6 +2239,38 @@
         }
       }
     },
+    "Bridgeplay is rebuilding the prefix for %@." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bridgeplay sta ricostruendo il prefisso di %@."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bridgeplay 正在重建 %@ 的游戏容器。"
+          }
+        }
+      }
+    },
+    "Bridgeplay is rebuilding this game's prefix." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bridgeplay sta ricostruendo il prefisso di questo gioco."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bridgeplay 正在重建此游戏的游戏容器。"
+          }
+        }
+      }
+    },
     "Bridgeplay is still moving its files to the new Bridgeplay folders." : {
       "localizations" : {
         "it" : {
@@ -3147,6 +3179,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "正在拷贝 Wine"
+          }
+        }
+      }
+    },
+    "Copying your files…" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Copia dei tuoi file…"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在复制你的文件…"
           }
         }
       }
@@ -4174,6 +4222,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "正在完成收尾工作"
+          }
+        }
+      }
+    },
+    "Finishing…" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Completamento…"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在完成…"
           }
         }
       }
@@ -6510,6 +6574,38 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "重建“%@”的游戏容器%@？"
+          }
+        }
+      }
+    },
+    "Rebuilding the prefix" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ricostruzione del prefisso"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在重建游戏容器"
+          }
+        }
+      }
+    },
+    "Rebuilding…" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ricostruzione…"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在重建…"
           }
         }
       }
