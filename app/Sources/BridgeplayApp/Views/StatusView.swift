@@ -304,7 +304,8 @@ struct StatusView: View {
                         StatusAction(label: Remedy.settingsButton) {
                             Remedy.openSettings(pane)
                         }
-                    }
+                    },
+                    menu: ErrorReport.actions(failure, in: "Status")
                 )
             } else if let outcome = status.outcome {
                 StatusRow(title: String(localized: "Done"), value: outcome, tone: .ok)
@@ -398,7 +399,8 @@ struct StatusView: View {
                     label: String(localized: "Try Again"),
                     isProminent: true,
                     isEnabled: !migration.isRunning
-                ) { Task { await migration.retry(status) } }
+                ) { Task { await migration.retry(status) } },
+                menu: ErrorReport.actions(failure, in: "Folder move")
             )
         }
         if !migration.keptNotes.isEmpty {
@@ -452,7 +454,8 @@ struct StatusView: View {
                       value: String(localized: "Sharper on Retina displays, but games run slower."),
                       toggle: gameDefault(.highResolution, $highResolution))
             if let gameDefaultsError {
-                StatusRow(title: String(localized: "Something went wrong"), value: gameDefaultsError, tone: .bad)
+                StatusRow(title: String(localized: "Something went wrong"), value: gameDefaultsError, tone: .bad,
+                          menu: ErrorReport.actions(gameDefaultsError, in: "Game settings"))
             }
         } header: {
             Text("For Every Game")

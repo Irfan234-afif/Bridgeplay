@@ -3858,6 +3858,38 @@
         }
       }
     },
+    "Downloading from %@: %@" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Download da %1$@: %2$@"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在从 %1$@ 下载：%2$@"
+          }
+        }
+      }
+    },
+    "Downloading from %@: %@, about %@ left" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Download da %1$@: %2$@, circa %3$@ rimanenti"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在从 %1$@ 下载：%2$@，大约还剩 %3$@"
+          }
+        }
+      }
+    },
     "Downloading missing components" : {
       "localizations" : {
         "it" : {
@@ -6994,6 +7026,22 @@
         }
       }
     },
+    "Report on GitHub" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Segnala su GitHub"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在 GitHub 上报告"
+          }
+        }
+      }
+    },
     "Reports are posted publicly in Bridgeplay's GitHub Discussions and counted on the compatibility list. Each one has the game, how it ran, anything you write about it, your Mac's chip, memory and displays, the macOS and Bridgeplay versions, the engine and backend, and the game's logs. Your home folder, user and computer names, Steam account name, Steam ID and email addresses are removed from the logs first. You don't need a GitHub account." : {
       "localizations" : {
         "it" : {
@@ -7598,6 +7646,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "在 Retina 显示屏上更清晰，但游戏会变慢。"
+          }
+        }
+      }
+    },
+    "Show Log" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mostra registro"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "显示日志"
           }
         }
       }

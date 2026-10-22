@@ -75,7 +75,8 @@ struct SetupAssistantView: View {
                         content
                         if let message = model.message {
                             SetupCard {
-                                WizardRow(row: StatusRow(title: String(localized: "Something went wrong"), value: message, tone: .bad))
+                                WizardRow(row: StatusRow(title: String(localized: "Something went wrong"), value: message, tone: .bad,
+                                          action: StatusAction(label: ErrorReport.reportLabel) { ErrorReport.open(message, in: "Setup") }))
                             }
                         }
                     }
@@ -286,7 +287,8 @@ struct SetupAssistantView: View {
         SetupCard {
             ForEach(Array(model.tasks.enumerated()), id: \.element.id) { index, task in
                 if index > 0 { SetupHairline() }
-                WizardRow(row: StatusRow(title: task.title, value: value(of: task), tone: tone(of: task)),
+                WizardRow(row: StatusRow(title: task.title, value: value(of: task), tone: tone(of: task),
+                                         action: report(task)),
                           pending: task.state == .running)
                     .animation(Self.rowSpring, value: task.state)
             }
@@ -374,6 +376,12 @@ struct SetupAssistantView: View {
         case .done: String(localized: "Done.")
         case .failed(let reason): reason
         }
+    }
+
+    // App Management has its own card and button.
+    private func report(_ task: SetupAssistant.SetupTask) -> StatusAction? {
+        guard case .failed(let reason) = task.state, !model.needsAppManagement else { return nil }
+        return StatusAction(label: ErrorReport.reportLabel) { ErrorReport.open(reason, in: "Setup: \(task.title)") }
     }
 
     private func tone(of task: SetupAssistant.SetupTask) -> StatusTone {
