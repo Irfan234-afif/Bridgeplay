@@ -271,7 +271,16 @@ struct SetupAssistantView: View {
     private var finishStep: some View {
         StepHeader(step: model.step, title: "Set up Bridgeplay",
                    detail: "Bridgeplay adds itself to Steam, sets up the WineCX engine and makes it Steam's default. Steam closes for a moment.")
-        if model.tasks.contains(where: { $0.state != .done }) {
+        // Above the tasks, so the button is in view without scrolling.
+        if model.needsAppManagement {
+            SetupCard {
+                WizardRow(row: StatusRow(title: String(localized: "App Management"),
+                          value: String(localized: "Turn on Bridgeplay in Privacy & Security › App Management. Setup continues by itself once it's on."),
+                          tone: .warning,
+                          detail: String(localized: "After a Bridgeplay update the switch can look on but no longer work. Turn it off and on again, or remove Bridgeplay from the list with − and add it back with +."),
+                          action: StatusAction(label: Remedy.settingsButton, isProminent: true) { model.openAppManagement() }))
+            }
+        } else if model.tasks.contains(where: { $0.state != .done }) {
             approvals
         }
         SetupCard {
@@ -294,15 +303,6 @@ struct SetupAssistantView: View {
                 .foregroundStyle(BP.fg3)
         }
         .padding(.horizontal, 2)
-        if model.needsAppManagement {
-            SetupCard {
-                WizardRow(row: StatusRow(title: String(localized: "App Management"),
-                          value: String(localized: "Turn on Bridgeplay in Privacy & Security › App Management. Setup continues by itself once it's on."),
-                          tone: .warning,
-                          detail: String(localized: "After a Bridgeplay update the switch can look on but no longer work. Turn it off and on again, or remove Bridgeplay from the list with − and add it back with +."),
-                          action: StatusAction(label: Remedy.settingsButton, isProminent: true) { model.openAppManagement() }))
-            }
-        }
     }
 
     // Told before Set Up is pressed, so the macOS dialogs that follow are expected. Signing

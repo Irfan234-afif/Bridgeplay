@@ -270,6 +270,7 @@ final class SetupAssistant {
             if status.failureRemedy == .appManagement {
                 needsAppManagement = true
                 set("steam", .failed(String(localized: "macOS needs your permission first.")))
+                openAppManagement()
                 watchPermission(status)
             } else {
                 set("steam", .failed(failure))
