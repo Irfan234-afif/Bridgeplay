@@ -79,12 +79,12 @@ func embeddedPlistSection(_ data: Data) throws -> Range<Int>? {
     return plist
 }
 
-func runCodesign(_ arguments: [String]) throws -> Data {
+func runCodesign(_ arguments: [String], stderr: Bool = false) throws -> Data {
     let process = Process()
     let output = Pipe()
     process.executableURL = URL(fileURLWithPath: "/usr/bin/codesign")
     process.arguments = arguments
-    process.standardOutput = output
+    if stderr { process.standardError = output } else { process.standardOutput = output }
     try process.run()
     let data = output.fileHandleForReading.readDataToEndOfFile()
     process.waitUntilExit()
@@ -150,14 +150,21 @@ func prepare(_ target: URL, _ info: URL) throws {
     let attributes = try files.attributesOfItem(atPath: target.path)
     try files.setAttributes(
         [.posixPermissions: attributes[.posixPermissions] ?? 0o755], ofItemAtPath: staged.path)
-    // CrossOver's loader is signed with the hardened runtime and entitlements; a free
-    // runtime's loader (WineCX) is not signed at all. Re-signing that one under the
-    // hardened runtime with no entitlements would refuse the DYLD_INSERT_LIBRARIES the
-    // launcher relies on, so it gets a plain ad hoc signature instead.
-    let signed = (try? runCodesign(["-d", target.path])) != nil
+    // CrossOver's loader is signed with the hardened runtime and entitlements; WineCX's is not
+    // signed at all and WineHQ's is signed ad hoc without the hardened runtime. Adding the
+    // hardened runtime to those would turn on library validation, which refuses their
+    // ntdll.so ("different Team IDs") and the DYLD_INSERT_LIBRARIES the launcher relies on,
+    // so only a loader that already had it keeps it.
+    let details = (try? runCodesign(["-dv", target.path], stderr: true)).map {
+        String(decoding: $0, as: UTF8.self)
+    }
+    let signed = details != nil
+    let hardened = details?.split(separator: "\n").contains {
+        $0.hasPrefix("CodeDirectory") && $0.contains("runtime")
+    } ?? false
     let entitlements = signed ? try runCodesign(["-d", "--entitlements", ":-", target.path]) : Data()
     var arguments = ["--force", "--sign", "-", "--identifier", identity]
-    if signed { arguments += ["--options", "runtime"] }
+    if hardened { arguments += ["--options", "runtime"] }
     if !entitlements.isEmpty {
         _ = try PropertyListSerialization.propertyList(from: entitlements, format: nil)
         let file = temporary.appendingPathComponent("entitlements.plist")

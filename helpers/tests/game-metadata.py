@@ -39,6 +39,20 @@ with tempfile.TemporaryDirectory(prefix="np-game-metadata-") as folder:
     assert runner.read_bytes() == before, "shared runner inode was modified"
     assert runner.stat().st_ino != wine.stat().st_ino
     subprocess.run(["codesign", "--verify", "--strict", str(wine)], check=True)
+
+    def flags(path):
+        out = subprocess.run(["codesign", "-dv", str(path)], capture_output=True, text=True).stderr
+        return next(l for l in out.splitlines() if l.startswith("CodeDirectory"))
+
+    # WineHQ's loader is ad hoc without the hardened runtime; adding it breaks ntdll.so loading
+    assert "runtime" not in flags(wine), "a loader without the hardened runtime gained it"
+    (root / "hardened").mkdir()
+    hardened = root / "hardened" / "wine"
+    subprocess.run(["clang", str(c), "-Wl,-sectcreate,__TEXT,__info_plist," + str(embedded),
+                    "-o", str(hardened)], check=True)
+    subprocess.run(["codesign", "-s", "-", "--options", "runtime", str(hardened)], check=True)
+    subprocess.run([str(tool), str(hardened), str(info)], check=True)
+    assert "runtime" in flags(hardened), "a hardened loader lost the hardened runtime"
     blob = wine.read_bytes()
     assert b"com.notproton.launcher.999" in blob and b"LSSupportsGameMode" in blob
     subprocess.run([str(tool), str(wine), str(info)], check=True)
