@@ -50,6 +50,9 @@ steam_tmp=""
 steam_mnt=""
 # The installer carries no app, so it never goes stale: it installs the Latest release.
 app_url="https://github.com/raymondchins/Bridgeplay/releases/latest/download/Bridgeplay.zip"
+# Release builds are signed with the self-signed "Bridgeplay Release" identity; pin its leaf
+# so an ad-hoc or other-signed zip on the release fails.
+app_requirement='=identifier "com.bridgeplay.Bridgeplay" and certificate leaf = H"63cd686b8e4c1123ef885e90e1127fefd5bd42b1"'
 app_tmp=""
 # shellcheck disable=SC2329 # runs from the EXIT trap
 cleanup() {
@@ -78,7 +81,7 @@ if [ "$install_app" = 1 ] && [ ! -d "$app_src" ]; then
     [ -d "$app_src" ] || die "File Bridgeplay yang diunduh tidak berisi Bridgeplay.app. Jalankan Install.command lagi."
     [ "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$app_src/Contents/Info.plist" 2>/dev/null)" = "com.bridgeplay.Bridgeplay" ] \
         || die "File yang diunduh bukan Bridgeplay. Jalankan Install.command lagi."
-    codesign --verify --strict "$app_src" 2>/dev/null \
+    codesign --verify --strict -R "$app_requirement" "$app_src" 2>/dev/null \
         || die "Tanda tangan Bridgeplay yang diunduh tidak valid. Jalankan Install.command lagi."
 fi
 
