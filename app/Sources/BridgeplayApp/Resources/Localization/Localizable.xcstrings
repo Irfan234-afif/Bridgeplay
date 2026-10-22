@@ -7266,18 +7266,18 @@
         }
       }
     },
-    "Reports are posted publicly in Bridgeplay's GitHub Discussions and counted on the compatibility list. Each one has the game, how it ran, anything you write about it, your Mac's chip, memory and displays, the macOS and Bridgeplay versions, the engine and backend, and the game's logs. Your home folder, user and computer names, Steam account name, Steam ID and email addresses are removed from the logs first. You don't need a GitHub account." : {
+    "Reports are posted publicly in Bridgeplay's GitHub Discussions and counted on the compatibility list. Each one has the game, how it ran, anything you write about it, your Mac's model, chip, GPU cores, memory and displays, whether it was on battery, in Low Power Mode or running hot, the macOS and Bridgeplay versions, the engine, backend and High Resolution setting, and the game's logs. Your home folder, user and computer names, Steam account name, Steam ID and email addresses are removed from the logs first. You don't need a GitHub account." : {
       "localizations" : {
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "I report vengono pubblicati nelle GitHub Discussions di Bridgeplay e contati nell'elenco di compatibilità. Ognuno contiene il gioco, come è andato, quello che scrivi al riguardo, chip, memoria e schermi del Mac, le versioni di macOS e Bridgeplay, motore e backend, e i log del gioco. Prima dell'invio vengono rimossi dai log la cartella Inizio, i nomi utente e computer, il nome dell'account Steam, lo Steam ID e gli indirizzi email. Non serve un account GitHub."
+            "value" : "I report vengono pubblicati nelle GitHub Discussions di Bridgeplay e contati nell'elenco di compatibilità. Ognuno contiene il gioco, come è andato, quello che scrivi al riguardo, modello, chip, core GPU, memoria e schermi del Mac, se era a batteria, in modalità Risparmio energia o surriscaldato, le versioni di macOS e Bridgeplay, motore, backend e impostazione Alta risoluzione, e i log del gioco. Prima dell'invio vengono rimossi dai log la cartella Inizio, i nomi utente e computer, il nome dell'account Steam, lo Steam ID e gli indirizzi email. Non serve un account GitHub."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "报告会公开发布到 Bridgeplay 的 GitHub Discussions，并计入兼容性列表。每份报告包含游戏、运行情况、你对此写下的说明、Mac 的芯片、内存和显示器、macOS 和 Bridgeplay 版本、引擎和后端，以及游戏日志。发送前会从日志中移除你的个人文件夹、用户名和电脑名称、Steam 账户名称、Steam ID 和电子邮件地址。不需要 GitHub 账户。"
+            "value" : "报告会公开发布到 Bridgeplay 的 GitHub Discussions，并计入兼容性列表。每份报告包含游戏、运行情况、你对此写下的说明、Mac 的型号、芯片、GPU 核心数、内存和显示器，是否使用电池供电、处于低电量模式或过热，macOS 和 Bridgeplay 版本，引擎、后端和高分辨率设置，以及游戏日志。发送前会从日志中移除你的个人文件夹、用户名和电脑名称、Steam 账户名称、Steam ID 和电子邮件地址。不需要 GitHub 账户。"
           }
         }
       }
