@@ -245,7 +245,7 @@ fi
 # whose sources (version.h and docs aside) match a commit that workflow passed skips them
 # too: push, let CI pass, bump, release. Needs gh; without it, or with no passing run, the
 # checks run here. A docs-only run is green with its build and checks skipped, so a run
-# counts only when both jobs ran and succeeded (scripts/ci-run-passed.sh).
+# counts only when its build, checks and tests jobs ran and succeeded (scripts/ci-run-passed.sh).
 ci_slug=${BRIDGEPLAY_CI_REPO:-raymondchins/Bridgeplay}
 ci_passed() {
 	command -v gh >/dev/null 2>&1 || return 1
