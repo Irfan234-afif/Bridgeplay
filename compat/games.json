@@ -476,11 +476,12 @@
     "name": "The Witcher 3: Wild Hunt — Remastered",
     "api": "D3D12",
     "anticheat": "none known",
-    "status": "untested",
-    "backend": "wined3d",
-    "engine": null,
-    "notes": "",
-    "last_tested": null,
-    "fork_commit": null
+    "status": "gold",
+    "backend": "d3dmetal",
+    "engine": "winecx-11.17",
+    "notes": "Gamefix starts it with --launcher-skip (REDlauncher's Qt WebEngine crashes with 0x80000003) and HIDE_WINE_EXPORTS=1 (5.0 skips Streamline, so no DLSS, when it finds wine_get_version). Set Display Mode to Borderless Window: exclusive fullscreen flickers and switches resolution on Cmd-Tab.",
+    "last_tested": "2026-10-22",
+    "fork_commit": null,
+    "tested_on": "M5 Max · macOS 27"
   }
 ]
