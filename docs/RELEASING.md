@@ -212,9 +212,12 @@ The app's one-tap reports go to `https://bridgeplay.dev/api/report` (bridgeplay-
 `api/report.mjs`), which posts each one as a Discussion in the `compatibility-reports`
 category of this repository. `api/compat.mjs` counts them (only posts by the report bot)
 for the compatibility page, cached for an hour; `compat/games.json` holds the results a
-maintainer checked and wins over them. Both functions use the `BRIDGEPLAY_BOT_TOKEN`
-Vercel env var: a fine-grained token on this repository with Discussions read and write and
-nothing else.
+maintainer checked and wins over them. Both functions post and read as the
+[Bridgeplay Reports](https://github.com/settings/apps/bridgeplay-reports) GitHub App
+(`bridgeplay-reports[bot]`), installed on this repository only with Discussions read and
+write. Its Vercel env vars are `BRIDGEPLAY_APP_ID`, `BRIDGEPLAY_APP_INSTALLATION_ID` and
+`BRIDGEPLAY_APP_PRIVATE_KEY`. Reports from before 2026-10-22 were posted with a personal
+token and carry the owner's login; they still count.
 
 The app asks about a game at most once per Bridgeplay version (an answer, Not Now or an
 automatic report all count), so a release is when players get asked again about the games
