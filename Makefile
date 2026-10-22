@@ -412,9 +412,18 @@ spawn-live: $(TARGET)
 
 APP_TESTS := app/Tests
 
+# SwiftPM on Xcode 27 beta (27A5218g) leaves Products/Debug/PackageFrameworks empty
+# and puts Sparkle.framework one level up, while the test bundle's rpath only looks
+# in PackageFrameworks, so the bundle fails to dlopen before a single test runs.
+# Build the tests, then link Sparkle where the rpath expects it. Build products only.
 app-tests:
 	@if [ ! -d $(APP_TESTS) ]; then $(call SKIP,app-tests,$(APP_TESTS)); exit 0; fi; \
-	touch app/Package.swift; cd app && swift test
+	touch app/Package.swift; cd app && swift build --build-tests && \
+	bin=$$(swift build --show-bin-path) && \
+	if [ -d "$$bin/PackageFrameworks" ] && [ -d "$$bin/Sparkle.framework" ] && \
+		[ ! -e "$$bin/PackageFrameworks/Sparkle.framework" ]; then \
+		ln -s ../Sparkle.framework "$$bin/PackageFrameworks/Sparkle.framework"; fi && \
+	swift test
 
 PANEL_TESTS := dylib/tests/panel-behavior
 

@@ -211,20 +211,6 @@ sha=$(shasum -a 256 "$zip_out" | cut -d' ' -f1)
 
 # --- checks ------------------------------------------------------------------------
 
-# SwiftPM on Xcode 27 beta (27A5218g) leaves Products/Debug/PackageFrameworks empty
-# and puts Sparkle.framework one level up, while the test bundle's rpath only looks
-# in PackageFrameworks, so the bundle fails to dlopen before a single test runs.
-# Build the tests, then link Sparkle where the rpath expects it. Build products only.
-link_test_sparkle() {
-	swift build --package-path app --build-tests
-	bin=$(swift build --package-path app --show-bin-path)
-	if [ -d "$bin/PackageFrameworks" ] && [ -d "$bin/Sparkle.framework" ] &&
-		[ ! -e "$bin/PackageFrameworks/Sparkle.framework" ]; then
-		ln -s ../Sparkle.framework "$bin/PackageFrameworks/Sparkle.framework"
-		echo "==> linked Sparkle.framework into $bin/PackageFrameworks"
-	fi
-}
-
 # The checks depend on the source, not on the version number, so a tree that already
 # passed (a release right after its bump commit) skips them. Only a clean tree is stamped.
 # BRIDGEPLAY_FORCE_CHECKS=1 runs them anyway.
@@ -271,7 +257,6 @@ if [ "$run_checks" -eq 1 ]; then
 	check_log=$LOG_DIR/checks.log
 	: >"$check_log"
 	start=$(date +%s)
-	link_test_sparkle >>"$check_log" 2>&1 || true
 	# make ci-checks is the list app.yml runs, JOBS checks at a time; each runs even after a failure
 	echo "==> [check] make ci-checks, log: $check_log"
 	if ! make ci-checks CHECK_JOBS="$JOBS" >>"$check_log" 2>&1; then
