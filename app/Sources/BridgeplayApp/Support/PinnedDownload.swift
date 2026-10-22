@@ -7,12 +7,30 @@ enum PinnedDownload {
     enum Progress: Sendable {
         case reusing
         case fetching(host: String)
+        case receiving(host: String, received: Int64, total: Int64, remaining: TimeInterval?)
 
         var label: String {
             switch self {
             case .reusing: String(localized: "Preparing")
             case .fetching(let host): String(localized: "Downloading from \(host)")
+            case .receiving(let host, let received, let total, let remaining):
+                Self.label(host: host, received: received, total: total, remaining: remaining)
             }
+        }
+
+        static func label(host: String, received: Int64, total: Int64, remaining: TimeInterval?) -> String {
+            let amount = ByteCountFormatter.string(fromByteCount: received, countStyle: .file) + " / "
+                + ByteCountFormatter.string(fromByteCount: total, countStyle: .file)
+            let time = DateComponentsFormatter()
+            time.unitsStyle = .full
+            time.maximumUnitCount = 1
+            time.allowedUnits = [.hour, .minute, .second]
+            // Seconds only near the end, so the estimate doesn't tick every second.
+            let rounded = remaining.map { $0 < 60 ? $0 : ($0 / 60).rounded(.up) * 60 }
+            guard let rounded, let left = time.string(from: max(rounded, 1)) else {
+                return String(localized: "Downloading from \(host): \(amount)")
+            }
+            return String(localized: "Downloading from \(host): \(amount), about \(left) left")
         }
     }
 
@@ -48,7 +66,11 @@ enum PinnedDownload {
             report(.fetching(host: host))
             let body: URL, response: URLResponse
             do {
-                (body, response) = try await session.download(from: base.appending(path: file))
+                (body, response) = try await withoutActuallyEscaping(report) { report in
+                    let relay = ProgressRelay(host: host, report: report)
+                    defer { relay.finish() }
+                    return try await session.download(from: base.appending(path: file), delegate: relay)
+                }
             } catch {
                 refusals.append("\(host): \(error.localizedDescription)")
                 kinds.insert(.unreachable)
@@ -103,5 +125,50 @@ enum PinnedDownload {
             return String(localized: "Bridgeplay could not reach \(source)'s servers. Please check your internet connection and try again.")
         }
         return String(localized: "Bridgeplay could not download the files it needs from \(source). Please try again later.")
+    }
+}
+
+// Turns the task's byte count into .receiving reports, once per percent.
+private final class ProgressRelay: NSObject, URLSessionTaskDelegate, @unchecked Sendable {
+    private let host: String
+    // Dropped by finish(): the caller's closure only lives as long as the download.
+    private var report: (@Sendable (PinnedDownload.Progress) -> Void)?
+    private let started = Date()
+    private let lock = NSLock()
+    private var observation: NSKeyValueObservation?
+    private var shown = -1
+
+    init(host: String, report: @escaping @Sendable (PinnedDownload.Progress) -> Void) {
+        self.host = host
+        self.report = report
+    }
+
+    func urlSession(_ session: URLSession, didCreateTask task: URLSessionTask) {
+        let observation = task.progress.observe(\.completedUnitCount) { [weak self] progress, _ in
+            self?.update(received: progress.completedUnitCount, total: progress.totalUnitCount)
+        }
+        lock.withLock { self.observation = observation }
+    }
+
+    func finish() {
+        lock.withLock {
+            observation?.invalidate()
+            observation = nil
+            report = nil
+        }
+    }
+
+    private func update(received: Int64, total: Int64) {
+        guard total > 0, received <= total else { return }
+        let percent = Int(received * 100 / total)
+        let elapsed = Date().timeIntervalSince(started)
+        // A few seconds in, so the first estimate isn't wild.
+        let remaining = received > 0 && elapsed > 3 ? elapsed * Double(total - received) / Double(received) : nil
+        // Reported under the lock, so finish() can't drop the closure mid-call.
+        lock.withLock {
+            guard percent != shown, let report else { return }
+            shown = percent
+            report(.receiving(host: host, received: received, total: total, remaining: remaining))
+        }
     }
 }

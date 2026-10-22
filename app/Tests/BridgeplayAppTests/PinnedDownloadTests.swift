@@ -109,7 +109,8 @@ struct PinnedDownloadTests {
 
         #expect(!failure.detail.contains("could not reach"))
         #expect(failure.detail.contains(downloads.path(percentEncoded: false)))
-        #expect(reported.all.count == 1)
+        // One host tried; byte counts (" / ") follow it.
+        #expect(reported.all.filter { !$0.contains(" / ") }.count == 1)
     }
 
     @Test("A download has an overall deadline, not only an idle one")
@@ -202,7 +203,8 @@ struct PinnedDownloadTests {
         )
 
         let label = try #require(reported.all.first)
-        #expect(reported.all.count == 1)
+        // One host tried; byte counts (" / ") follow it.
+        #expect(reported.all.filter { !$0.contains(" / ") }.count == 1)
         #expect(label.hasPrefix("Downloading from "))
         #expect(label.contains(serving.lastPathComponent))
     }
