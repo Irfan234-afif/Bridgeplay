@@ -101,6 +101,8 @@ enum GameReport {
             (#"\[U:1:\d+\]"#, "[U:1:<redacted>]"),
             (#"[\w.+-]{1,64}@[\w-]{1,63}(\.[\w-]{1,63})+"#, "<email>"),
             (#"/Volumes/(?!Preboot/|Macintosh HD/)[^/\n:]+"#, "/Volumes/<drive>"),
+            // Wine's view of a home folder whose name differs from the account name.
+            (#"(?i)\b([A-Za-z]:\\+Users\\+)(?!(?:crossover|public|steamuser)\b)[^\\\s:'"]+"#, "$1<user>"),
         ]
         for name in [user] + computerNames where name.count >= 3 {
             text = text.replacingOccurrences(of: #"\b\#(NSRegularExpression.escapedPattern(for: name))\b"#,

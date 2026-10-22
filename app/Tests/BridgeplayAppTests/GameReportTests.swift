@@ -68,10 +68,11 @@ struct GameReportTests {
             STEAM_COMPAT_LIBRARY_PATHS=/Volumes/Tester's T7/SteamLibrary:/Volumes/Preboot/x
             host Testers-MacBook-Pro wrote to someone@example.com
             C:/users/crossover/AppData
+            could not open working directory L"Z:\\Users\\oldname\\Library" C:\\users\\crossover
             """
         let text = GameReport.redacted(raw, home: "/Users/tester", user: "tester",
                                        computerNames: ["Tester's MacBook Pro", "Testers-MacBook-Pro"])
-        for secret in ["player_one", "1002", "76561198012345678", "52079950", "tester", "Tester's T7",
+        for secret in ["oldname", "player_one", "1002", "76561198012345678", "52079950", "tester", "Tester's T7",
                        "Testers-MacBook-Pro", "someone@example.com"] {
             #expect(!text.contains(secret), "\(secret) is still in the log")
         }
