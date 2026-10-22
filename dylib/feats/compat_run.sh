@@ -1330,6 +1330,23 @@ note_prefix_volume() {
   notify_user "This Steam library is not on APFS" "It is formatted $fs. Games run from it may hang or fail to start. Move the game to a library on an APFS drive for the best results."
 }
 
+# Without C:\windows\system32 Wine stops at "could not load kernel32.dll" and the game quits
+# with no window. exFAT and FAT have no symbolic links, so dosdevices/c: cannot exist there.
+refuse_broken_prefix() {
+  [ ! -f "$WINEPREFIX/dosdevices/c:/windows/system32/kernel32.dll" ] || return 0
+  vol=$(volume_type "$STEAM_COMPAT_DATA_PATH") || vol=""
+  fs=${vol%% *}
+  echo "=== the prefix has no C:\\windows\\system32\\kernel32.dll, Wine did not finish building it ===" \
+    >> "$log" 2>&1 || true
+  case "$fs" in
+    exfat|msdos|ntfs)
+      show_alert "This Steam library cannot hold the game's prefix" "It is formatted $fs, which has no symbolic links, so Wine cannot set up the game here. Move the game to a library on an APFS drive." ;;
+    *)
+      show_alert "The game's prefix could not be set up" "Wine did not finish building it. Rebuild the prefix in Bridgeplay, then launch again. bridgeplay-run.log has the details." ;;
+  esac
+  return 1
+}
+
 # Steam keeps a game's prefix in the library that holds the game, so a game moved to another
 # library starts over with an empty one: saves and launcher sign-ins kept only in the old
 # prefix seem lost. Names the old one when a new prefix is about to be built.
@@ -2192,6 +2209,8 @@ if [ -n "$STEAM_COMPAT_DATA_PATH" ]; then
   # A prefix that Wine built just now only has dosdevices from this point on.
   stage_step="game drive"
   map_game_drive
+  stage_step="prefix check"
+  refuse_broken_prefix || exit 1
 fi
 
 stage_step="graphics backend"

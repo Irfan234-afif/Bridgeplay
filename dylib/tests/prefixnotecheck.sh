@@ -1,20 +1,22 @@
 #!/bin/sh
 # A new prefix names an older one for the same game in another Steam library, and every run
-# logs the file system of the library holding the prefix.
+# logs the file system of the library holding the prefix. A prefix Wine did not finish stops the launch.
 # shellcheck disable=SC2016 # the sh -ec program expands its own variables
 set -e
 SRC="${1:-$(dirname "$0")/../feats/compat_run.sh}"
 [ -f "$SRC" ] || { echo "prefixnotecheck: $SRC not present, skipped"; exit 0; }
 
-body=$(sed -n '/^volume_type() {/,/^}/p;/^note_prefix_volume() {/,/^}/p;/^steam_libraries() {/,/^}/p;/^note_other_prefixes() {/,/^}/p' "$SRC")
+body=$(sed -n '/^volume_type() {/,/^}/p;/^note_prefix_volume() {/,/^}/p;/^steam_libraries() {/,/^}/p;/^note_other_prefixes() {/,/^}/p;/^refuse_broken_prefix() {/,/^}/p' "$SRC")
 case "$body" in
-  *note_prefix_volume*note_other_prefixes*) ;;
+  *note_prefix_volume*refuse_broken_prefix*note_other_prefixes*) ;;
   *) echo "FAIL: the prefix notes were not found in $SRC"; exit 1 ;;
 esac
 body="$body"'
-notify_user() { printf "%s|%s\n" "$1" "$2" >> "$notes"; }'
+notify_user() { printf "%s|%s\n" "$1" "$2" >> "$notes"; }
+show_alert() { printf "%s|%s\n" "$1" "$2" >> "$notes"; }'
 
-work=$(cd "$(mktemp -d)" && pwd -P)
+# a failed mktemp must not leave work at the current folder, which the trap deletes
+work=$(mktemp -d) && work=$(cd "$work" && pwd -P) || exit 1
 trap 'rm -rf "$work"' EXIT
 
 fails=0
@@ -87,6 +89,29 @@ has "a new prefix on exFAT notifies" "This Steam library is not on APFS|It is fo
 run 1 ""
 has "an unknown file system is logged" "volume: compatdata on unknown" "$work/log"
 is "an unknown file system does not notify" "" "$(cat "$work/notes")"
+
+echo "== a prefix Wine did not finish"
+pfx="$two/steamapps/compatdata/42/pfx"
+check_prefix() { # check_prefix FS: prints the exit status
+	: > "$work/log"
+	: > "$work/notes"
+	env log="$work/log" notes="$work/notes" body="$body" fs="$1" WINEPREFIX="$pfx" \
+		STEAM_COMPAT_DATA_PATH="$two/steamapps/compatdata/42" \
+		sh -c 'eval "$body"; volume_type() { [ -z "$fs" ] || echo "$fs /Volumes/Drive"; }
+			refuse_broken_prefix; echo $?'
+}
+is "no dosdevices stops the launch" 1 "$(check_prefix apfs)"
+has "it is logged" "Wine did not finish building it" "$work/log"
+has "the player is told to rebuild" "The game's prefix could not be set up|Wine did not finish building it. Rebuild the prefix" "$work/notes"
+is "exFAT stops the launch" 1 "$(check_prefix exfat)"
+has "exFAT names the file system" "This Steam library cannot hold the game's prefix|It is formatted exfat" "$work/notes"
+mkdir -p "$pfx/drive_c/windows/system32" "$pfx/dosdevices"
+ln -s ../drive_c "$pfx/dosdevices/c:"
+is "C: without kernel32.dll stops the launch" 1 "$(check_prefix apfs)"
+: > "$pfx/drive_c/windows/system32/kernel32.dll"
+is "a finished prefix launches" 0 "$(check_prefix apfs)"
+is "a finished prefix says nothing" "" "$(cat "$work/notes" "$work/log")"
+rm -rf "$pfx/dosdevices" "$pfx/drive_c"
 
 echo "== the real mount table"
 real=$(env body="$body" sh -ec 'eval "$body"; volume_type /')
