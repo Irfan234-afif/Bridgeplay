@@ -2,6 +2,7 @@
 
 import BridgeplayUI
 import Foundation
+import Network
 import Observation
 
 enum PinnedDownload {
@@ -87,6 +88,9 @@ enum PinnedDownload {
                         } catch let error as URLError where attempt < 4 && error.downloadTaskResumeData != nil {
                             resumeData = error.downloadTaskResumeData
                             AppLog.note("\(file) from \(host) interrupted (\(error.localizedDescription)), resuming")
+                            // #279: a Wi-Fi drop spent every try within one second.
+                            await networkBack(within: .seconds(120))
+                            try await Task.sleep(for: .seconds(2 * attempt))
                         }
                     }
                     fatalError("unreachable")
@@ -130,6 +134,27 @@ enum PinnedDownload {
 
         AppLog.note("\(file) refused by all \(bases.count) hosts: \(refusals.joined(separator: ". "))")
         throw StepFailure(step: step, detail: reason(kinds, from: source))
+    }
+
+    /// Returns once macOS reports a usable network, or after `limit`.
+    static func networkBack(within limit: Duration) async {
+        let monitor = NWPathMonitor()
+        defer { monitor.cancel() }
+        let online = AsyncStream<Void> { stream in
+            monitor.pathUpdateHandler = { path in
+                if path.status == .satisfied { stream.yield(); stream.finish() }
+            }
+            monitor.start(queue: .global(qos: .utility))
+        }
+        await withTaskGroup(of: Void.self) { group in
+            group.addTask { for await _ in online { return } }
+            group.addTask { try? await Task.sleep(for: limit) }
+            await group.next()
+            group.cancelAll()
+        }
+        if monitor.currentPath.status != .satisfied {
+            AppLog.note("network still down after \(limit), trying anyway")
+        }
     }
 
     private enum Refusal {
