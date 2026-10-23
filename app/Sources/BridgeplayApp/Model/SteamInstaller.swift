@@ -332,13 +332,16 @@ enum SteamInstaller {
     static func refusalDetail(_ remedy: Remedy, deployed: Bool) -> String? {
         switch remedy {
         case .otherAccount: deployed ? mismatchAcrossAccounts : unpatchedAcrossAccounts
-        case .rootOwned: remedy.advice
+        case .rootOwned: deployed ? mismatchRootOwned + " " + remedy.advice : remedy.advice
         case .appManagement, .ownership: nil
         }
     }
 
     private static let mismatchAcrossAccounts =
         String(localized: "Steam has a different copy of Bridgeplay, installed by another account on this Mac. Update Bridgeplay from that account, then try again.")
+
+    private static let mismatchRootOwned =
+        String(localized: "Steam has a different copy of Bridgeplay, and this account cannot update it.")
 
     private static let unpatchedAcrossAccounts =
         String(localized: "Steam has not been set up for Bridgeplay, and this account cannot change it. Install from the account that owns Steam.")

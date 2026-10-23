@@ -8453,6 +8453,22 @@
         }
       }
     },
+    "Steam has a different copy of Bridgeplay, and this account cannot update it." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Steam ha una copia diversa di Bridgeplay e questo account non può aggiornarla."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Steam 中有另一份 Bridgeplay，而此账户无法更新它。"
+          }
+        }
+      }
+    },
     "Steam has a different copy of Bridgeplay, installed by another account on this Mac. Update Bridgeplay from that account, then try again." : {
       "localizations" : {
         "it" : {
@@ -9685,18 +9701,18 @@
         }
       }
     },
-    "This folder belongs to the system (root), not to your account, so Bridgeplay cannot change it. An administrator has to make your account its owner." : {
+    "This folder belongs to the system (root), and your account cannot write to it. Try again from an administrator account, or ask an administrator for help." : {
       "localizations" : {
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Questa cartella appartiene al sistema (root), non al tuo account, quindi Bridgeplay non può modificarla. Un amministratore deve rendere il tuo account proprietario."
+            "value" : "Questa cartella appartiene al sistema (root) e il tuo account non può scriverci. Riprova da un account amministratore oppure chiedi aiuto a un amministratore."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "此文件夹属于系统（root），而不是你的账户，因此 Bridgeplay 无法修改它。需要由管理员将其所有者改为你的账户。"
+            "value" : "此文件夹属于系统（root），你的账户无法写入。请使用管理员账户重试，或向管理员寻求帮助。"
           }
         }
       }
