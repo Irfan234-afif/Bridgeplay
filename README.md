@@ -15,6 +15,8 @@
   <a href="LICENSE"><img alt="License GPL-3.0" src="https://img.shields.io/badge/license-GPL--3.0-000?style=for-the-badge"></a>
 </p>
 
+> **Bridgeplay is a fork of [NotProton](https://github.com/NotProtonNot/NotProton)** by NotProtonNot. Games run on CodeWeavers' open-source Wine, the engine behind [CrossOver](https://www.codeweavers.com/crossover), and Apple's Game Porting Toolkit. I'm not affiliated with either. If CrossOver works for you, buy it: that money is a big part of what keeps Wine on the Mac moving. Bridgeplay is a hobby project I maintain part-time, so support is best-effort. Full list in [Credits](#credits) and [Support Wine](#support-wine).
+
 <br>
 
 <p align="center">
