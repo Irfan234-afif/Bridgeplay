@@ -292,7 +292,7 @@ struct FailureReportTests {
 
     @Test("A path root owns is not blamed on App Management")
     func rootOwnedBeatsAppManagement() throws {
-        #expect(Remedy(forPath: "/usr/bin") == .rootOwned(bundle: nil))
+        #expect(Remedy(forPath: "/usr/bin") == .rootOwned(handOver: nil))
         #expect(Remedy(forPath: "/usr/bin").settingsPane == nil)
     }
 

@@ -36,10 +36,15 @@ enum RemoveEverythingCommand {
 
     static func failureMessage(_ error: Error) -> String {
         guard let refused = error as? WriteRefused else { return error.localizedDescription }
-        // Only App Management names a different app here: the terminal, not Bridgeplay.
-        let advice = refused.remedy == .appManagement
-            ? "Allow your terminal app in System Settings > Privacy & Security > App Management, then run it again."
-            : refused.remedy.advice
+        // The app's advice, except where the command line asks for something else.
+        let advice = switch refused.remedy {
+        case .appManagement:
+            "Allow your terminal app in System Settings > Privacy & Security > App Management, then run it again."
+        case .otherAccount:
+            "Steam was installed by another account on this Mac. Run this again while logged in to that account."
+        case .rootOwned, .ownership:
+            refused.remedy.advice
+        }
         return "Could not write \(refused.path). \(advice)"
     }
 

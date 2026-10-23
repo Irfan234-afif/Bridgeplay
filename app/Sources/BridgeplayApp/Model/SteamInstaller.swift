@@ -353,7 +353,7 @@ enum SteamInstaller {
             try Data("probe".utf8).write(to: probe, options: .withoutOverwriting)
             try FileManager.default.removeItem(at: probe)
         } catch let error as NSError where error.code == NSFileWriteNoPermissionError {
-            throw WriteRefused(path: directory.path(percentEncoded: false))
+            throw WriteRefused(path: directory.path(percentEncoded: false), errno: WriteRefused.posixCode(of: error))
         } catch {
             throw StepFailure(
                 step: step,

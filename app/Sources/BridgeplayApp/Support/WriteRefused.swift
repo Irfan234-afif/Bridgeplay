@@ -8,9 +8,18 @@ struct WriteRefused: LocalizedError {
     // Worked out when the write fails, while the folder is as the write found it.
     let remedy: Remedy
 
-    init(path: String, remedy: Remedy? = nil) {
+    init(path: String, errno code: Int32? = nil, remedy: Remedy? = nil) {
         self.path = path
-        self.remedy = remedy ?? Remedy(forPath: path)
+        self.remedy = remedy ?? Remedy(forPath: path, errno: code)
+    }
+
+    static func posixCode(of error: Error) -> Int32? {
+        var current: NSError? = error as NSError
+        while let error = current {
+            if error.domain == NSPOSIXErrorDomain { return Int32(error.code) }
+            current = error.userInfo[NSUnderlyingErrorKey] as? NSError
+        }
+        return nil
     }
 
     var errorDescription: String? { String(localized: "Could not write files.") }
@@ -21,7 +30,7 @@ extension WriteRefused {
         do {
             return try body()
         } catch let error as NSError where error.code == NSFileWriteNoPermissionError {
-            throw WriteRefused(path: path)
+            throw WriteRefused(path: path, errno: posixCode(of: error))
         }
     }
 
@@ -35,9 +44,9 @@ extension WriteRefused {
 enum Remedy: Hashable {
     case appManagement
     case otherAccount
-    // Root owns it (MDM, `sudo cp`). Only a bundle gets a chown command: a root folder
-    // outside one may be /Applications itself, which nobody should take over.
-    case rootOwned(bundle: String?)
+    // Root owns it (MDM, `sudo cp`, `sudo make deploy`). Carries what a chown should cover,
+    // if anything: a root folder outside a bundle and the home may be /Applications itself.
+    case rootOwned(handOver: String?)
     case ownership
 
     var advice: String {
@@ -48,8 +57,8 @@ enum Remedy: Hashable {
             String(localized: "Bridgeplay needs the App Management permission. Turn on Bridgeplay in System Settings › Privacy & Security › App Management. After a Bridgeplay update the switch can look on but no longer work: turn it off and on again.")
         case .otherAccount:
             String(localized: "Steam was installed by another account on this Mac. Only that account can modify it. Log in to macOS with that account to reinstall Bridgeplay.")
-        case .rootOwned(let bundle?):
-            String(localized: "\(bundle) belongs to the system (root), not to your account, so Bridgeplay cannot change it. An administrator has to make your account its owner, for example by running this in Terminal: \(Self.chownCommand(bundle))")
+        case .rootOwned(let target?):
+            String(localized: "\(target) belongs to the system (root), not to your account, so Bridgeplay cannot change it. An administrator has to make your account its owner, for example by running this in Terminal: \(Self.chownCommand(target))")
         case .rootOwned(nil):
             String(localized: "This folder belongs to the system (root), and your account cannot write to it. Try again from an administrator account, or ask an administrator for help.")
         case .ownership: String(localized: "Check permissions, make sure your user owns the folder.")
@@ -82,47 +91,40 @@ enum Remedy: Hashable {
         NSWorkspace.shared.open(pane)
     }
 
-    struct Owner: Equatable {
-        var uid: uid_t
-        var gid: gid_t
-        var mode: Int
-
-        // The POSIX check: owner bits for the owner, group bits for a member, other bits otherwise.
-        func letsWrite(_ user: uid_t, groups: Set<gid_t>) -> Bool {
-            if uid == user { return mode & 0o200 != 0 }
-            if groups.contains(gid) { return mode & 0o020 != 0 }
-            return mode & 0o002 != 0
-        }
+    // What the lookup reads, swappable in tests.
+    struct Lookup {
+        var owner: (String) -> uid_t? = Remedy.owner(of:)
+        var writable: (String) -> Bool = { access($0, W_OK) == 0 }
+        var user: uid_t = getuid()
+        var home: String = NSHomeDirectory()
     }
 
-    static func owner(of path: String) -> Owner? {
-        let files = FileManager.default
+    static func owner(of path: String) -> uid_t? {
+        guard
+            let attributes = try? FileManager.default.attributesOfItem(atPath: path),
+            let owner = attributes[.ownerAccountID] as? NSNumber
+        else { return nil }
+        return uid_t(owner.uint32Value)
+    }
+
+    private static func plainPath(_ url: URL) -> String {
+        var path = url.path(percentEncoded: false)
+        if path.count > 1, path.hasSuffix("/") { path.removeLast() }
+        return path
+    }
+
+    // The folder whose permissions decide a create, rename or delete: the path when it is a
+    // folder, else the one it sits in.
+    static func folder(holding path: String) -> String? {
         let url = URL(filePath: path)
         for candidate in [url, url.deletingLastPathComponent()] {
-            guard
-                let attributes = try? files.attributesOfItem(
-                    atPath: candidate.path(percentEncoded: false)
-                ),
-                let uid = attributes[.ownerAccountID] as? NSNumber,
-                let gid = attributes[.groupOwnerAccountID] as? NSNumber,
-                let mode = attributes[.posixPermissions] as? NSNumber
-            else { continue }
-            return Owner(uid: uid_t(uid.uint32Value), gid: gid_t(gid.uint32Value), mode: mode.intValue)
+            var isDirectory: ObjCBool = false
+            if FileManager.default.fileExists(atPath: plainPath(candidate), isDirectory: &isDirectory),
+               isDirectory.boolValue {
+                return plainPath(candidate)
+            }
         }
         return nil
-    }
-
-    static func groups(of user: String = NSUserName(), primary: gid_t = getgid()) -> Set<gid_t> {
-        var size: Int32 = 64
-        while size <= 4096 {
-            var list = [Int32](repeating: 0, count: Int(size))
-            var count = size
-            if getgrouplist(user, Int32(bitPattern: primary), &list, &count) == 0 {
-                return Set(list.prefix(Int(count)).map { gid_t(bitPattern: $0) })
-            }
-            size *= 2
-        }
-        return [primary]
     }
 
     // The outermost one, so a refusal inside Steam Helper.app names Steam.app.
@@ -133,25 +135,36 @@ enum Remedy: Hashable {
         while directory.pathComponents.count > 1 {
             let plist = directory.appending(path: "Contents/Info.plist")
             if files.fileExists(atPath: plist.path(percentEncoded: false)) {
-                var bundle = directory.path(percentEncoded: false)
-                if bundle.count > 1, bundle.hasSuffix("/") { bundle.removeLast() }
-                outermost = bundle
+                outermost = plainPath(directory)
             }
             directory = directory.deletingLastPathComponent()
         }
         return outermost
     }
 
-    init(
-        forPath path: String,
-        owner: (String) -> Owner? = Remedy.owner(of:),
-        user: uid_t = getuid(),
-        groups: @autoclosure () -> Set<gid_t> = Remedy.groups()
-    ) {
-        // A folder the permissions let this account write was refused by App Management,
-        // whoever owns it (a root:admin 775 Steam.app, for an admin).
-        if let owner = owner(path), owner.uid != user, !owner.letsWrite(user, groups: groups()) {
-            self = owner.uid == 0 ? .rootOwned(bundle: Self.enclosingBundle(of: path)) : .otherAccount
+    // The outermost bundle, or the topmost folder root owns inside the home.
+    static func handOver(_ path: String, folder: String, lookup: Lookup) -> String? {
+        if let bundle = enclosingBundle(of: path) { return bundle }
+        let inside = lookup.home + "/"
+        guard folder.hasPrefix(inside) else { return nil }
+        var top = URL(filePath: folder)
+        while true {
+            let parent = plainPath(top.deletingLastPathComponent())
+            guard parent.hasPrefix(inside), lookup.owner(parent) == 0 else { break }
+            top = URL(filePath: parent)
+        }
+        return plainPath(top)
+    }
+
+    init(forPath path: String, errno code: Int32? = nil, lookup: Lookup = Lookup()) {
+        // EPERM is a policy refusing (App Management, a locked file), EACCES the permissions.
+        // Without a code, ask the system, which counts ACLs and every group.
+        if let folder = Self.folder(holding: path),
+           code.map({ $0 != EPERM }) ?? !lookup.writable(folder),
+           let owner = lookup.owner(folder), owner != lookup.user {
+            self = owner == 0
+                ? .rootOwned(handOver: Self.handOver(path, folder: folder, lookup: lookup))
+                : .otherAccount
             return
         }
         self = Self.enclosingBundle(of: path) == nil ? .ownership : .appManagement
@@ -165,7 +178,7 @@ enum Remedy: Hashable {
         let allRoot = !distinct.isEmpty && distinct.allSatisfy {
             if case .rootOwned = $0 { true } else { false }
         }
-        return allRoot ? .rootOwned(bundle: nil) : nil
+        return allRoot ? .rootOwned(handOver: nil) : nil
     }
 }
 
