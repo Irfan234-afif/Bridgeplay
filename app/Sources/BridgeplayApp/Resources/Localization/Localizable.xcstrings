@@ -81,6 +81,22 @@
         }
       }
     },
+    "%@ belongs to the system (root), not to your account, so Bridgeplay cannot change it. An administrator has to make your account its owner, for example by running this in Terminal: %@" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ appartiene al sistema (root), non al tuo account, quindi Bridgeplay non può modificarlo. Un amministratore deve rendere il tuo account proprietario, per esempio eseguendo questo comando nel Terminale: %@"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ 属于系统（root），而不是你的账户，因此 Bridgeplay 无法修改它。需要由管理员将其所有者改为你的账户，例如在“终端”中运行：%@"
+          }
+        }
+      }
+    },
     "%@ carries no entitlements to extend." : {
       "localizations" : {
         "it" : {
@@ -9665,6 +9681,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "这份 Bridgeplay 比 Steam 中的版本旧。请打开较新的 App。"
+          }
+        }
+      }
+    },
+    "This folder belongs to the system (root), not to your account, so Bridgeplay cannot change it. An administrator has to make your account its owner." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Questa cartella appartiene al sistema (root), non al tuo account, quindi Bridgeplay non può modificarla. Un amministratore deve rendere il tuo account proprietario."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "此文件夹属于系统（root），而不是你的账户，因此 Bridgeplay 无法修改它。需要由管理员将其所有者改为你的账户。"
           }
         }
       }

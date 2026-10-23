@@ -30,6 +30,9 @@ extension WriteRefused {
 enum Remedy: Hashable {
     case appManagement
     case otherAccount
+    // Root owns it (MDM, `sudo cp`). Only a bundle gets a chown command: a root folder
+    // outside one may be /Applications itself.
+    case rootOwned(bundle: String?)
     case ownership
 
     var advice: String {
@@ -40,8 +43,18 @@ enum Remedy: Hashable {
             String(localized: "Bridgeplay needs the App Management permission. Turn on Bridgeplay in System Settings › Privacy & Security › App Management. After a Bridgeplay update the switch can look on but no longer work: turn it off and on again.")
         case .otherAccount:
             String(localized: "Steam was installed by another account on this Mac. Only that account can modify it. Log in to macOS with that account to reinstall Bridgeplay.")
+        case .rootOwned(let bundle?):
+            String(localized: "\(bundle) belongs to the system (root), not to your account, so Bridgeplay cannot change it. An administrator has to make your account its owner, for example by running this in Terminal: \(Self.chownCommand(bundle))")
+        case .rootOwned(nil):
+            String(localized: "This folder belongs to the system (root), not to your account, so Bridgeplay cannot change it. An administrator has to make your account its owner.")
         case .ownership: String(localized: "Check permissions, make sure your user owns the folder.")
         }
+    }
+
+    // Names this account rather than $(whoami): the administrator may run it from their own.
+    static func chownCommand(_ path: String, user: String = NSUserName()) -> String {
+        func quoted(_ word: String) -> String { "'" + word.replacingOccurrences(of: "'", with: "'\\''") + "'" }
+        return "sudo chown -R \(quoted(user)) \(quoted(path))"
     }
 
     static let settingsButton = String(localized: "Open System Settings")
@@ -52,7 +65,7 @@ enum Remedy: Hashable {
     var settingsPane: URL? {
         switch self {
         case .appManagement: URL(string: Self.appManagementPane)
-        case .otherAccount, .ownership: nil
+        case .otherAccount, .rootOwned, .ownership: nil
         }
     }
 
@@ -77,23 +90,32 @@ enum Remedy: Hashable {
         return nil
     }
 
-    init(forPath path: String) {
-        if let owner = Self.owner(of: path), owner != getuid() {
-            self = .otherAccount
-            return
-        }
-
+    static func enclosingBundle(of path: String) -> String? {
         let files = FileManager.default
         var directory = URL(filePath: path)
         while directory.pathComponents.count > 1 {
             let plist = directory.appending(path: "Contents/Info.plist")
             if files.fileExists(atPath: plist.path(percentEncoded: false)) {
-                self = .appManagement
-                return
+                var bundle = directory.path(percentEncoded: false)
+                if bundle.count > 1, bundle.hasSuffix("/") { bundle.removeLast() }
+                return bundle
             }
             directory = directory.deletingLastPathComponent()
         }
-        self = .ownership
+        return nil
+    }
+
+    init(
+        forPath path: String,
+        owner: (String) -> uid_t? = Remedy.owner(of:),
+        user: uid_t = getuid()
+    ) {
+        let bundle = Self.enclosingBundle(of: path)
+        switch owner(path) {
+        case 0? where user != 0: self = .rootOwned(bundle: bundle)
+        case let other? where other != user: self = .otherAccount
+        default: self = bundle == nil ? .ownership : .appManagement
+        }
     }
 }
 

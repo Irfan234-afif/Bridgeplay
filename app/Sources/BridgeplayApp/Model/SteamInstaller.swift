@@ -321,13 +321,20 @@ enum SteamInstaller {
 
         do {
             try assertBundleIsWritable(app)
-        } catch let refusal as WriteRefused where refusal.remedy == .otherAccount {
-            throw StepFailure(
-                step: step,
-                detail: deployed ? Self.mismatchAcrossAccounts : Self.unpatchedAcrossAccounts
-            )
+        } catch let refusal as WriteRefused {
+            guard let detail = refusalDetail(refusal.remedy, deployed: deployed) else { throw refusal }
+            throw StepFailure(step: step, detail: detail)
         }
         return true
+    }
+
+    // What to say when Steam.app can't be written for a reason this account can't fix.
+    static func refusalDetail(_ remedy: Remedy, deployed: Bool) -> String? {
+        switch remedy {
+        case .otherAccount: deployed ? mismatchAcrossAccounts : unpatchedAcrossAccounts
+        case .rootOwned: remedy.advice
+        case .appManagement, .ownership: nil
+        }
     }
 
     private static let mismatchAcrossAccounts =

@@ -41,6 +41,10 @@ enum RemoveEverythingCommand {
             "Allow your terminal app in System Settings > Privacy & Security > App Management, then run it again."
         case .otherAccount:
             "Steam was installed by another account on this Mac. Run this again while logged in to that account."
+        case .rootOwned(let bundle?):
+            "\(bundle) belongs to root. Make your account its owner with: \(Remedy.chownCommand(bundle))"
+        case .rootOwned(nil):
+            "The folder belongs to root. An administrator has to make your account its owner."
         case .ownership:
             "Check permissions, make sure your user owns the folder."
         }
