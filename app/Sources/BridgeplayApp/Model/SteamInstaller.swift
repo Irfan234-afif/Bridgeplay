@@ -321,17 +321,27 @@ enum SteamInstaller {
 
         do {
             try assertBundleIsWritable(app)
-        } catch let refusal as WriteRefused where refusal.remedy == .otherAccount {
-            throw StepFailure(
-                step: step,
-                detail: deployed ? Self.mismatchAcrossAccounts : Self.unpatchedAcrossAccounts
-            )
+        } catch let refusal as WriteRefused {
+            guard let detail = refusalDetail(refusal.remedy, deployed: deployed) else { throw refusal }
+            throw StepFailure(step: step, detail: detail)
         }
         return true
     }
 
+    // What to say when Steam.app can't be written for a reason this account can't fix.
+    static func refusalDetail(_ remedy: Remedy, deployed: Bool) -> String? {
+        switch remedy {
+        case .otherAccount: deployed ? mismatchAcrossAccounts : unpatchedAcrossAccounts
+        case .rootOwned: deployed ? mismatchRootOwned + " " + remedy.advice : remedy.advice
+        case .appManagement, .ownership: nil
+        }
+    }
+
     private static let mismatchAcrossAccounts =
         String(localized: "Steam has a different copy of Bridgeplay, installed by another account on this Mac. Update Bridgeplay from that account, then try again.")
+
+    private static let mismatchRootOwned =
+        String(localized: "Steam has a different copy of Bridgeplay, and this account cannot update it.")
 
     private static let unpatchedAcrossAccounts =
         String(localized: "Steam has not been set up for Bridgeplay, and this account cannot change it. Install from the account that owns Steam.")
@@ -343,7 +353,7 @@ enum SteamInstaller {
             try Data("probe".utf8).write(to: probe, options: .withoutOverwriting)
             try FileManager.default.removeItem(at: probe)
         } catch let error as NSError where error.code == NSFileWriteNoPermissionError {
-            throw WriteRefused(path: directory.path(percentEncoded: false))
+            throw WriteRefused(path: directory.path(percentEncoded: false), errno: WriteRefused.posixCode(of: error))
         } catch {
             throw StepFailure(
                 step: step,
