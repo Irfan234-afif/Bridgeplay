@@ -74,6 +74,158 @@ struct SetupAssistantTests {
         defaults.set(true, forKey: SetupAssistant.finishedKey)
         #expect(!SetupAssistant.shouldShow(nil, defaults: defaults))
     }
+
+    // MARK: Making WineCX Steam's default
+
+    // Steam in this account, another account, or both. quits: whether it obeys steam://exit.
+    private final class FakeSteam: @unchecked Sendable {
+        private let lock = NSLock()
+        private var here: Bool
+        private let elsewhere: Bool
+        private let quits: Bool
+        private var asked = false
+
+        init(here: Bool, elsewhere: Bool = false, quits: Bool = true) {
+            self.here = here
+            self.elsewhere = elsewhere
+            self.quits = quits
+        }
+
+        var runningHere: Bool { lock.withLock { here } }
+        var askedToQuit: Bool { lock.withLock { asked } }
+
+        var client: SteamBundle.Client {
+            SteamBundle.Client(
+                runningAnywhere: { self.lock.withLock { self.here || self.elsewhere } },
+                runningHere: { self.runningHere },
+                askToQuit: { self.lock.withLock { self.asked = true; if self.quits { self.here = false } } },
+                requestQuit: {},
+                stuckExiting: { _ in false },
+                kill: {},
+                sweep: { _ in },
+                pause: {},
+                attempts: 2,
+                escalationAttempts: 1)
+        }
+    }
+
+    private static let config = """
+        "InstallConfigStore"
+        {
+        \t"Software"
+        \t{
+        \t\t"Valve"
+        \t\t{
+        \t\t\t"Steam"
+        \t\t\t{
+        \t\t\t}
+        \t\t}
+        \t}
+        }
+        """
+
+    private static let tool = "bridgeplay-proton-winecx-11.17"
+
+    // Runs the setup step against a temporary config.vdf; returns its text afterwards.
+    private func makeDefault(_ steam: FakeSteam, config: String? = config, runningBuild: String? = nil) throws -> String {
+        let dir = try folder()
+        let file = dir.appending(path: "config.vdf")
+        try config?.write(to: file, atomically: true, encoding: .utf8)
+        defer { try? FileManager.default.removeItem(at: dir) }
+        do {
+            try SetupAssistant.makeDefault(
+                Self.tool,
+                needsChange: { try SteamDefaultTool.needsChange(to: $0, in: file) },
+                steamOpen: { steam.runningHere },
+                runningBuild: { runningBuild },
+                stop: { try SteamBundle.stopClient(app: URL(filePath: "/tmp/Steam.app"), helpers: [], step: "Test", client: steam.client) },
+                write: { try SteamDefaultTool.set($0, in: file, backup: dir.appending(path: "backup.json"),
+                                                  steamRunning: { steam.runningHere }) })
+        } catch {
+            #expect((try? String(contentsOf: file, encoding: .utf8)) == config)
+            throw error
+        }
+        return try String(contentsOf: file, encoding: .utf8)
+    }
+
+    @Test("Setup quits this account's Steam, then writes the default")
+    func quitsSteamThenWritesDefault() throws {
+        let steam = FakeSteam(here: true)
+        let result = try makeDefault(steam)
+        #expect(steam.askedToQuit)
+        #expect(SteamDefaultTool.current(in: result)?.name == Self.tool)
+    }
+
+    @Test("With Steam closed, nothing is asked to quit and the default is written")
+    func closedSteamIsLeftAlone() throws {
+        let steam = FakeSteam(here: false)
+        let result = try makeDefault(steam)
+        #expect(!steam.askedToQuit)
+        #expect(SteamDefaultTool.current(in: result)?.name == Self.tool)
+    }
+
+    @Test("Steam open only in another account is left open, and this account's default is written")
+    func steamInAnotherAccount() throws {
+        let steam = FakeSteam(here: false, elsewhere: true)
+        let result = try makeDefault(steam)
+        #expect(!steam.askedToQuit)
+        #expect(SteamDefaultTool.current(in: result)?.name == Self.tool)
+    }
+
+    @Test("Steam open in both accounts: this account's is quit and its default is written")
+    func steamInBothAccounts() throws {
+        let steam = FakeSteam(here: true, elsewhere: true)
+        let result = try makeDefault(steam)
+        #expect(steam.askedToQuit)
+        #expect(SteamDefaultTool.current(in: result)?.name == Self.tool)
+    }
+
+    @Test("Without a config.vdf yet, Steam is still quit, since it may write one as it quits")
+    func noConfigYet() throws {
+        let steam = FakeSteam(here: true)
+        let error = #expect(throws: StepFailure.self) { try makeDefault(steam, config: nil) }
+        #expect(error?.detail.contains("no config.vdf") == true)
+        #expect(steam.askedToQuit)
+    }
+
+    @Test("A config.vdf without a Steam section fails without quitting Steam")
+    func brokenConfig() throws {
+        let steam = FakeSteam(here: true)
+        let error = #expect(throws: StepFailure.self) { try makeDefault(steam, config: "\"InstallConfigStore\"\n{\n}\n") }
+        #expect(error?.detail.contains("no InstallConfigStore") == true)
+        #expect(!steam.askedToQuit)
+    }
+
+    @Test("With Steam closed, a running Wine tool does not stop the default being written")
+    func wineToolWithSteamClosed() throws {
+        let steam = FakeSteam(here: false)
+        let result = try makeDefault(steam, runningBuild: "winecx-11.17")
+        #expect(SteamDefaultTool.current(in: result)?.name == Self.tool)
+    }
+
+    @Test("Steam is left open when WineCX is already its default")
+    func alreadyDefault() throws {
+        let steam = FakeSteam(here: true)
+        let config = try #require(SteamDefaultTool.updated(Self.config, tool: Self.tool))
+        #expect(try makeDefault(steam, config: config) == config)
+        #expect(!steam.askedToQuit)
+    }
+
+    @Test("A running game stops setup before Steam is quit, and nothing is written")
+    func runningGame() throws {
+        let steam = FakeSteam(here: true)
+        let error = #expect(throws: StepFailure.self) { try makeDefault(steam, runningBuild: "winecx-11.17") }
+        #expect(error?.detail.contains("winecx-11.17") == true)
+        #expect(!steam.askedToQuit)
+    }
+
+    @Test("Steam that does not quit stops setup with that reason and writes nothing")
+    func steamDoesNotQuit() throws {
+        let steam = FakeSteam(here: true, quits: false)
+        let error = #expect(throws: StepFailure.self) { try makeDefault(steam) }
+        #expect(error?.detail.hasPrefix("Steam did not quit.") == true)
+        #expect(steam.runningHere)
+    }
 }
 
 @Suite("Setup checks")

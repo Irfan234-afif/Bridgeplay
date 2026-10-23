@@ -67,10 +67,12 @@ final class SetupAssistant {
     var metalHUD = GameDefaults.isOn(.metalHUD)
     var highResolution = GameDefaults.isOn(.highResolution)
 
+    nonisolated static let defaultStep = String(localized: "Make WineCX Steam's default")
+
     static let plannedTasks = [
         SetupTask(id: "steam", title: String(localized: "Add Bridgeplay to Steam")),
         SetupTask(id: "engine", title: String(localized: "Set up the WineCX engine")),
-        SetupTask(id: "default", title: String(localized: "Make WineCX Steam's default")),
+        SetupTask(id: "default", title: defaultStep),
     ]
 
     // Set by the debug-only --setup-preview window: actions pretend instead of installing,
@@ -314,10 +316,10 @@ final class SetupAssistant {
         set("engine", .done)
 
         set("default", .running)
-        // pgrep and the config.vdf write stay off the main actor.
+        // Quitting Steam and the config.vdf write stay off the main actor.
         do {
             if let tool = FreeEngineWinecx.current.runner.tools.first?.name {
-                try await Task.detached(priority: .userInitiated) { try SteamDefaultTool.set(tool) }.value
+                try await Task.detached(priority: .userInitiated) { try Self.makeDefault(tool) }.value
             }
             set("default", .done)
         } catch is SteamDefaultTool.SteamRunning {
@@ -330,6 +332,31 @@ final class SetupAssistant {
 
         UserDefaults.standard.set(true, forKey: Self.finishedKey)
         step = .done
+    }
+
+    // Steam rewrites config.vdf when it quits, so this account's Steam is quit first, and
+    // only when the default changes. The "steam" task only quits it when it has files to
+    // replace. A Steam open in another account does not write this account's config.vdf.
+    nonisolated static func makeDefault(
+        _ tool: String,
+        needsChange: (String) throws -> Bool = { try SteamDefaultTool.needsChange(to: $0) },
+        steamOpen: () -> Bool = { SteamBundle.isRunningForThisUser },
+        runningBuild: () -> String? = {
+            RunnerStore.clonedBuilds().first { RunnerInstaller.isRunning(from: SupportPaths.runnerRoot(forBuild: $0)) }
+        },
+        stop: () throws -> Bool = { try SteamBundle.stopClient(step: defaultStep) },
+        write: (String) throws -> Void = { try SteamDefaultTool.set($0) }
+    ) throws {
+        guard try needsChange(tool) else { return }
+        // Quitting Steam can take a running game with it.
+        if steamOpen(), let build = runningBuild() {
+            throw StepFailure(step: defaultStep,
+                              detail: String(localized: "A game or Wine tool is still running on build \(build). Quit it first."))
+        }
+        do {
+            if try stop() { AppLog.note("setup: quit Steam to set its default compatibility tool") }
+        } catch is SteamBundle.OpenInAnotherAccount {}
+        try write(tool)
     }
 
     var notStarted: Bool { tasks.allSatisfy { $0.state == .waiting } }

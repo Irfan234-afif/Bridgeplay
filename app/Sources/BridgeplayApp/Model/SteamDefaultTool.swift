@@ -38,12 +38,7 @@ enum SteamDefaultTool {
         steamRunning: () -> Bool = { SteamBundle.isRunningForThisUser }
     ) throws {
         guard !steamRunning() else { throw SteamRunning() }
-        guard let text = try? String(contentsOf: file, encoding: .utf8) else {
-            throw StepFailure(step: step, detail: "Steam has no config.vdf yet. Open Steam once, log in, quit it and run this again.")
-        }
-        guard let result = updated(text, tool: tool) else {
-            throw StepFailure(step: step, detail: "config.vdf has no InstallConfigStore > Software > Valve > Steam section.")
-        }
+        let (text, result) = try planned(tool, in: file)
         guard result != text else { return }
         // A default that is already one of ours is not the user's, so the backup taken when
         // Bridgeplay first replaced theirs is kept.
@@ -53,6 +48,24 @@ enum SteamDefaultTool {
             try JSONEncoder().encode(Backup(previous: previous)).write(to: backup, options: .atomic)
         }
         try result.write(to: file, atomically: true, encoding: .utf8)
+    }
+
+    // Whether set() would write, so a caller can leave Steam open when it would not. A new
+    // Steam may write config.vdf only when it quits, so a missing one counts as a change.
+    static func needsChange(to tool: String, in file: URL = config) throws -> Bool {
+        guard FileManager.default.fileExists(atPath: file.path(percentEncoded: false)) else { return true }
+        let (text, result) = try planned(tool, in: file)
+        return result != text
+    }
+
+    private static func planned(_ tool: String, in file: URL) throws -> (text: String, result: String) {
+        guard let text = try? String(contentsOf: file, encoding: .utf8) else {
+            throw StepFailure(step: step, detail: "Steam has no config.vdf yet. Open Steam once, log in, quit it and run this again.")
+        }
+        guard let result = updated(text, tool: tool) else {
+            throw StepFailure(step: step, detail: "config.vdf has no InstallConfigStore > Software > Valve > Steam section.")
+        }
+        return (text, result)
     }
 
     // Puts back what set() replaced when the default is still one of Bridgeplay's tools: the
