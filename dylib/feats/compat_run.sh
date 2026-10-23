@@ -1133,7 +1133,7 @@ run_rebuild() {
     sleep 1
     waited=$((waited + 1))
     # Nothing holds the lock once the app is gone. The grace covers its startup.
-    if [ "$waited" -gt 30 ] && /usr/bin/lockf -s -t 0 "$rebuild_lock" true 2>/dev/null; then
+    if [ "$waited" -gt 30 ] && /usr/bin/lockf -k -s -t 0 "$rebuild_lock" true 2>/dev/null; then
       sleep 2
       [ -f "$rebuild_exit" ] || return 1
     fi
