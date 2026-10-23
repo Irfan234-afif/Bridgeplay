@@ -246,7 +246,7 @@ if [ "$run_checks" -eq 1 ] && [ -n "$fingerprint" ] && [ "${BRIDGEPLAY_FORCE_CHE
 	checks_reused=1
 fi
 
-# The app workflow runs the same make ci-checks on every push to main and beta, so a release
+# The app workflow runs the same make ci-checks on every push to main and dev, so a release
 # whose sources (version.h and docs aside) match a commit that workflow passed skips them
 # too: push, let CI pass, bump, release. Needs gh; without it, or with no passing run, the
 # checks run here. A docs-only run is green with its build and checks skipped, so a run

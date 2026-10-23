@@ -44,8 +44,8 @@ a newer install and leaves it alone. `VersioningTests` guards both.
 
 ## Betas
 
-The committed `BRIDGEPLAY_VERSION` is always a plain `X.Y.Z`, on `main` and on `beta`, so merging
-`main` into `beta` never conflicts over a version. A beta's label, build number and channel are
+The committed `BRIDGEPLAY_VERSION` is always a plain `X.Y.Z`, on `main` and on `dev`, so merging
+`main` into `dev` never conflicts over a version. A beta's label, build number and channel are
 stamped into the app at build time by `scripts/stamp-beta.sh` and never committed;
 `bump-version.sh`, `stamp-beta.sh` and `make app` refuse a beta label in `dylib/version.h`.
 
@@ -77,8 +77,8 @@ scripts/bump-version.sh patch --named 0.7.3 --highest-build 47    # minor --name
 `--named` fails the bump when it would land anywhere else, and `BRIDGEPLAY_HIGHEST_BUILD` can stand in
 for `--highest-build`. Without it the bump only knows the committed build, so give it the real maximum.
 
-Upstream merges go to `beta`: `scripts/sync-upstream.sh` merges and commits no version bump there
-(`BRIDGEPLAY_BETA_BRANCH` names the branch, default `beta`). On `main`, the exception for a security or
+Betas are built from `dev`, and upstream merges go there: `scripts/sync-upstream.sh` merges and
+commits no version bump on it (`BRIDGEPLAY_BETA_BRANCH` names the branch, default `dev`). On `main`, the exception for a security or
 crash hotfix from upstream, it still bumps the patch.
 
 `release-local.sh` does not publish betas: a stamped build no longer matches `dylib/version.h`, so
@@ -99,7 +99,7 @@ its version check stops it. `make versioncheck` covers the stamp, the bump and t
    `set X.Y.Z` takes any version above the committed one, such as `0.7.31` after `0.7.3` for a
    small follow-up. The numbers compare as integers, so `0.7.31` sorts above `0.7.4`: after it,
    go on with `0.7.32` (or `patch`) or a minor. Updates still order by the build, which goes up by one.
-   `scripts/sync-upstream.sh` already bumps the patch after an upstream merge on `main`; on `beta` it
+   `scripts/sync-upstream.sh` already bumps the patch after an upstream merge on `main`; on `dev` it
    commits no bump, see Betas.
 2. Push to `main` of `raymondchins/Bridgeplay` (the script refuses anything else).
 3. Optionally rehearse: `scripts/release-local.sh --dry-run` writes the zip, appcast and
