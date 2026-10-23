@@ -227,6 +227,44 @@ struct RunnerInstallerTests {
             runners.appending(path: ".crossover-\(build.id).new").path(percentEncoded: false)))
     }
 
+    @Test("A runner a game is using is not replaced")
+    func runningRunnerIsNotReplaced() throws {
+        let runners = try makeRunners()
+        defer { try? FileManager.default.removeItem(at: runners) }
+        let (install, build) = try makeSupportedInstall(in: runners)
+        _ = try RunnerInstaller.clone(from: install, runners: runners)
+        let installed = SupportPaths.clonedRoot(forBuild: build.id, runners: runners)
+        let marker = installed.appending(path: "in-use")
+        try Data().write(to: marker)
+
+        let failure = #expect(throws: StepFailure.self) {
+            try RunnerInstaller.clone(from: install, replacingExisting: true, runners: runners, running: { _ in true })
+        }
+        #expect(failure?.detail.contains("still running") == true)
+        #expect(FileManager.default.fileExists(atPath: marker.path(percentEncoded: false)))
+        for leftover in [".new", ".removing"] {
+            #expect(!FileManager.default.fileExists(atPath:
+                runners.appending(path: ".crossover-\(build.id)\(leftover)").path(percentEncoded: false)))
+        }
+    }
+
+    @Test("An idle runner is replaced and the old copy removed")
+    func idleRunnerIsReplaced() throws {
+        let runners = try makeRunners()
+        defer { try? FileManager.default.removeItem(at: runners) }
+        let (install, build) = try makeSupportedInstall(in: runners)
+        _ = try RunnerInstaller.clone(from: install, runners: runners)
+        let installed = SupportPaths.clonedRoot(forBuild: build.id, runners: runners)
+        let marker = installed.appending(path: "old-copy")
+        try Data().write(to: marker)
+
+        _ = try RunnerInstaller.clone(from: install, replacingExisting: true, runners: runners, running: { _ in false })
+        #expect(!FileManager.default.fileExists(atPath: marker.path(percentEncoded: false)))
+        try RunnerInstaller.verifyClone(build: build, root: installed)
+        #expect(!FileManager.default.fileExists(atPath:
+            runners.appending(path: ".crossover-\(build.id).removing").path(percentEncoded: false)))
+    }
+
     @Test("A rejected first copy is not left installed")
     func rejectedFirstCopyIsNotInstalled() throws {
         let runners = try makeRunners()
