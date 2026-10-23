@@ -60,11 +60,13 @@ struct RootView: View {
             }
             .safeAreaInset(edge: .bottom, spacing: 0) {
                 VStack(alignment: .leading, spacing: 10) {
+                    credits
                     libraryCard
                     Text(verbatim: ProductVersion.display)
                         .font(BP.sans(11, .medium))
                         .foregroundStyle(BP.fg3)
-                        .lineLimit(1)
+                        .lineLimit(2)
+                        .frame(maxWidth: .infinity, alignment: .leading)
                         .padding(.horizontal, 6)
                 }
                 .padding(.horizontal, 12)
@@ -111,6 +113,20 @@ struct RootView: View {
         .font(BP.sans(13))
         .tint(BP.blue)
         .preferredColorScheme(.dark)
+    }
+
+    private var credits: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text("Credits")
+                .font(BP.sans(11, .semibold))
+                .foregroundStyle(BP.fg2)
+            Text("A fork of [NotProton](https://github.com/NotProtonNot/NotProton), running on [CodeWeavers](https://www.codeweavers.com)' open-source Wine and Apple's Game Porting Toolkit.")
+            Text("If CrossOver works for you, [buy it](https://www.codeweavers.com/crossover) to support Wine.")
+        }
+        .font(BP.sans(11))
+        .foregroundStyle(BP.fg3)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, 6)
     }
 
     // The landing page's games marquee in miniature, under the hero line.
