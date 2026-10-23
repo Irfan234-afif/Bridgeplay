@@ -50,6 +50,11 @@ struct SetupPreviewApp: App {
         .defaultSize(width: 900, height: 760)
         .defaultLaunchBehavior(Self.mainFirst ? .presented : .suppressed)
         .restorationBehavior(.disabled)
+        .commands {
+            CommandGroup(replacing: .appInfo) {
+                Button("About Bridgeplay") { AboutPanel.show() }
+            }
+        }
     }
 }
 

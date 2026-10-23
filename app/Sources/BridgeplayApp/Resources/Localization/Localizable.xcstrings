@@ -2495,6 +2495,22 @@
         }
       }
     },
+    "Built on [NotProton](https://github.com/NotProtonNot/NotProton) and CodeWeavers' Wine.\nSupport Wine: [buy CrossOver](https://www.codeweavers.com/crossover)." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Basato su [NotProton](https://github.com/NotProtonNot/NotProton) e sul Wine di CodeWeavers.\nSostieni Wine: [acquista CrossOver](https://www.codeweavers.com/crossover)."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "基于 [NotProton](https://github.com/NotProtonNot/NotProton) 和 CodeWeavers 的 Wine。\n支持 Wine：[购买 CrossOver](https://www.codeweavers.com/crossover)。"
+          }
+        }
+      }
+    },
     "Built-in optical flow" : {
       "localizations" : {
         "it" : {
@@ -7618,6 +7634,22 @@
         }
       }
     },
+    "Runs on CodeWeavers' Wine and Apple's Game Porting Toolkit." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Funziona con il Wine di CodeWeavers e il Game Porting Toolkit di Apple."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "基于 CodeWeavers 的 Wine 和 Apple 的 Game Porting Toolkit 运行。"
+          }
+        }
+      }
+    },
     "Select a copy of CrossOver." : {
       "localizations" : {
         "it" : {
@@ -8901,6 +8933,22 @@
         }
       }
     },
+    "Support Wine: buy CrossOver" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sostieni Wine: acquista CrossOver"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "支持 Wine：购买 CrossOver"
+          }
+        }
+      }
+    },
     "Takes what did not move, like a HUD or a menu, straight from the real frame instead of warping it." : {
       "localizations" : {
         "it" : {
@@ -8977,6 +9025,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "模板 %@"
+          }
+        }
+      }
+    },
+    "Thanks to everyone who contributed on GitHub" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Grazie a tutti quelli che hanno contribuito su GitHub"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "感谢所有在 GitHub 上做出贡献的人"
           }
         }
       }

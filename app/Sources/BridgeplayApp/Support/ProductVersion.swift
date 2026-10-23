@@ -49,23 +49,32 @@ enum ProductVersion {
 @MainActor
 enum AboutPanel {
 
-    // The standard panel already reads "Version 2.0.0 (32)"; the credits line adds the
-    // upstream release.
+    // The standard panel already reads "Version 2.0.0 (32)"; the credits name what
+    // Bridgeplay is built on and point people to CrossOver, which funds Wine.
     static func show() {
-        var options: [NSApplication.AboutPanelOptionKey: Any] = [:]
-        if let upstream = ProductVersion.upstream {
-            let centered = NSMutableParagraphStyle()
-            centered.alignment = .center
-            options[.credits] = NSAttributedString(
-                string: "Based on NotProton \(upstream)",
-                attributes: [
-                    .font: NSFont.systemFont(ofSize: NSFont.smallSystemFontSize),
-                    .foregroundColor: NSColor.secondaryLabelColor,
-                    .paragraphStyle: centered,
-                ]
-            )
+        let centered = NSMutableParagraphStyle()
+        centered.alignment = .center
+        let base: [NSAttributedString.Key: Any] = [
+            .font: NSFont.systemFont(ofSize: NSFont.smallSystemFontSize),
+            .foregroundColor: NSColor.secondaryLabelColor,
+            .paragraphStyle: centered,
+        ]
+        let lines: [(text: String, link: String?)] = [
+            (ProductVersion.upstream.map { "Based on NotProton \($0)" } ?? "Based on NotProton",
+             "https://github.com/NotProtonNot/NotProton"),
+            (String(localized: "Runs on CodeWeavers' Wine and Apple's Game Porting Toolkit."), nil),
+            (String(localized: "Support Wine: buy CrossOver"), "https://www.codeweavers.com/crossover"),
+            (String(localized: "Thanks to everyone who contributed on GitHub"),
+             "https://github.com/raymondchins/Bridgeplay/graphs/contributors"),
+        ]
+        let credits = NSMutableAttributedString()
+        for line in lines {
+            if credits.length > 0 { credits.append(NSAttributedString(string: "\n", attributes: base)) }
+            var attributes = base
+            if let link = line.link { attributes[.link] = URL(string: link) }
+            credits.append(NSAttributedString(string: line.text, attributes: attributes))
         }
-        NSApp.orderFrontStandardAboutPanel(options: options)
+        NSApp.orderFrontStandardAboutPanel(options: [.credits: credits])
         NSApp.activate()
     }
 }

@@ -418,6 +418,12 @@ struct SetupAssistantView: View {
                 Button("Back") { go(forward: false) { model.back() } }
                     .buttonStyle(.pillPlain)
                     .disabled(model.isWorking)
+            } else {
+                // Shown once, where it can't be scrolled past.
+                Text("Built on [NotProton](https://github.com/NotProtonNot/NotProton) and CodeWeavers' Wine.\nSupport Wine: [buy CrossOver](https://www.codeweavers.com/crossover).")
+                    .font(BP.sans(12))
+                    .foregroundStyle(BP.fg3)
+                    .fixedSize(horizontal: false, vertical: true)
             }
             Spacer()
             if model.isWorking { ProgressView().controlSize(.small).padding(.trailing, 4) }
