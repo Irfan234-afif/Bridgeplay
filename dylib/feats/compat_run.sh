@@ -1903,7 +1903,7 @@ prefix_server_dir() {
   # Callers lsof and kill -9 whatever is open under this path: refuse a link or a folder
   # another macOS user planted in the shared /tmp.
   for owned in "/tmp/.wine-$(id -u)" \
-    "/tmp/.wine-$(id -u)/server-$(printf '%s' "$ids" | awk -F- '{printf "%x-%x", $1, $2}')"; do
+    "/tmp/.wine-$(id -u)/server-$(printf '%x-%x' "${ids%-*}" "${ids#*-}")"; do
     [ ! -L "$owned" ] || return 1
     [ ! -e "$owned" ] || [ "$(stat -f %u "$owned" 2>/dev/null)" = "$(id -u)" ] || return 1
   done
