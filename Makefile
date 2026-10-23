@@ -363,7 +363,7 @@ webpatch-fixtures:
 	if [ $$fail -eq 0 ]; then \
 		if command -v node >/dev/null 2>&1; then \
 			node dylib/tests/library-filter/behavior.js $$tmp/library.*.out.js || fail=1; \
-		else echo "==> library filter: node not found, skipped"; fi; \
+		else echo "==> webpatch-fixtures: library filter skipped, node not found"; fi; \
 	fi; \
 	rm -rf $$tmp; \
 	$(MAKE) -s $(NATIVEPLATFORMCHECK) && $(NATIVEPLATFORMCHECK) || fail=1; \
