@@ -336,8 +336,8 @@ job() { awk -v j="  $1:" '$0 == j { p = 1; next } p && /^  [a-z_-]+:$/ { exit } 
 has() { printf '%s\n' "$2" | grep -Fxq -- "$1"; }
 
 no "app.yml: no path filters" grep -Eq '^[[:space:]]*paths(-ignore)?:' "$app"
-eq "app.yml: push branches" "    branches: [main, beta]" "$(grep -E '^    branches:' "$app")"
-eq "lint.yml: push branches" "    branches: [main, beta]" "$(grep -E '^    branches:' "$lint")"
+eq "app.yml: push branches" "    branches: [main, dev]" "$(grep -E '^    branches:' "$app")"
+eq "lint.yml: push branches" "    branches: [main, dev]" "$(grep -E '^    branches:' "$lint")"
 yes "app.yml: runs on every pull request" grep -Fxq '  pull_request:' "$app"
 no "app.yml: pull requests not limited to a branch" awk '/^  pull_request:/ { p = 1; next } p && /^    branches/ { f = 1 } p && /^  [a-z_]+:/ { p = 0 } END { exit !f }' "$app"
 yes "lint.yml: runs on every pull request" grep -Fxq '  pull_request:' "$lint"
