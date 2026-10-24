@@ -20,7 +20,7 @@ steps from it.
 | `nvapi-shim/` | Windows `nvapi64.dll` that lets games use DLSS (answered by MetalFX) | Wine |
 | `overlay-shim/` | HDR, Metal 4 and frame generation | Game process |
 | `native-launch/`, `native-shim/` | Launch wrapper and gamepad shim for native Mac games | Native game process |
-| `helpers/` | Small tools the dylib and run script call (icons, app info, game host, shortcuts) | Command line |
+| `helpers/` | Small tools the dylib and run script call (icons, app info, shortcuts) | Command line |
 | `gamefixes/` | Per-game defaults, `<appid>.conf`. Format: [docs/GAMEFIXES.md](docs/GAMEFIXES.md) | Read by the run script |
 | `installer/`, `scripts/` | The `Install.command` installer, plus build, test and release scripts | — |
 | `fonts/`, `vendor/` | Proton's font build; vendored cJSON (Dobby is cloned, see [vendor/README.md](vendor/README.md)) | — |
