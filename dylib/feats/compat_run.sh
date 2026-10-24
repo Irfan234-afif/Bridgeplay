@@ -2652,7 +2652,7 @@ if [ -x "$loader_macos/wine" ]; then
   # A loader with com.apple.developer.* entitlements (CrossOver 27's, backed by a
   # provisioning profile in its own wine.app) is killed when run from the game's bundle,
   # so it runs where it is.
-  if codesign -d --entitlements - "$loader_macos/wine" 2>/dev/null | grep -q 'com\.apple\.developer\.'; then
+  if /usr/bin/codesign -d --entitlements - "$loader_macos/wine" 2>/dev/null | grep -q 'com\.apple\.developer\.'; then
     WINELOADER=$original_loader
     echo "loader needs its own wine.app; running the engine's own loader" >> "$log" 2>&1 || true
   else
