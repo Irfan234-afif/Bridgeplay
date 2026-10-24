@@ -9173,6 +9173,22 @@
         }
       }
     },
+    "Thanks to NotProton's contributors" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Grazie a chi ha contribuito a NotProton"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "感谢 NotProton 的所有贡献者"
+          }
+        }
+      }
+    },
     "Thanks to everyone who contributed on GitHub" : {
       "localizations" : {
         "it" : {

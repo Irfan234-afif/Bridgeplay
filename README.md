@@ -133,7 +133,16 @@ Online games with anti-cheat (Easy Anti-Cheat, BattlEye and others) often won't 
 
 ## Credits
 
-Bridgeplay is a fork of [NotProton](https://github.com/NotProtonNot/NotProton) (GPL-3.0), by way of Leon Seemann's NotProton-WineHQ (see [NOTICE](NOTICE)). It is built on CodeWeavers' [WineCX](https://www.codeweavers.com/crossover), as rebased by [dappermint](https://github.com/dappermint/winecx) and packaged with [winecx-gptk](https://github.com/dappermint/winecx-gptk), and on Apple's [Game Porting Toolkit](https://developer.apple.com/games/game-porting-toolkit/). `lsteamclient` and `steam.exe` come from Valve's [Proton](https://github.com/ValveSoftware/Proton). The DualSense Bluetooth bridge and Steam rumble forwarding come from [sn0wst0rm's NotProton fork](https://github.com/sn0wst0rm/NotProton). It also uses [Dobby](https://github.com/jmpews/Dobby) (Apache-2.0), [Sparkle](https://sparkle-project.org) (MIT), [DXMT](https://github.com/3Shain/dxmt) and [DXVK-macOS](https://github.com/Gcenx/DXVK-macOS).
+Bridgeplay is a fork of [NotProton](https://github.com/NotProtonNot/NotProton) by [NotProtonNot](https://github.com/NotProtonNot) and [its contributors](https://github.com/NotProtonNot/NotProton/graphs/contributors) (GPL-3.0), by way of [Leon Seemann](https://github.com/leonseemann)'s NotProton-WineHQ. The Steam hooks, the Steam Play interface patches, the run script and the steamclient bridge all started as their work. Copyright and license details are in [NOTICE](NOTICE).
+
+- **Engine:** CodeWeavers' [WineCX](https://www.codeweavers.com/crossover) (LGPL-2.1-or-later), as rebased by [dappermint](https://github.com/dappermint/winecx) and packaged with [winecx-gptk](https://github.com/dappermint/winecx-gptk).
+- **Graphics:** Apple's [Game Porting Toolkit](https://developer.apple.com/games/game-porting-toolkit/) (Apple's license), [DXMT](https://github.com/3Shain/dxmt) by 3Shain and [DXVK-macOS](https://github.com/Gcenx/DXVK-macOS) by Gcenx.
+- **Steam bridge:** `lsteamclient` and `steam.exe` come from Valve's [Proton](https://github.com/ValveSoftware/Proton).
+- **Controllers and Game Mode:** the DualSense Bluetooth bridge, Steam rumble forwarding and game-mode host were written by [sn0wst0rm](https://github.com/sn0wst0rm) ([sn0wst0rm/NotProton](https://github.com/sn0wst0rm/NotProton)).
+- **Libraries:** [Dobby](https://github.com/jmpews/Dobby) (Apache-2.0), [Sparkle](https://sparkle-project.org) (MIT), [SDL](https://www.libsdl.org) (zlib) and [cJSON](https://github.com/DaveGamble/cJSON) (MIT).
+- **Bridgeplay:** [everyone who has contributed](https://github.com/raymondchins/Bridgeplay/graphs/contributors).
+
+NotProton in turn thanks the people who came before it, among them Nat Brown's Kaon, mont127's Neutron and Gio's work on Steam Play in Mac Steam; see [docs/UPSTREAM.md](docs/UPSTREAM.md).
 
 ## Support Wine
 
