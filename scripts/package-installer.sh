@@ -139,6 +139,16 @@ mkdir -p "$stage/config/gamefixes-default"
 cp gamefixes/*.conf "$stage/config/gamefixes-default/"
 rsync -a --exclude .DS_Store "$GPTK_DIR/" "$stage/gptk/"
 cp "$ENGINE_CACHE/$winecx_rel" "$stage/cache/$winecx_rel"
+# The runtime bundles third-party libraries without their licence files, so the installer
+# names every one of them; NOTICE says which licences they fall under.
+# CEILING: lists files, not each library's own copyright notice — generate those from the
+# Homebrew formulae the runtime was built from, or get winecx-gptk to ship them upstream.
+{
+	echo "Libraries bundled in the WineCX runtime ($winecx_rel)."
+	echo "Licences and the written offer for source code: see NOTICE."
+	echo
+	tar -tzf "$stage/cache/$winecx_rel" | grep -E '\.(dylib|so)$' | sed 's#.*/##' | sort -u
+} >"$stage/WINECX-RUNTIME-LIBRARIES.txt" || die "could not list the WineCX runtime's libraries"
 cp "$ENGINE_CACHE/engines/$dxmt_archive" "$ENGINE_CACHE/engines/$dxvk_archive" "$stage/cache/engines/"
 
 # Valve's software is downloaded from Valve on the user's Mac, never shipped.

@@ -38,7 +38,8 @@ setup. Each is built from CodeWeavers' winecx source, as rebased by dappermint
 (https://github.com/dappermint/winecx) and packaged as a runtime by
 https://github.com/dappermint/winecx-gptk, with a patch from this repository.
 Wine is licensed under the GNU Lesser General Public License, version 2.1 or
-later (LGPL-2.1-or-later); these files keep that license. Build recipes and
+later (LGPL-2.1-or-later); these files keep that license. Wine's license notice
+and the LGPL-2.1 text ship in the app as LICENSE.wine. Build recipes and
 sha256 pins are in docs/WINECX.md and each patch directory's README.
 
   WineCX 11.17 (winecx e0aa380780b73e20fabcfe78fd42713b94929a53, runtime 4.7.3):
@@ -82,6 +83,13 @@ in app/Sources/BridgeplayApp/Model/FreeEngine*.swift) when they are not there.
       Wine built from https://github.com/dappermint/winecx at
       e0aa380780b73e20fabcfe78fd42713b94929a53, LGPL-2.1-or-later, with the
       third-party libraries that runtime bundles under their own licenses.
+      WINECX-RUNTIME-LIBRARIES.txt in the installer lists every one of them. Most
+      are under the LGPL or permissive licenses. Some are under the GNU GPL: FFmpeg
+      (libavcodec, libpostproc and the rest, built with --enable-gpl
+      --enable-version3, so GPL-3.0-or-later), x264, x265, libdvdcss, libdvdread
+      and libdvdnav (GPL-2.0-or-later); the GPL-3.0 text is LICENSE. libfdk-aac is
+      under the Fraunhofer FDK AAC license, shipped as LICENSE.fdk-aac. The LGPL-2.1
+      text is LICENSE.wine.
   DXMT (dxmt-e94c312.tar.gz, built from https://github.com/3Shain/dxmt at
       e94c312f5c054263acf261cfa109edf13e757587; docs/DXMT.md), Copyright (c)
       2023-2026 Feifan He for CodeWeavers, LGPL-2.1-or-later.
@@ -99,7 +107,8 @@ in app/Sources/BridgeplayApp/Model/FreeEngine*.swift) when they are not there.
       under the offer below. How each condition of Apple's license is met:
       docs/GPTK-LICENSE.md.
 
-The license texts of DXMT and DXVK ship next to these archives in the installer.
+The license texts of DXMT, DXVK and libfdk-aac ship next to these archives in the
+installer.
 
 Written offer for source code: the Corresponding Source of each binary above is
 the upstream source at the commit named above plus the patch or file named next
@@ -107,8 +116,12 @@ to it, all of which are public: winecx at https://github.com/dappermint/winecx,
 Wine 11.15 at https://dl.winehq.org/wine/source/11.x/, DXMT at
 https://github.com/3Shain/dxmt, DXVK-macOS at https://github.com/Gcenx/DXVK-macOS,
 and the patches in this repository (https://github.com/raymondchins/Bridgeplay).
-This offer covers every LGPL-licensed file Bridgeplay or its installer ships,
-including the unmodified WineCX runtime and DXMT above. For at least three years
+The WineCX runtime's third-party libraries are built from their upstream
+releases, as packaged by https://github.com/dappermint/winecx-gptk at the
+runtime tag above.
+This offer covers every LGPL- or GPL-licensed file Bridgeplay or its installer
+ships, including the unmodified WineCX runtime, its bundled libraries and DXMT
+above. For at least three years
 after the last release that ships them, Raymond Chin will also provide that source
 on request, for no more than the cost of providing it; open an issue at
 https://github.com/raymondchins/Bridgeplay/issues.

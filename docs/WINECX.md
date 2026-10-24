@@ -31,7 +31,9 @@ Compared with the WineHQ 11.15 engine it adds:
   round trips that slow down CPU-heavy games.
 - **D3DMetal support** through CrossOver's hooks (winemac `macdrv_functions`, the
   `libd3dshared` non-native code regions in ntdll, and the d3dkmt answers). This only works
-  with a Game Porting Toolkit you install yourself. Bridgeplay never downloads or ships it.
+  with Apple's Game Porting Toolkit: the one-click installer ships its redistributables
+  under Apple's non-commercial license ([GPTK-LICENSE.md](GPTK-LICENSE.md)). The app links
+  that copy or one you install yourself, and never downloads it.
 - **DXMT master and DXVK-macOS 1.10.3** as backends a game opts into. DXMT is the same
   `e94c312` build as the WineHQ engine ([DXMT.md](DXMT.md)), not the archive's 0.80. The
   builtin Direct3D is Wine's own, or D3DMetal once a Game Porting Toolkit is linked.
