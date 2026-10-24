@@ -2341,7 +2341,17 @@ stage_step="graphics backend"
 select_backend "$1"
 activate_backend || true
 record_backend || true
-graphics_log "backend=$backend ($backend_from)"
+# An engine without lib/notproton-backends (CrossOver) picks its graphics itself, from
+# CX_GRAPHICS_BACKEND, so the log names that choice, not the dxmt-builtin placeholder.
+if [ "$backend" = dxmt-builtin ]; then
+  engine_backend=$(printf '%s' "${CX_GRAPHICS_BACKEND:-}" | tr '[:upper:]' '[:lower:]')
+  case "$engine_backend" in
+    d3dmetal|dxmt|dxvk|wined3d) graphics_log "backend=$engine_backend (CX_GRAPHICS_BACKEND, applied by the engine)" ;;
+    *) graphics_log "backend=engine-default (the engine picks its own graphics, CX_GRAPHICS_BACKEND is not set)" ;;
+  esac
+else
+  graphics_log "backend=$backend ($backend_from)"
+fi
 compose_dll_overrides
 [ -z "$backend_overrides" ] || graphics_log "backend overrides $backend_overrides"
 
@@ -2659,12 +2669,16 @@ for f in "$wine_unix"/*; do
 done
 ln "$WINELOADER" "$loader_macos/wine" 2>/dev/null || cp "$WINELOADER" "$loader_macos/wine"
 game_host=""
+original_loader=$WINELOADER
 if [ -x "$loader_macos/wine" ]; then
   WINELOADER="$loader_app/Contents/MacOS/wine"
   if "$np_support/prepare-game-loader" "$loader_macos/wine" "$loader_contents/Info.plist" >> "$log" 2>&1; then
     game_host="$np_support/game-host.dylib"
   else
-    echo "embedded loader metadata unsupported; keeping original launcher behavior" >> "$log" 2>&1 || true
+    # A loader whose signature depends on its own wine.app (CrossOver 27's provisioning
+    # profile) is killed when run from the game's bundle, so run it where it is.
+    WINELOADER=$original_loader
+    echo "embedded loader metadata unsupported; running the engine's own loader" >> "$log" 2>&1 || true
   fi
   echo "loader staged in bundle for game mode" >> "$log" 2>&1 || true
 else
