@@ -117,6 +117,11 @@ cicheck:
 	@if [ ! -f scripts/tests/cicheck.sh ]; then $(call SKIP,cicheck,scripts/tests/cicheck.sh); exit 0; fi; \
 	sh scripts/tests/cicheck.sh
 
+# Validate batch exit statuses without starting games.
+.PHONY: np-test-batch-check
+np-test-batch-check:
+	@sh scripts/tests/np-test-batch.sh
+
 .PHONY: seedcheck
 seedcheck:
 	@if [ ! -f dylib/tests/seedcheck.sh ]; then $(call SKIP,seedcheck,dylib/tests/seedcheck.sh); exit 0; fi; \
@@ -874,7 +879,7 @@ native-shim-tests:
 # and CI gate on one list. Each check runs even when an earlier one failed.
 # overlay-shim-tests is left out: it needs a Metal GPU and real frame timing.
 CI_CHECKS := mincheck l10ncheck \
-	sigcheck callscheck webpatch-fixtures peicon-fixtures panel-behavior spawn-env \
+	sigcheck callscheck np-test-batch-check webpatch-fixtures peicon-fixtures panel-behavior spawn-env \
 	activatecheck compatcheck compatsvc-check prefixstate-check shortcutcheck launch-shell envcheck \
 	buildcheck settingscheck routecheck bridgecheck envpasscheck prefixnotecheck powernotecheck exitcheck gamedrivecheck launchercheck \
 	seedcheck gamefixescheck versioncheck cicheck padcheck compat-reported-check np-native-tests native-shim-tests \
