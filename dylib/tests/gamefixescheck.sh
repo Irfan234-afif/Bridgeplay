@@ -6,7 +6,7 @@ SRC="${1:-$(dirname "$0")/../feats/compat_run.sh}"
 
 functions=""
 for name in gamefix_log valid_dll_overrides gamefix_reason gamefix_read gamefix_apply_env \
-	load_gamefixes resolve_msync graphics_log d3dmetal_engine backend_dlls managed_dlls backend_available \
+	load_gamefixes resolve_overlay resolve_msync graphics_log d3dmetal_engine backend_dlls managed_dlls backend_available \
 	backend_record pe_word pe_words pe_rva_offset imports_d3d12 select_backend stage_backend_file restore_stock_dll \
 	activate_backend record_backend compose_dll_overrides; do
 	body=$(sed -n "/^$name() {\$/,/^}\$/p" "$SRC")
@@ -116,7 +116,7 @@ launch() {
 			eval "$bridge_line"
 			for v in backend WINEDLLOVERRIDES WINEMSYNC msync_from NOTPROTON_RETINA NOTPROTON_FRAMEGEN \
 				NOTPROTON_FRAMEGEN_QUALITY NOTPROTON_FRAMEGEN_UI NOTPROTON_FRAMEGEN_FALLBACK NOTPROTON_FRAMEGEN_ENGINE CX_GRAPHICS_BACKEND \
-				DXVK_HUD VKD3D_CONFIG WINEDEBUG MTL_HUD_ENABLED D3DM_VENDOR_ID D3DM_DEVICE_ID D3DM_DEVICE_DESCRIPTION NOTPROTON_NGX_SIGNER NOTPROTON_DRIVER_VERSION CX_ACTIVE_GRAPHICS_BACKEND NOTPROTON_VSYNC NOTPROTON_HIDE_WINE_EXPORTS CX_FWD_COMPAT_GL_CTX gamefix_args; do
+				DXVK_HUD VKD3D_CONFIG WINEDEBUG MTL_HUD_ENABLED D3DM_VENDOR_ID D3DM_DEVICE_ID D3DM_DEVICE_DESCRIPTION NOTPROTON_NGX_SIGNER NOTPROTON_DRIVER_VERSION CX_ACTIVE_GRAPHICS_BACKEND NOTPROTON_VSYNC NOTPROTON_HIDE_WINE_EXPORTS NOTPROTON_OVERLAY CX_FWD_COMPAT_GL_CTX gamefix_args; do
 				eval "printf \"%s=%s\\n\" \$v \"\${$v-<unset>}\""
 			done
 		' launch "$target" > "$case_dir/out" 2>&1 || echo "launch exited $?" >> "$case_dir/out"
@@ -401,6 +401,16 @@ is "VSYNC=1 asks the overlay shim to keep the layer on display sync" "1" "$(got 
 user_conf 'HIDE_WINE_EXPORTS=1'
 launch waitforexitandrun "$case_dir/game/game.exe"
 is "HIDE_WINE_EXPORTS=1 hides ntdll's wine_* exports from GetProcAddress" "1" "$(got NOTPROTON_HIDE_WINE_EXPORTS)"
+user_conf 'OVERLAY=0'
+launch waitforexitandrun "$case_dir/game/game.exe"
+is "OVERLAY=0 reaches the launch as NOTPROTON_OVERLAY" "0" "$(got NOTPROTON_OVERLAY)"
+user_conf 'OVERLAY=0'
+launch waitforexitandrun "$case_dir/game/game.exe" BRIDGEPLAY_OVERLAY=1
+is "a launch option's BRIDGEPLAY_OVERLAY wins over the conf" "1" "$(got NOTPROTON_OVERLAY)"
+user_conf 'OVERLAY=yes'
+launch waitforexitandrun "$case_dir/game/game.exe"
+is "OVERLAY=yes is refused" "<unset>" "$(got NOTPROTON_OVERLAY)"
+has "and says why" "rejected OVERLAY: not 0 or 1" "$case_dir/log"
 user_conf 'NVAPI=1' 'BACKEND=dxmt'
 launch waitforexitandrun "$case_dir/game/game.exe"
 is "but not for dxmt" "d3d10core,d3d11,dxgi=n,b;d3d10,d3d12=b;nvapi64,nvngx=d;$trio" "$(got WINEDLLOVERRIDES)"
@@ -588,6 +598,24 @@ is "no conf leaves the quality to the shim" "<unset>" "$(got NOTPROTON_FRAMEGEN_
 
 # The stub reports NOTPROTON_OVERLAY_SHIM, set beside DYLD_INSERT_LIBRARIES, since SIP strips DYLD_* from /bin/sh.
 # Without SIP (GitHub runners) dyld does load the shim into /bin/sh, so it is a real, empty arm64e dylib.
+echo "== OVERLAY=0 drops the overlay renderer, and the shim rides out with it"
+staged=/tmp/steamloader.dylib:/tmp/gameoverlayrenderer.dylib
+overlay_run() {
+	: > "$work/overlay.log"
+	env -i PATH="$PATH" functions="$functions" log="$work/overlay.log" \
+		STEAM_DYLD_INSERT_LIBRARIES="$staged" "$@" \
+		sh -ec 'eval "$functions"; resolve_overlay
+			printf "%s" "${STEAM_DYLD_INSERT_LIBRARIES:-<empty>}"'
+}
+is "no OVERLAY key keeps what the client staged" "$staged" "$(overlay_run)"
+has "and logs the injection" "overlay injected from" "$work/overlay.log"
+is "OVERLAY=1 keeps it too" "$staged" "$(overlay_run NOTPROTON_OVERLAY=1)"
+is "OVERLAY=0 clears it, so the launcher inserts neither" "<empty>" "$(overlay_run NOTPROTON_OVERLAY=0)"
+has "and says the shim stays out with it" "overlay dropped by OVERLAY=0" "$work/overlay.log"
+has "and reports the overlay disabled" "client staged no overlay renderer" "$work/overlay.log"
+overlay_run NOTPROTON_OVERLAY=0 >/dev/null
+lacks "without claiming an injection" "overlay injected from" "$work/overlay.log"
+
 echo "== the launcher loads the shim for frame generation unless it is off"
 mkdir -p "$work/launcher/Contents/MacOS" "$work/launcher/home/Library/Application Support/bridgeplay"
 clang -dynamiclib -arch arm64e -arch arm64 -arch x86_64 -x c /dev/null \

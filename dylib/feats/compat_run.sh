@@ -411,7 +411,7 @@ gamefix_reason() {
   case "$1" in
     BACKEND)
       case "$2" in dxmt|dxvk|wined3d|d3dmetal) ;; *) echo "not dxmt, dxvk, wined3d or d3dmetal" ;; esac ;;
-    MSYNC|RETINA|NVAPI|DLSS_FG|STDOUT_NULL|VSYNC|HIDE_WINE_EXPORTS|FRAMEGEN_UI|FRAMEGEN_FALLBACK|STEAMDECK)
+    MSYNC|RETINA|NVAPI|DLSS_FG|STDOUT_NULL|VSYNC|HIDE_WINE_EXPORTS|FRAMEGEN_UI|FRAMEGEN_FALLBACK|STEAMDECK|OVERLAY)
       case "$2" in 0|1) ;; *) echo "not 0 or 1" ;; esac ;;
     FRAMEGEN)
       # 1 is the 2x of the first release.
@@ -457,7 +457,7 @@ gamefix_read() {
     fi
     # The keys that set a BRIDGEPLAY_ variable also take its full name: BRIDGEPLAY_RETINA=1 is RETINA=1.
     case "$key" in
-      BRIDGEPLAY_STDOUT_NULL|BRIDGEPLAY_VSYNC|BRIDGEPLAY_RETINA|BRIDGEPLAY_FRAMEGEN|BRIDGEPLAY_FRAMEGEN_?*)
+      BRIDGEPLAY_STDOUT_NULL|BRIDGEPLAY_VSYNC|BRIDGEPLAY_RETINA|BRIDGEPLAY_OVERLAY|BRIDGEPLAY_FRAMEGEN|BRIDGEPLAY_FRAMEGEN_?*)
         key=${key#BRIDGEPLAY_} ;;
     esac
     value=${line#*=}
@@ -511,6 +511,7 @@ load_gamefixes() {
           gamefix_log "ARGS not applied, $verb is not the game launch"
         fi ;;
       RETINA) gamefix_apply_env NOTPROTON_RETINA "$value" "$from" ;;
+      OVERLAY) gamefix_apply_env NOTPROTON_OVERLAY "$value" "$from" ;;
       # Steam reads SteamDeck in mixed case, which a conf key cannot spell.
       STEAMDECK) gamefix_apply_env SteamDeck "$value" "$from" ;;
       FRAMEGEN|FRAMEGEN_QUALITY|FRAMEGEN_UI|FRAMEGEN_FALLBACK|FRAMEGEN_ENGINE)
@@ -518,6 +519,24 @@ load_gamefixes() {
       *) gamefix_apply_env "$key" "$value" "$from" ;;
     esac
   done
+}
+
+# OVERLAY=0 drops the overlay renderer the client staged. The launcher inserts the overlay
+# shim beside that renderer, or on its own only for frame generation, so dropping the
+# renderer leaves the shim out too. For a game whose simulation follows the frame rate,
+# the overlay's per-frame work is the difference between full speed and half: eFootball
+# (1665460) locks its match to 60 fps and runs in slow motion under it.
+resolve_overlay() {
+  if [ "${NOTPROTON_OVERLAY:-1}" = 0 ] && [ -n "$STEAM_DYLD_INSERT_LIBRARIES" ]; then
+    STEAM_DYLD_INSERT_LIBRARIES=""
+    echo "=== overlay dropped by OVERLAY=0, the overlay shim stays out with it ===" \
+      >> "$log" 2>&1 || true
+  fi
+  if [ -n "$STEAM_DYLD_INSERT_LIBRARIES" ]; then
+    echo "=== overlay injected from $STEAM_DYLD_INSERT_LIBRARIES ===" >> "$log" 2>&1 || true
+  else
+    echo "=== client staged no overlay renderer, overlay disabled ===" >> "$log" 2>&1 || true
+  fi
 }
 
 # Launch options > gamefix MSYNC > an engine with msync > the prefix's last choice > off.
@@ -2781,11 +2800,7 @@ if [ -n "$gamefix_args" ]; then
   set -- "$@" $gamefix_args
   echo "gamefix: game arguments are now: $*" >> "$log" 2>&1 || true
 fi
-if [ -n "$STEAM_DYLD_INSERT_LIBRARIES" ]; then
-  echo "=== overlay injected from $STEAM_DYLD_INSERT_LIBRARIES ===" >> "$log" 2>&1 || true
-else
-  echo "=== client staged no overlay renderer, overlay disabled ===" >> "$log" 2>&1 || true
-fi
+resolve_overlay
 set -- --args "$shim_exe" "$@"
 for name in $(env | LC_ALL=C sed -nE 's/^(CX_APPLEGPTK_LIBD3DSHARED_PATH|SDL_GAMECONTROLLERCONFIG(_FILE)?|SDL_JOYSTICK_MFI|WINE_LARGE_ADDRESS_AWARE|WINE_CPU_TOPOLOGY|CX_FWD_COMPAT_GL_CTX|Steam[A-Za-z0-9]*|(CX_GRAPHICS|D3DM_|DXMT_|DXVK_|FEX_|MVK_|VKD3D_|STAGING_|MTL_|ROSETTA_)[A-Z0-9_]*|NOTPROTON_FRAMEGEN(_[A-Z]+)?|NOTPROTON_NGX_SIGNER|NOTPROTON_NVAPI_DRIVER|NOTPROTON_DRIVER_VERSION|NOTPROTON_STDOUT_NULL|NOTPROTON_VSYNC|NOTPROTON_HIDE_WINE_EXPORTS|CX_ACTIVE_GRAPHICS_BACKEND)=.*/\1/p'); do
   eval "value=\$$name"
