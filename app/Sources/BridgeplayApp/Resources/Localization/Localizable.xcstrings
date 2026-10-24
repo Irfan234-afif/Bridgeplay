@@ -4402,6 +4402,22 @@
         }
       }
     },
+    "Found. Set it up in Status to run games on your licensed CrossOver." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Trovato. Configuralo in Stato per avviare i giochi con il tuo CrossOver con licenza."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已找到。在“状态”中设置后，即可用你已授权的 CrossOver 运行游戏。"
+          }
+        }
+      }
+    },
     "Frame Generation (Experimental. Adds input lag)" : {
       "localizations" : {
         "it" : {
@@ -4542,6 +4558,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "常规"
+          }
+        }
+      }
+    },
+    "Get CrossOver" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ottieni CrossOver"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "获取 CrossOver"
           }
         }
       }
@@ -6034,6 +6066,22 @@
         }
       }
     },
+    "Online games with anti-cheat often won't start, and Bridgeplay can't promise that anti-cheat won't flag it. Play online and competitive games at your own risk." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "I giochi online con anti-cheat spesso non si avviano, e Bridgeplay non può garantire che l'anti-cheat non lo segnali. Giochi online e competitivi sono a tuo rischio."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "带反作弊的在线游戏经常无法启动，Bridgeplay 也无法保证反作弊不会将其标记。在线和竞技游戏请自行承担风险。"
+          }
+        }
+      }
+    },
     "Only on native Mac games, next to Metal HUD and Frame Generation. Raw HID suits Unity, SDL and Unreal games, GameController uses Apple's framework, and Off leaves controllers alone." : {
       "localizations" : {
         "it" : {
@@ -6238,6 +6286,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "游戏叠加层适配组件"
+          }
+        }
+      }
+    },
+    "Own CrossOver? Bridgeplay finds it in Applications and can run games on it. Buying it funds Wine." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hai CrossOver? Bridgeplay lo trova in Applicazioni e può avviare i giochi con esso. Acquistarlo finanzia Wine."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已有 CrossOver？Bridgeplay 会在“应用程序”中找到它，并可用它运行游戏。购买 CrossOver 可以资助 Wine。"
           }
         }
       }

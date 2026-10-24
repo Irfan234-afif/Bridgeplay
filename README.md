@@ -100,7 +100,7 @@ The installer includes Apple's Game Porting Toolkit redistributables under Apple
 
 Bridgeplay runs inside the native macOS Steam client and registers itself as a Steam Play compatibility tool. Under the hood:
 
-- **Engine:** CodeWeavers' open-source WineCX 11.17 with MSync, running under Rosetta 2.
+- **Engine:** CodeWeavers' open-source WineCX 11.17 with MSync, running under Rosetta 2. Bridgeplay does not include CrossOver: its free engine is built from the LGPL source CodeWeavers publishes ([dappermint/winecx](https://github.com/dappermint/winecx)). If you own CrossOver, Bridgeplay can run games on your copy instead.
 - **Graphics:** Apple's Game Porting Toolkit 4.0 beta 3 (D3DMetal). It is not stored in this repository; the installer ships its redistributables under Apple's non-commercial license (see Install). DXMT and DXVK are available for games that prefer them.
 - **Extras:** NVAPI/NGX routing for DLSS on MetalFX, in-process frame generation on `CAMetalLayer`, per-game Game Mode, Retina back buffers and a controller layer for HID pads.
 
@@ -115,6 +115,10 @@ Building from source: see [docs/DEVELOPING.md](docs/DEVELOPING.md), [docs/ARCHIT
 Bridgeplay modifies your Steam app. To turn on Steam Play for Windows games, it copies a library (`notproton.dylib`) into `/Applications/Steam.app`, sets Steam's `Info.plist` so Steam loads that library at startup, and re-signs Steam on your Mac with a local signature, which replaces Valve's. The library hooks Steam's compatibility tool, shortcut and launch option code, and changes Steam's interface in memory to show Steam Play. Games run in Wine with Proton's lsteamclient, which passes Steam API calls to your Mac Steam.
 
 Valve does not support or endorse Bridgeplay, and modifying the Steam client may go against the [Steam Subscriber Agreement](https://store.steampowered.com/subscriber_agreement/). Use it at your own risk. **Repair Steam** and **Remove Everything** on the Status page put Steam's original `Info.plist` back, and reinstalling Steam from Valve restores Valve's signature.
+
+## Online games and anti-cheat
+
+Online games with anti-cheat (Easy Anti-Cheat, BattlEye and others) often won't start under Wine. For games that do start, Bridgeplay can't promise that anti-cheat, VAC included, won't flag it, so play online and competitive games at your own risk. The [compatibility list](compat/README.md) shows what other players found.
 
 ## Credits
 
