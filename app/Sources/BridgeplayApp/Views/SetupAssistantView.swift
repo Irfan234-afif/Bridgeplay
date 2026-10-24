@@ -188,7 +188,7 @@ struct SetupAssistantView: View {
     @ViewBuilder
     private var graphicsStep: some View {
         StepHeader(step: model.step, title: "Add Apple's game graphics",
-                   detail: "Apple's Game Porting Toolkit includes D3DMetal, which runs DirectX 11 and 12 games on Metal, with MetalFX upscaling. It's free, but only Apple can hand it out, so you download it once with your Apple Account.")
+                   detail: "Apple's Game Porting Toolkit (D3DMetal) runs DirectX 11 and 12 games on Metal. The installer includes it under Apple's non-commercial license, or link your own copy from Apple.")
         SetupCard {
             if let gptk = model.gptk {
                 WizardRow(row: StatusRow(title: String(localized: "Game Porting Toolkit"),
@@ -235,8 +235,8 @@ struct SetupAssistantView: View {
                    detail: "Sign in with your account in Steam. Bridgeplay continues on its own once you're in.")
         // Above the rows, so it is read before the Set Up step patches Steam.
         VStack(alignment: .leading, spacing: 6) {
-            Text("Bridgeplay modifies Steam.app. It adds a library that Steam loads at startup and re-signs Steam on this Mac. Valve doesn't support this, and it may go against Steam's terms. Repair Steam or Remove Everything on the Status page undoes it.")
-            Text("Online games with anti-cheat often won't start, and Bridgeplay can't promise that anti-cheat won't flag it. Play online and competitive games at your own risk.")
+            Text("Bridgeplay adds a library to Steam.app and re-signs Steam on this Mac. Valve doesn't support this, and it may go against Steam's terms. Repair Steam in Status undoes it.")
+            Text("Online games with anti-cheat often won't start and may flag Bridgeplay. Play them at your own risk.")
         }
         .font(BP.sans(12))
         .foregroundStyle(BP.fg3)
@@ -252,7 +252,7 @@ struct SetupAssistantView: View {
                       ) { Task { await model.installSteam() } }))
             SetupHairline()
             checked(1, StatusRow(title: String(localized: "Steam account"),
-                      value: model.signedIn ? String(localized: "Signed in.") : String(localized: "Waiting for you to sign in. Bridgeplay never sees your password."),
+                      value: model.signedIn ? String(localized: "Signed in.") : String(localized: "Waiting for you to sign in to Steam. Bridgeplay doesn't read or store your password."),
                       tone: model.signedIn ? .ok : .info,
                       action: model.signedIn || !model.steamInstalled ? nil : StatusAction(label: String(localized: "Open Steam"), isProminent: true) { model.openSteam() }))
             SetupHairline()
@@ -346,10 +346,10 @@ struct SetupAssistantView: View {
     private var crossOverRow: StatusRow {
         let title = String(localized: "CrossOver")
         if CrossOverSource.discover().contains(where: \.isUsable) {
-            return StatusRow(title: title, value: String(localized: "Found. Set it up in Status to run games on your licensed CrossOver."), tone: .ok)
+            return StatusRow(title: title, value: String(localized: "Found. Set it up in Status to play on it."), tone: .ok)
         }
         return StatusRow(title: title,
-                         value: String(localized: "Own CrossOver? Bridgeplay finds it in Applications and can run games on it. Buying it funds Wine."),
+                         value: String(localized: "Own CrossOver? Bridgeplay can run games on it. Buying it funds Wine."),
                          tone: .neutral,
                          action: StatusAction(label: String(localized: "Get CrossOver")) {
                              NSWorkspace.shared.open(URL(string: "https://www.codeweavers.com/crossover")!)
