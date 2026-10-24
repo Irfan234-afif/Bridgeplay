@@ -129,7 +129,7 @@ Valve doesn't support or endorse Bridgeplay, and modifying Steam may go against 
 
 ## Online games and anti-cheat
 
-Online games with anti-cheat (Easy Anti-Cheat, BattlEye and others) often won't start, and Bridgeplay can't promise that anti-cheat, VAC included, won't flag it. Play online at your own risk. The [compatibility list](compat/README.md) shows what other players found.
+Online games with anti-cheat (Easy Anti-Cheat, BattlEye and others) often won't start, and Bridgeplay can't promise that anti-cheat, VAC included, won't flag it. Counter-Strike 2 and Dota 2 run, but VAC keeps them off its secure servers. Play online at your own risk. The [compatibility list](compat/README.md) shows what other players found.
 
 ## Credits
 
