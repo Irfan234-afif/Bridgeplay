@@ -249,6 +249,12 @@ struct SetupAssistantView: View {
             SetupHairline()
             checked(2, trustRow)
         }
+        // Shown before the Set Up step patches Steam.
+        Text("Bridgeplay modifies Steam.app. It adds a library that Steam loads at startup and re-signs Steam on this Mac. Valve doesn't support this, and it may go against Steam's terms. Repair Steam or Remove Everything on the Status page undoes it.")
+            .font(BP.sans(12))
+            .foregroundStyle(BP.fg3)
+            .fixedSize(horizontal: false, vertical: true)
+            .padding(.horizontal, 2)
     }
 
     // Optional: Continue does not wait for it. No password is asked for.

@@ -70,7 +70,7 @@ To add yours: after you play, Bridgeplay asks once per game *How did it run?* On
 
 1. **Download the installer** from [bridgeplay.dev](https://bridgeplay.dev): `Bridgeplay-Setup.zip`, under 1 MB. It fetches Bridgeplay, Apple's graphics, the engine and Steam (from Valve, if missing) as it installs, and checks every download against Bridgeplay's signature.
 2. **Open Bridgeplay Installer.** macOS blocks it the first time: `READ ME FIRST.html` in the download shows the three clicks, Done, then **Open Anyway** in **System Settings > Privacy & Security**, then confirm with your password or Touch ID. It needs an admin account.
-3. **Follow the Setup Assistant**: Rosetta, graphics, Steam sign-in and a couple of standard macOS prompts.
+3. **Follow the Setup Assistant**: Rosetta, graphics, Steam sign-in and a couple of standard macOS prompts. Setup modifies your Steam app; see [What Bridgeplay changes in Steam](#what-bridgeplay-changes-in-steam).
 4. **Press Play** on any Windows game in Steam. The first time you use a controller, allow Steam's Input Monitoring request.
 
 Each game's Bridgeplay settings (graphics backend, Metal HUD, DLSS, frame generation, controllers) are in Steam: right-click the game, **Properties… › Bridgeplay**.
@@ -109,6 +109,12 @@ Bridgeplay runs inside the native macOS Steam client and registers itself as a S
 </p>
 
 Building from source: see [docs/DEVELOPING.md](docs/DEVELOPING.md), [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) and [docs/BUILD-LOCAL.md](docs/BUILD-LOCAL.md). The one-click installer lives in [`installer/`](installer/) and is packaged by `scripts/package-installer.sh`.
+
+## What Bridgeplay changes in Steam
+
+Bridgeplay modifies your Steam app. To turn on Steam Play for Windows games, it copies a library (`notproton.dylib`) into `/Applications/Steam.app`, sets Steam's `Info.plist` so Steam loads that library at startup, and re-signs Steam on your Mac with a local signature, which replaces Valve's. The library hooks Steam's compatibility tool, shortcut and launch option code, and changes Steam's interface in memory to show Steam Play. Games run in Wine with Proton's lsteamclient, which passes Steam API calls to your Mac Steam.
+
+Valve does not support or endorse Bridgeplay, and modifying the Steam client may go against the [Steam Subscriber Agreement](https://store.steampowered.com/subscriber_agreement/). Use it at your own risk. **Repair Steam** and **Remove Everything** on the Status page put Steam's original `Info.plist` back, and reinstalling Steam from Valve restores Valve's signature.
 
 ## Credits
 

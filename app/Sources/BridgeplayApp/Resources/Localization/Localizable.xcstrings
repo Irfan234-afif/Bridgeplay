@@ -2351,6 +2351,22 @@
         }
       }
     },
+    "Bridgeplay modifies Steam.app. It adds a library that Steam loads at startup and re-signs Steam on this Mac. Valve doesn't support this, and it may go against Steam's terms. Repair Steam or Remove Everything on the Status page undoes it." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bridgeplay modifica Steam.app. Aggiunge una libreria che Steam carica all'avvio e rifirma Steam su questo Mac. Valve non lo supporta e potrebbe andare contro i termini di Steam. Ripara Steam o Rimuovi tutto nella pagina Stato annullano la modifica."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bridgeplay 会修改 Steam.app：添加一个 Steam 启动时加载的库，并在这台 Mac 上重新签名 Steam。Valve 不支持这种做法，这可能违反 Steam 的条款。在状态页面使用“修复 Steam”或“全部移除”即可撤销。"
+          }
+        }
+      }
+    },
     "Bridgeplay needs the App Management permission. Turn on Bridgeplay in System Settings › Privacy & Security › App Management. After a Bridgeplay update the switch can look on but no longer work: turn it off and on again." : {
       "localizations" : {
         "it" : {
