@@ -143,7 +143,8 @@ bridgecheck:
 	sh dylib/tests/bridgecheck.sh dylib/feats/compat_run.sh
 
 envpasscheck:
-	@if [ ! -f dylib/tests/envpasscheck.sh ]; then $(call SKIP,envpasscheck,dylib/tests/envpasscheck.sh); exit 0; fi; \
+	@if [ ! -f dylib/tests/envpasscheck.sh ]; then \
+		$(call SKIP,envpasscheck,dylib/tests/envpasscheck.sh); exit 0; fi; \
 	sh dylib/tests/envpasscheck.sh dylib/feats/compat_run.sh
 
 prefixnotecheck:
